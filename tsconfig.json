@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "noEmit": true,
+    "paths": {
+      "@tdesign/ai-shared": ["packages/shared/index.ts"],
+      "@tdesign/ai-shared/*": ["packages/shared/*"],
+      "@tdesign/ai-chat-engine": ["packages/chat-engine/index.ts"],
+      "@tdesign/ai-chat-engine/*": ["packages/chat-engine/*"]
+    }
+  },
+  "include": [
+    "packages/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/dist",
+    "**/*.test.ts"
+  ]
+}

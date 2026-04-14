@@ -1,0 +1,22 @@
+{
+  "name": "@tdesign/ai-chat-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TDesign ChatEngine - Framework-agnostic AI chat engine core",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./*": "./*.ts"
+  },
+  "files": ["**/*.ts", "!**/*.test.ts"],
+  "dependencies": {
+    "@tdesign/ai-shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "immer": "^10.0.0"
+  },
+  "peerDependencies": {
+    "immer": ">=9.0.0"
+  }
+}

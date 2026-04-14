@@ -1,0 +1,30 @@
+{
+  "name": "@tdesign/ai-core",
+  "private": true,
+  "description": "TDesign AIGC framework-agnostic core SDKs",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint packages --ext .ts",
+    "clean": "pnpm -r run clean"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Tencent/tdesign-ai-core.git"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "packageManager": "pnpm@9.15.9",
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "immer": "^10.0.0"
+  },
+  "dependencies": {
+    "@tdesign/ai-chat-engine": "workspace:*",
+    "@tdesign/ai-shared": "workspace:*"
+  }
+}

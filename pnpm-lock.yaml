@@ -1,0 +1,58 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@tdesign/ai-chat-engine':
+        specifier: workspace:*
+        version: link:packages/chat-engine
+      '@tdesign/ai-shared':
+        specifier: workspace:*
+        version: link:packages/shared
+    devDependencies:
+      immer:
+        specifier: ^10.0.0
+        version: 10.2.0
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
+  packages/chat-engine:
+    dependencies:
+      '@tdesign/ai-shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      immer:
+        specifier: ^10.0.0
+        version: 10.2.0
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
+  packages/shared:
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
+packages:
+
+  immer@10.2.0:
+    resolution: {integrity: sha512-d/+XTN3zfODyjr89gM3mPq1WNX2B8pYsu7eORitdwyA2sBubnTl3laYlBk4sXY5FUa5qTZGBDPJICVbvqzjlbw==}
+
+  typescript@5.9.3:
+    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
+snapshots:
+
+  immer@10.2.0: {}
+
+  typescript@5.9.3: {}
