@@ -26,6 +26,8 @@
   },
   "dependencies": {
     "@tdesign/ai-chat-engine": "workspace:*",
-    "@tdesign/ai-shared": "workspace:*"
+    "@tdesign/ai-shared": "workspace:*",
+    "@json-render/core": "^0.17.0",
+    "zod": "^4.3.6"
   }
 }

@@ -8,12 +8,18 @@ importers:
 
   .:
     dependencies:
+      '@json-render/core':
+        specifier: ^0.17.0
+        version: 0.17.0(zod@4.3.6)
       '@tdesign/ai-chat-engine':
         specifier: workspace:*
         version: link:packages/chat-engine
       '@tdesign/ai-shared':
         specifier: workspace:*
         version: link:packages/shared
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       immer:
         specifier: ^10.0.0
@@ -30,6 +36,9 @@ importers:
       '@tdesign/ai-shared':
         specifier: workspace:*
         version: link:../shared
+      zod:
+        specifier: '3'
+        version: 3.25.76
     devDependencies:
       immer:
         specifier: ^10.0.0
@@ -217,6 +226,11 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@json-render/core@0.17.0':
+    resolution: {integrity: sha512-8woFjU0RZqxDvJ9E1vxv21uv1lcXEGut/tcVWiVsduds3pcX3tCv5xKSjREjew/yS061CGjFAPr5vozYS39whg==}
+    peerDependencies:
+      zod: ^4.0.0
 
   '@rollup/rollup-android-arm-eabi@4.60.1':
     resolution: {integrity: sha512-d6FinEBLdIiK+1uACUttJKfgZREXrF0Qc2SmLII7W2AD8FfiZ9Wjd+rD/iRuf5s5dWrr1GgwXCvPqOuDquOowA==}
@@ -549,6 +563,12 @@ packages:
   ufo@1.6.3:
     resolution: {integrity: sha512-yDJTmhydvl5lJzBmy/hyOAA0d+aqCBuwl818haVdYCRrWV84o7YyeVm4QlVHStqNrrJSTb6jKuFAVqAFsr+K3Q==}
 
+  zod@3.25.76:
+    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+
+  zod@4.3.6:
+    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+
 snapshots:
 
   '@esbuild/aix-ppc64@0.27.7':
@@ -642,6 +662,10 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@json-render/core@0.17.0(zod@4.3.6)':
+    dependencies:
+      zod: 4.3.6
 
   '@rollup/rollup-android-arm-eabi@4.60.1':
     optional: true
@@ -932,3 +956,7 @@ snapshots:
   typescript@5.9.3: {}
 
   ufo@1.6.3: {}
+
+  zod@3.25.76: {}
+
+  zod@4.3.6: {}

@@ -21,7 +21,7 @@ import type {
   ConnectParams,
   ConnectChallengePayload,
 } from './types';
-import { mergeOpenClawConfig, DEFAULT_OPENCLAW_CONFIG } from './types/config';
+import { mergeOpenClawConfig } from './types/config';
 import { OpenClawEventType, OpenClawConnectionState } from './types/events';
 import {
   generateUUID,

@@ -5,10 +5,10 @@
  */
 
 const _hasOwnProperty = Object.prototype.hasOwnProperty;
-export function hasOwnProperty(obj, key) {
+export function hasOwnProperty(obj: any, key: string | number) {
     return _hasOwnProperty.call(obj, key);
 }
-export function _objectKeys(obj) {
+export function _objectKeys(obj: any) {
     if (Array.isArray(obj)) {
         const keys = new Array(obj.length);
         for (let k = 0; k < keys.length; k++) {
@@ -33,7 +33,7 @@ export function _objectKeys(obj) {
 * @param  {any} obj value to clone
 * @return {any} cloned obj
 */
-export function _deepClone(obj) {
+export function _deepClone(obj: any) {
     switch (typeof obj) {
         case "object":
             return JSON.parse(JSON.stringify(obj)); //Faster than ES5 clone - http://jsperf.com/deep-cloning-of-objects/5
@@ -76,7 +76,7 @@ export function unescapePathComponent(path: string): string {
     return path.replace(/~1/g, '/').replace(/~0/g, '~');
 }
 
-export function _getPathRecursive(root: Object, obj: Object): string {
+export function _getPathRecursive(root: Record<string, any>, obj: any): string {
     let found;
     for (let key in root) {
         if (hasOwnProperty(root, key)) {
@@ -94,7 +94,7 @@ export function _getPathRecursive(root: Object, obj: Object): string {
     return '';
 }
 
-export function getPath(root: Object, obj: Object): string {
+export function getPath(root: Record<string, any>, obj: any): string {
     if (root === obj) {
         return '/';
     }
@@ -146,7 +146,7 @@ export type JsonPatchErrorName = 'SEQUENCE_NOT_AN_ARRAY' |
     'OPERATION_VALUE_OUT_OF_BOUNDS' |
     'TEST_OPERATION_FAILED';
 
-function patchErrorMessageFormatter(message: String, args: Object): string {
+function patchErrorMessageFormatter(message: string, args: Record<string, any>): string {
     const messageParts = [message];
     for (const key in args) {
         const value = typeof args[key] === 'object' ? JSON.stringify(args[key], null, 2) : args[key]; // pretty print

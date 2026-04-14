@@ -22,7 +22,7 @@ export default class MessageProcessor {
     this.registerDefaultHandlers();
   }
 
-  public createUserMessage(content, attachments?: AttachmentItem[]): ChatMessagesData {
+  public createUserMessage(content: string, attachments?: AttachmentItem[]): ChatMessagesData {
     const messageContent: UserMessage['content'] = [
       {
         type: 'text',

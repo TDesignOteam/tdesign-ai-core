@@ -5,7 +5,7 @@
  * 同时负责发布 AG-UI 细粒度事件（AGUI_ACTIVITY / AGUI_TOOLCALL）
  */
 import type { AGUIAdapter } from '../adapters/agui';
-import type { AIMessageContent, SSEChunkData } from '../type';
+import type { AIMessageContent, ChatRequestParams, SSEChunkData } from '../type';
 import { ChatEngineEventType } from '../event-bus';
 import { LLMService } from '../server';
 import type { IStreamHandler, StreamContext } from './types';
@@ -19,7 +19,7 @@ export class AGUIStreamHandler implements IStreamHandler {
     this.aguiAdapter = aguiAdapter;
   }
 
-  async handleStream(params, context: StreamContext): Promise<void> {
+  async handleStream(params: ChatRequestParams, context: StreamContext): Promise<void> {
     const { messageId, config } = context;
 
     await this.llmService.handleStreamRequest(params, {

@@ -14,7 +14,11 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
-  "files": ["dist", "**/*.ts", "!**/*.test.ts"],
+  "files": [
+    "dist",
+    "**/*.ts",
+    "!**/*.test.ts"
+  ],
   "scripts": {
     "build": "tsup",
     "clean": "rimraf dist"
@@ -36,12 +40,13 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@tdesign/ai-shared": "workspace:*"
+    "@tdesign/ai-shared": "workspace:*",
+    "zod": "3"
   },
   "devDependencies": {
-    "typescript": "^5.5.0",
     "immer": "^10.0.0",
-    "tsup": "^8.5.0"
+    "tsup": "^8.5.0",
+    "typescript": "^5.5.0"
   },
   "peerDependencies": {
     "immer": ">=9.0.0"

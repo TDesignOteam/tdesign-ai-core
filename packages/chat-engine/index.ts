@@ -116,7 +116,7 @@ export default class ChatEngine implements IChatEngine {
     // 清理上一次 init 遗留的资源（防止 React StrictMode 重复调用导致孤儿连接）
     if (this.streamHandler) {
       try {
-        await this.streamHandler.destroy();
+        await this.streamHandler.destroy?.();
       } catch {
         // 旧连接可能尚在 CONNECTING 阶段，忽略关闭时的异常
       }
@@ -175,7 +175,7 @@ export default class ChatEngine implements IChatEngine {
       return;
     }
 
-    const userMessage = this.messageProcessor.createUserMessage(prompt, attachments);
+    const userMessage = this.messageProcessor.createUserMessage(prompt ?? '', attachments);
     const aiMessage = this.messageProcessor.createAssistantMessage();
     this.messageStore.createMultiMessages([userMessage, aiMessage]);
 

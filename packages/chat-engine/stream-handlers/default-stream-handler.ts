@@ -3,7 +3,7 @@
  *
  * SSE 原始数据 → 用户自定义 onMessage → processMessageResult
  */
-import type { SSEChunkData } from '../type';
+import type { ChatRequestParams, SSEChunkData } from '../type';
 import { ChatEngineEventType } from '../event-bus';
 import { LLMService } from '../server';
 import type { IStreamHandler, StreamContext } from './types';
@@ -15,7 +15,7 @@ export class DefaultStreamHandler implements IStreamHandler {
     this.llmService = llmService;
   }
 
-  async handleStream(params, context: StreamContext): Promise<void> {
+  async handleStream(params: ChatRequestParams, context: StreamContext): Promise<void> {
     const { messageId, config } = context;
 
     await this.llmService.handleStreamRequest(params, {

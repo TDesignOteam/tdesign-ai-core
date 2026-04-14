@@ -123,7 +123,7 @@ export function isActivityContent(content: AIMessageContent): content is Activit
   return content.type === 'activity' || content.type.startsWith('activity-');
 }
 
-export function isReasoningContent(content) {
+export function isReasoningContent(content: AIMessageContent) {
   return content.type === 'reasoning';
 }
 

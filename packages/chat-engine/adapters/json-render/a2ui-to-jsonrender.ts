@@ -168,7 +168,6 @@ function convertComponent(component: A2UIComponent): UIElement {
   const props = mapProps(component);
 
   const element: UIElement = {
-    key: component.id, // UIElement 需要 key 属性
     type: mappedType,
     props,
   };

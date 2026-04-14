@@ -34,7 +34,7 @@ export interface ConnectionInfo {
   id: string;
   retryCount: number;
   lastActivity: number;
-  state?: SSEConnectionState; // 可选状态
+  state?: SSEConnectionState | string; // 兼容 SSE / WebSocket 等不同连接类型的状态枚举
   url?: string; // 可选URL
   createdAt?: number; // 可选创建时间
   error?: Error; // 可选错误信息

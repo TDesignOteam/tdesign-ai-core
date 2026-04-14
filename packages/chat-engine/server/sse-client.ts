@@ -31,7 +31,7 @@ export class SSEClient extends EventEmitter {
 
   private timeoutTimer?: ReturnType<typeof setInterval>; // 统一超时定时器
 
-  private config: SSEClientConfig;
+  private config!: SSEClientConfig;
 
   private logger = LoggerManager.getLogger();
 
@@ -124,7 +124,7 @@ export class SSEClient extends EventEmitter {
       this.resetParser();
       this.emit('complete', true);
     } catch (error) {
-      if (error.name !== 'AbortError') {
+      if ((error as Error).name !== 'AbortError') {
         this.logger.error('stream abort failed:', error);
         this.emit('error', error);
       }

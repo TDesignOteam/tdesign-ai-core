@@ -81,26 +81,25 @@ export interface PatchResult<T> extends Array<OperationResult<T>> {
  to its dedicated function in efficient way.
  */
 
+type PatchOpFn = (this: any, obj: any, key: any, document: any) => any;
+
 /* The operations applicable to an object */
-const objOps = {
-  add: function (obj, key, document) {
+const objOps: Record<string, PatchOpFn> = {
+  add: function (this: any, obj: any, key: any, document: any) {
     obj[key] = this.value;
     return { newDocument: document };
   },
-  remove: function (obj, key, document) {
+  remove: function (this: any, obj: any, key: any, document: any) {
     var removed = obj[key];
     delete obj[key];
     return { newDocument: document, removed }
   },
-  replace: function (obj, key, document) {
+  replace: function (this: any, obj: any, key: any, document: any) {
     var removed = obj[key];
     obj[key] = this.value;
     return { newDocument: document, removed };
   },
-  move: function (obj, key, document) {
-    /* in case move target overwrites an existing value,
-    return the removed value, this can be taxing performance-wise,
-    and is potentially unneeded */
+  move: function (this: any, obj: any, key: any, document: any) {
     let removed = getValueByPointer(document, this.path);
 
     if (removed) {
@@ -117,22 +116,21 @@ const objOps = {
 
     return { newDocument: document, removed };
   },
-  copy: function (obj, key, document) {
+  copy: function (this: any, obj: any, key: any, document: any) {
     const valueToCopy = getValueByPointer(document, this.from);
-    // enforce copy by value so further operations don't affect source (see issue #177)
     applyOperation(document,
       { op: "add", path: this.path, value: _deepClone(valueToCopy) }
     );
     return { newDocument: document }
   },
-  test: function (obj, key, document) {
+  test: function (this: any, obj: any, key: any, document: any) {
     return { newDocument: document, test: _areEquals(obj[key], this.value) }
   },
-  _get: function (obj, key, document) {
+  _get: function (this: any, obj: any, key: any, document: any) {
     this.value = obj[key];
     return { newDocument: document }
   },
-  append: function (obj, key, document) {
+  append: function (this: any, obj: any, key: any, document: any) {
     const existing = obj[key];
     if (existing === undefined || existing === null) {
       obj[key] = this.value;
@@ -144,21 +142,20 @@ const objOps = {
 };
 
 /* The operations applicable to an array. Many are the same as for the object */
-var arrOps = {
-  add: function (arr, i, document) {
+var arrOps: Record<string, PatchOpFn> = {
+  add: function (this: any, arr: any, i: any, document: any) {
     if(isInteger(i)) {
       arr.splice(i, 0, this.value);
-    } else { // array props
+    } else {
       arr[i] = this.value;
     }
-    // this may be needed when using '-' in an array
     return { newDocument: document, index: i }
   },
-  remove: function (arr, i, document) {
+  remove: function (this: any, arr: any, i: any, document: any) {
     var removedList = arr.splice(i, 1);
     return { newDocument: document, removed: removedList[0] };
   },
-  replace: function (arr, i, document) {
+  replace: function (this: any, arr: any, i: any, document: any) {
     var removed = arr[i];
     arr[i] = this.value;
     return { newDocument: document, removed };
@@ -235,7 +232,7 @@ export function applyOperation<T>(document: T, operation: Operation, validateOpe
       return returnValue;
     } else if (operation.op === 'remove') { // a remove on root
       returnValue.removed = document;
-      returnValue.newDocument = null;
+      returnValue.newDocument = null as any;
       return returnValue;
     } else if (operation.op === '_get') {
       operation.value = document;
@@ -262,7 +259,7 @@ export function applyOperation<T>(document: T, operation: Operation, validateOpe
     }
     const path = operation.path || "";
     const keys = path.split('/');
-    let obj = document;
+    let obj: any = document;
     let t = 1; //skip empty element - http://jsperf.com/to-shift-or-not-to-shift
     let len = keys.length;
     let existingPathFragment = undefined;
@@ -434,7 +431,7 @@ export function validator(operation: Operation, index: number, document?: any, e
   else if (document) {
     if (operation.op == "add" || operation.op == "append") {
       var pathLen = operation.path.split("/").length;
-      var existingPathLen = existingPathFragment.split("/").length;
+      var existingPathLen = existingPathFragment!.split("/").length;
       if (pathLen !== existingPathLen + 1 && pathLen !== existingPathLen) {
         throw new JsonPatchError('Cannot perform an `add` or `append` operation at the desired path', 'OPERATION_PATH_CANNOT_ADD', index, operation, document);
       }
@@ -461,7 +458,7 @@ export function validator(operation: Operation, index: number, document?: any, e
  * @param document
  * @returns {JsonPatchError|undefined}
  */
-export function validate<T>(sequence: ReadonlyArray<Operation>, document?: T, externalValidator?: Validator<T>): PatchError {
+export function validate<T>(sequence: ReadonlyArray<Operation>, document?: T, externalValidator?: Validator<T>): PatchError | undefined {
   try {
     if (!Array.isArray(sequence)) {
       throw new JsonPatchError('Patch sequence must be an array', 'SEQUENCE_NOT_AN_ARRAY');
@@ -473,7 +470,7 @@ export function validate<T>(sequence: ReadonlyArray<Operation>, document?: T, ex
     else {
       externalValidator = externalValidator || validator;
       for (var i = 0; i < sequence.length; i++) {
-        externalValidator(sequence[i], i, document, undefined);
+        externalValidator!(sequence[i], i, document!, undefined!);
       }
     }
   }

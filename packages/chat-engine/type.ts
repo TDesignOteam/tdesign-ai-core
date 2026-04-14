@@ -421,7 +421,7 @@ export interface ModelParams {
 }
 
 export interface ModelServiceState extends ModelParams {
-  config: ChatServiceConfig;
+  config?: ChatServiceConfig;
 }
 
 // 聚合根状态

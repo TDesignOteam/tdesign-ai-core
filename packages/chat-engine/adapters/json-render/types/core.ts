@@ -2,17 +2,15 @@
  * json-render 核心类型定义（框架无关）
  */
 
-import type { UITree, UIElement } from '@json-render/core';
+import type { UIElement } from '@json-render/core';
 
 /**
  * json-render Activity 内容格式
  * 用于 ACTIVITY_SNAPSHOT 和 ACTIVITY_DELTA 事件
  */
-export interface JsonRenderSchema extends UITree {
-  // json-render 标准 UITree 结构
+export interface JsonRenderSchema {
   root: string;
   elements: Record<string, UIElement>;
-  // 可选的数据模型
   data?: Record<string, unknown>;
 }
 
