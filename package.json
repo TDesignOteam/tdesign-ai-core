@@ -21,7 +21,8 @@
   "packageManager": "pnpm@9.15.9",
   "devDependencies": {
     "typescript": "^5.5.0",
-    "immer": "^10.0.0"
+    "immer": "^10.0.0",
+    "tsup": "^8.5.0"
   },
   "dependencies": {
     "@tdesign/ai-chat-engine": "workspace:*",

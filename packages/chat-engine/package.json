@@ -1,20 +1,47 @@
 {
   "name": "@tdesign/ai-chat-engine",
   "version": "0.1.0",
-  "private": true,
   "description": "TDesign ChatEngine - Framework-agnostic AI chat engine core",
   "type": "module",
   "exports": {
-    ".": "./index.ts",
-    "./*": "./*.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "default": "./index.ts"
+    }
   },
-  "files": ["**/*.ts", "!**/*.test.ts"],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "**/*.ts", "!**/*.test.ts"],
+  "scripts": {
+    "build": "tsup",
+    "clean": "rimraf dist"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.mjs",
+        "require": "./dist/index.cjs"
+      }
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Tencent/tdesign-ai-core.git",
+    "directory": "packages/chat-engine"
+  },
+  "license": "MIT",
   "dependencies": {
     "@tdesign/ai-shared": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.5.0",
-    "immer": "^10.0.0"
+    "immer": "^10.0.0",
+    "tsup": "^8.5.0"
   },
   "peerDependencies": {
     "immer": ">=9.0.0"
