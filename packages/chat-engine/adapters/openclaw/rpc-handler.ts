@@ -67,7 +67,7 @@ export class OpenClawRPCHandler {
 
   private config: Required<RPCHandlerConfig>;
 
-  private sendFn: ((frame: OpenClawRequestFrame) => void) | null = null;
+  private sendFn: ((frame: OpenClawRequestFrame<any>) => void) | null = null;
 
   private seq = 0;
 
@@ -97,7 +97,7 @@ export class OpenClawRPCHandler {
   /**
    * 发送 RPC 请求
    */
-  async request<TParams extends Record<string, unknown>, TResult>(
+  async request<TParams extends object, TResult>(
     method: string,
     params: TParams,
   ): Promise<TResult> {

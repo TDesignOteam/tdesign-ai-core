@@ -40,12 +40,12 @@ export class BatchClient extends EventEmitter {
         return null as T;
       }
       return (await response.json()) as T;
-    } catch (error) {
+    } catch (error: unknown) {
       if ((error as Error).name !== 'AbortError') {
         this.logger.error('Batch request failed:', error);
         this.emit('error', error);
       }
-      return null as T;
+      return undefined as unknown as T;
     } finally {
       clearTimeout(timeoutId);
       this.controller = null;

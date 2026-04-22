@@ -80,15 +80,12 @@ export function processMessageGroup(messages: any[], toolCallMap: Map<string, an
         }
       }
 
-      // 处理普通文本内容
-      if (msg.content) {
-        allContent.push({
-          type: 'markdown',
-          data: msg.content,
-        });
+      // 处理文本内容
+      if (typeof msg.content === 'string') {
+        allContent.push({ type: 'markdown', data: msg.content });
       }
 
-      // 处理工具调用内容
+      // 处理工具调用内容（旧格式：toolCalls 独立字段 + 单独 tool 消息）
       if (msg.toolCalls && msg.toolCalls.length > 0) {
         const toolCallContents = processToolCalls(msg.toolCalls, toolCallMap);
         allContent.push(...toolCallContents);
@@ -599,11 +596,13 @@ export function processToolCalls(toolCalls: any[], toolCallMap: Map<string, any>
       };
     }
 
+    const parsedResult = typeof toolResult === 'string' ? parseSSEData(toolResult) ?? toolResult : toolResult;
+
     const toolCallData = {
       toolCallId: toolCall.id,
       toolCallName: toolCall.function.name,
       args: toolCall.function.arguments,
-      result: toolResult,
+      result: parsedResult,
     };
 
     return {

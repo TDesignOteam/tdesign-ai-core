@@ -40,6 +40,9 @@ export class LLMService implements ILLMService {
 
   private isDestroyed = false;
 
+  /** WS 长连接模式标记：initWSConnection 成功后设为 true，表示 WS 连接跨消息复用 */
+  private wsPersistent = false;
+
   private logger = LoggerManager.getLogger();
 
   /**
@@ -93,6 +96,49 @@ export class LLMService implements ILLMService {
   }
 
   /**
+   * 初始化 WebSocket 连接
+   *
+   * 建立连接并绑定基础事件处理器（onStart / onMessage）。
+   *
+   * 基础 onMessage 绑定 config.onChunk，使 connectWS 建连后即可处理
+   * 如后端主动推送的事件（如 HISTORY_MESSAGES）。
+   */
+  async initWSConnection(config: ChatServiceConfig): Promise<void> {
+    if (!config.endpoint) return;
+
+    // 清理旧连接（先取消重连，再关闭）
+    if (this.wsClient) {
+      this.wsClient.removeAllListeners();
+      await this.wsClient.close().catch(() => {});
+      this.wsClient = null;
+    }
+
+    this.wsClient = new WebSocketClient(config.endpoint);
+    this.wsPersistent = true;
+
+    // 设置基础事件处理器
+    this.wsClient.on('start', (chunk) => {
+      config.onStart?.(chunk);
+    });
+
+    // 绑定 onChunk 处理后端主动推送的事件（如 HISTORY_MESSAGES）
+    this.wsClient.on('message', (msg) => {
+      const chunk = msg as SSEChunkData;
+      if (config.isValidChunk && !config.isValidChunk(chunk)) return;
+      config.onChunk?.(chunk);
+    });
+
+    // 长连接模式下禁用客户端心跳超时检测，避免用户空闲时触发不必要的断连重连。
+    // 连接保活依赖 WebSocket 协议层的 ping/pong 或服务端心跳。
+    await this.wsClient.connect({
+      ...config.ws,
+      heartbeatInterval: 0,
+    });
+
+    this.logger.info(`WebSocket connection established to ${config.endpoint}`);
+  }
+
+  /**
    * 处理流式请求 — 根据 transport 自动选择 SSE 或 WebSocket
    *
    * 注意：OpenClaw 协议不再走此方法，而是由 OpenClawStreamHandler 直接管理。
@@ -142,42 +188,51 @@ export class LLMService implements ILLMService {
 
   /**
    * WebSocket 流式请求
-   *
+   * 
    * WS 消息格式需兼容 SSEChunkData（{ event, data }），
    * 以便上层 StreamHandler（AGUIStreamHandler / DefaultStreamHandler）无感知地处理。
+   *
+   * 按需建连：无连接时自动调用 initWSConnection 建立连接，
+   * 重新绑定事件处理器 + 发送消息
    */
   private async handleWSStreamRequest(params: ChatRequestParams, config: ChatServiceConfig): Promise<void> {
-    this.wsClient = new WebSocketClient(config.endpoint!);
+    // 如果连接不存在或已断开，通过 initWSConnection 按需建连
+    if (!this.wsClient || !this.wsClient.isConnected()) {
+      await this.initWSConnection(config);
+    }
+
+    // 重新绑定事件处理器（每次发消息时用最新的 config 回调）
+    this.wsClient!.removeAllListeners();
 
     // 设置事件处理器（与 SSE 事件模型一致）
-    this.wsClient.on('start', (chunk) => {
+    this.wsClient!.on('start', (chunk) => {
       config.onStart?.(chunk);
     });
 
-    this.wsClient.on('message', (msg) => {
+    this.wsClient!.on('message', (msg) => {
       const chunk = msg as SSEChunkData;
       if (config.isValidChunk && !config.isValidChunk(chunk)) return;
       config.onMessage?.(chunk);
     });
 
-    this.wsClient.on('error', (error) => {
+    this.wsClient!.on('error', (error) => {
       config.onError?.(error);
     });
 
-    this.wsClient.on('complete', (isAborted) => {
+    this.wsClient!.on('complete', (isAborted) => {
       config.onComplete?.(isAborted, params);
     });
 
-    // 建立 WS 连接
-    await this.wsClient.connect(config.ws);
-
-    // 连接建立后发送请求
+    // 发送请求
     const req = (await config.onRequest?.(params)) || params;
-    this.wsClient.send(req);
+    this.wsClient!.send(req);
   }
 
   /**
    * 关闭所有客户端连接
+   *
+   * 注意：WS 长连接模式下（wsPersistent=true），不会关闭 WS 连接本身，
+   * 只会移除事件监听器以停止当前消息的流式处理。WS 连接由 destroy() 统一销毁。
    */
   closeConnect(): void {
     if (this.sseClient) {
@@ -185,8 +240,13 @@ export class LLMService implements ILLMService {
       this.sseClient = null;
     }
     if (this.wsClient) {
-      this.wsClient.close();
-      this.wsClient = null;
+      if (this.wsPersistent) {
+        // 长连接模式：只移除事件监听器，不关闭连接
+        this.wsClient.removeAllListeners();
+      } else {
+        this.wsClient.close();
+        this.wsClient = null;
+      }
     }
     if (this.batchClient) {
       this.batchClient.abort();
@@ -195,7 +255,7 @@ export class LLMService implements ILLMService {
   }
 
   /**
-   * 获取连接统计
+   * 获取 SSE 连接统计
    */
   getSSEStats(): { id: string; status: string; info: any } | null {
     if (!this.sseClient) return null;
@@ -221,10 +281,28 @@ export class LLMService implements ILLMService {
   }
 
   /**
-   * 销毁服务
+   * 检查 WebSocket 是否处于已连接状态
+   */
+  isWSConnected(): boolean {
+    return !!this.wsClient?.isConnected();
+  }
+
+  /**
+   * 断开 WebSocket 长连接
+   *
+   * 与destroy方法的区别是，disconnectWS不会设置isDestroyed为true
+   */
+  disconnectWS(): void {
+    this.wsPersistent = false;
+    this.closeConnect();
+  }
+
+  /**
+   * 销毁服务（彻底关闭所有连接，包括 WS 长连接）
    */
   async destroy(): Promise<void> {
     this.isDestroyed = true;
+    this.wsPersistent = false; // 取消长连接模式，确保 closeConnect 能关闭 WS
     this.closeConnect();
     this.logger.info('LLM Service destroyed');
   }

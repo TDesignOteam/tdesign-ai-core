@@ -24,8 +24,17 @@ export class AGUIStreamHandler implements IStreamHandler {
 
     await this.llmService.handleStreamRequest(params, {
       ...config,
-      onMessage: (chunk: SSEChunkData) => {
+      // @ts-ignore
+      onMessage: (_chunk: SSEChunkData) => {
         if (context.getStopReceive() || !messageId) return null;
+        let chunk = _chunk;
+        if (config.onChunk) {
+          // @ts-ignore
+          chunk = config.onChunk(chunk);
+          if (!chunk) {
+            return;
+          }
+        }
 
         let result: AIMessageContent | AIMessageContent[] | null = null;
 

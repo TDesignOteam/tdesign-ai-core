@@ -20,24 +20,27 @@ export enum WebSocketConnectionState {
  * WebSocket 客户端配置
  */
 export interface WebSocketClientConfig {
-  /** 请求超时时间（毫秒） */
+  /** 连接超时时间（毫秒），默认 30000 */
   timeout?: number;
-  /** 重连间隔（毫秒） */
+  /** 重连间隔（毫秒），默认 1000 */
   retryInterval?: number;
-  /** 最大重连次数 */
+  /** 最大重连次数，默认 0（不重连） */
   maxRetries?: number;
-  /** 心跳间隔（毫秒），0 表示禁用 */
+  /** 心跳间隔（毫秒），默认 0（禁用） */
   heartbeatInterval?: number;
 }
 
 /**
  * 默认 WebSocket 配置
+ *
+ * 默认禁用心跳超时检测和自动重连，连接保活依赖 WebSocket 协议层的 ping/pong 或服务端心跳。
+ * 如需启用心跳/重连（如 OpenClaw 适配器），请在 connect() 时显式传入配置。
  */
 export const DEFAULT_WS_CONFIG: Required<WebSocketClientConfig> = {
   timeout: 30000,
   retryInterval: 1000,
-  maxRetries: 5,
-  heartbeatInterval: 30000,
+  maxRetries: 0,
+  heartbeatInterval: 0,
 };
 
 /**
@@ -55,7 +58,8 @@ export interface WSStateChangeEvent {
  *
  * 设计原则：
  * - 与 SSEClient 保持相同的事件接口（message、error、complete、start、stateChange）
- * - 支持心跳保活、自动重连
+ * - 默认禁用心跳保活和自动重连（heartbeatInterval=0, maxRetries=0）
+ * - 如需启用（如 OpenClaw 适配器），在 connect() 时显式传入非零配置
  * - 支持消息发送和接收
  */
 export class WebSocketClient extends EventEmitter {
@@ -166,13 +170,11 @@ export class WebSocketClient extends EventEmitter {
       }
 
       if (this.ws) {
-        // 如果 WebSocket 还在 CONNECTING 阶段，先移除事件处理器以避免触发错误回调
-        if (this.ws.readyState === WebSocket.CONNECTING) {
-          this.ws.onopen = null;
-          this.ws.onmessage = null;
-          this.ws.onerror = null;
-          this.ws.onclose = null;
-        }
+        // 先清除原生 handlers，防止 close 握手期间回调引发竞态
+        this.ws.onopen = null;
+        this.ws.onmessage = null;
+        this.ws.onerror = null;
+        this.ws.onclose = null;
         this.ws.close(1000, 'Client initiated close');
         this.ws = null;
       }

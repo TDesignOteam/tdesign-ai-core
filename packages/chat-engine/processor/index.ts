@@ -23,12 +23,7 @@ export default class MessageProcessor {
   }
 
   public createUserMessage(content: string, attachments?: AttachmentItem[]): ChatMessagesData {
-    const messageContent: UserMessage['content'] = [
-      {
-        type: 'text',
-        data: content,
-      },
-    ];
+    const messageContent: UserMessage['content'] = [];
 
     if (attachments?.length) {
       messageContent.push({
@@ -36,6 +31,11 @@ export default class MessageProcessor {
         data: attachments,
       });
     }
+
+    messageContent.push({
+      type: 'text',
+      data: content,
+    });
 
     return {
       id: this.generateID(),

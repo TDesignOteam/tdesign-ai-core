@@ -35,7 +35,7 @@ export default class ChatEngine implements IChatEngine {
    */
   public readonly eventBus: IChatEventBus;
 
-  private messageProcessor: MessageProcessor;
+  public messageProcessor: MessageProcessor;
 
   private llmService!: LLMService;
 
@@ -45,13 +45,16 @@ export default class ChatEngine implements IChatEngine {
 
   private stopReceive = false;
 
-  private aguiAdapter: AGUIAdapter | null = null;
+  public aguiAdapter: AGUIAdapter | null = null;
 
   /** 流式处理策略（由协议类型决定） */
   private streamHandler!: IStreamHandler;
 
   /** 是否已完成初始化（防止 React StrictMode 等场景下重复调用 init） */
   private initialized = false;
+
+  /** ensureConnected 去重：正在进行中的连接 Promise */
+  private _connectingPromise: Promise<void> | null = null;
 
   constructor(eventBusOptions?: ChatEventBusOptions) {
     this.messageProcessor = new MessageProcessor();
@@ -89,6 +92,9 @@ export default class ChatEngine implements IChatEngine {
 
     // 中止当前请求
     this.abortChat();
+
+    // 销毁 LLM 服务（彻底关闭所有连接，包括 WS 长连接）
+    this.llmService.destroy();
 
     // 清理消息存储
     this.messageStore.clearHistory();
@@ -174,7 +180,6 @@ export default class ChatEngine implements IChatEngine {
       console.warn('[ChatEngine] sendUserMessage: 必须提供有效的prompt或attachments');
       return;
     }
-
     const userMessage = this.messageProcessor.createUserMessage(prompt ?? '', attachments);
     const aiMessage = this.messageProcessor.createAssistantMessage();
     this.messageStore.createMultiMessages([userMessage, aiMessage]);
@@ -287,34 +292,111 @@ export default class ChatEngine implements IChatEngine {
    * @description 停止接收流式响应，关闭连接，并调用配置的onAbort回调
    */
   public async abortChat() {
-    this.stopReceive = true;
+    const transport = LLMService.resolveTransport(this.config);
+    const lastAI = this.messageStore.lastAIMessage;
 
     if (this.config?.onAbort) {
       await this.config.onAbort();
     }
 
     try {
-      this.llmService.closeConnect();
-      // OpenClaw 的 abort 由 StreamHandler 管理
-      if (this.streamHandler instanceof OpenClawStreamHandler) {
-        (this.streamHandler as OpenClawStreamHandler).abort();
-      }
-      if (!this.config.stream) {
-        // 只有在批量模式下才删除最后一条AI消息
-        if (this.messageStore.lastAIMessage?.id) {
-          const messageId = this.messageStore.lastAIMessage.id;
-          this.messageStore.removeMessage(messageId);
+      if (transport === 'ws') {
+        // ws 模式下，通过 sendRequest 管线发送 /stop（fire-and-forget）
+        if (lastAI && (lastAI.status === 'streaming' || lastAI.status === 'pending')) {
+          this.handleComplete(lastAI.id, true, this.lastRequestParams || ({} as ChatRequestParams));
+        }
 
-          // 发布消息删除事件
-          this.eventBus.emit(ChatEngineEventType.MESSAGE_DELETE, {
-            messageId,
-            messages: this.messages,
-          });
+        if (this.config.abortRequest) {
+          const savedParams = this.lastRequestParams;
+          try {
+            await this.sendRequest({ ...this.config.abortRequest });
+          } catch (e) {
+            console.warn('[ChatEngine] abortChat: sendRequest failed', e);
+          }
+          this.lastRequestParams = savedParams;
+        }
+      } else {
+        this.stopReceive = true;
+        this.llmService.closeConnect();
+        // OpenClaw 的 abort 由 StreamHandler 管理
+        if (this.streamHandler instanceof OpenClawStreamHandler) {
+          (this.streamHandler as OpenClawStreamHandler).abort();
+        }
+
+        if (transport === 'fetch') {
+          // 只有在非流式（fetch）模式下才删除最后一条AI消息
+          if (this.messageStore.lastAIMessage?.id) {
+            const messageId = this.messageStore.lastAIMessage.id;
+            this.messageStore.removeMessage(messageId);
+
+            // 发布消息删除事件
+            this.eventBus.emit(ChatEngineEventType.MESSAGE_DELETE, {
+              messageId,
+              messages: this.messages,
+            });
+          }
         }
       }
     } catch (error) {
       console.warn('Error during service cleanup:', error);
     }
+  }
+
+  /**
+   * 建立 WebSocket 连接
+   *
+   * 关闭当前 WS 连接并建立新连接，用于切换会话等需要干净连接状态的场景。
+   * 内部委托给 LLMService.initWSConnection，复用已有的连接管理逻辑。
+   */
+  public async connectWS(configOverrides?: Partial<ChatServiceConfig>): Promise<void> {
+    const config = configOverrides ? { ...this.config, ...configOverrides } : this.config;
+    const transport = LLMService.resolveTransport(config);
+    if (transport === 'ws' && config.endpoint) {
+      await this.llmService.initWSConnection(config);
+    }
+  }
+
+  /**
+   * 确保 WebSocket 连接已就绪（幂等、去重）
+   *
+   * - 已连接 → 立即返回
+   * - 正在建连 → 复用同一个 Promise，不会重复创建连接
+   * - 未连接 → 建立新连接并等待握手完成
+   *
+   * 适合在用户开始输入时提前调用，让连接在发送前就绪。
+   */
+  public async ensureConnected(): Promise<void> {
+    const transport = LLMService.resolveTransport(this.config);
+    if (transport !== 'ws' || !this.config.endpoint) return;
+
+    if (this.llmService.isWSConnected()) return;
+
+    if (!this._connectingPromise) {
+      this._connectingPromise = this.llmService.initWSConnection(this.config)
+        .finally(() => { this._connectingPromise = null; });
+    }
+    return this._connectingPromise;
+  }
+
+  /**
+   * 更新 WS 端点地址
+   *
+   * 声明式更新 config.endpoint，后续自动建连（handleWSStreamRequest）
+   * 和显式建连（connectWS 无参数）均使用新值。不会触发重连或影响当前连接。
+   */
+  public updateEndpoint(endpoint: string): void {
+    this.config.endpoint = endpoint;
+  }
+
+  /**
+   * 断开 WebSocket 连接。
+   *
+   * 先置 stopReceive 阻止已缓冲 chunk 继续被处理，再关闭 WS 传输层。
+   * 下次发送消息时 handleWSStreamRequest 会自动重置 stopReceive 并建立新连接。
+   */
+  public disconnectWS(): void {
+    this.stopReceive = true;
+    this.llmService.disconnectWS();
   }
 
   /**
@@ -401,13 +483,15 @@ export default class ChatEngine implements IChatEngine {
     });
 
     try {
-      if (this.config.stream) {
-        // 处理sse流式响应模式
+      const transport = LLMService.resolveTransport(this.config);
+
+      if (transport === 'fetch') {
+        // 处理非流式批量响应模式
+        await this.handleBatchRequest(params);
+      } else {
+        // 处理流式响应模式（SSE 或 WebSocket，由 LLMService 内部分流）
         this.stopReceive = false;
         await this.handleStreamRequest(params);
-      } else {
-        // 处理批量响应模式
-        await this.handleBatchRequest(params);
       }
       this.lastRequestParams = params;
     } catch (error) {
@@ -542,7 +626,7 @@ export default class ChatEngine implements IChatEngine {
    * 支持单个内容块、多个内容块和增量更新
    * 支持 MESSAGES_SNAPSHOT 的 replaceContent 语义（_isSnapshot 标记）
    */
-  private processMessageResult(messageId: string, result: AIMessageContent | AIMessageContent[] | null) {
+  public processMessageResult(messageId: string, result: AIMessageContent | AIMessageContent[] | null) {
     if (!result) return;
 
     // MESSAGES_SNAPSHOT 场景：使用 replaceContent 一次性替换消息内容

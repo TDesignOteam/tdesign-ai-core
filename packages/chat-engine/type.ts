@@ -205,9 +205,9 @@ export type ChatTransport = 'fetch' | 'sse' | 'ws';
  * WebSocket 专属配置（仅 transport: 'ws' 时生效）
  */
 export interface ChatWSConfig {
-  /** 心跳检测间隔（毫秒），默认 30000 */
+  /** 心跳检测间隔（毫秒），默认 0（禁用） */
   heartbeatInterval?: number;
-  /** 最大重连次数，默认 5 */
+  /** 最大重连次数，默认 0（不重连） */
   maxRetries?: number;
   /** 重连间隔（毫秒），默认 1000 */
   retryInterval?: number;
@@ -241,6 +241,8 @@ export interface ChatNetworkConfig {
   timeout?: number;
   /** 协议类型 */
   protocol?: 'default' | 'agui' | 'openclaw';
+  /** abort 时通过 WS 发送的请求参数（经 onRequest 格式化后发出），仅 transport: 'ws' 时生效 */
+  abortRequest?: ChatRequestParams;
   /**
    * OpenClaw 专属配置（仅协议层必需项）
    * 只在 protocol: 'openclaw' 时生效
@@ -256,6 +258,8 @@ export interface DefaultEngineCallbacks {
     params: ChatRequestParams,
   ) => (ChatRequestParams & RequestInit) | Promise<ChatRequestParams & RequestInit>;
   onStart?: (chunk: string) => void;
+  /** 用来过滤 SSE 数据块 仅AGUI可用*/
+  onChunk?: (chunk: SSEChunkData) => SSEChunkData | null;
   /** 接收到消息数据块 - 用于解析和处理聊天内容 */
   onMessage?: (
     chunk: SSEChunkData,
@@ -401,6 +405,13 @@ export interface IChatEngine {
   get messageStore(): any; // 抽象化，不同引擎可能有不同的store
 
   /**
+   * 更新 WS 端点地址
+   * @param endpoint 新的 WS 端点 URL
+   * @description 声明式更新 config.endpoint，后续自动建连使用新值，不触发重连
+   */
+  updateEndpoint(endpoint: string): void;
+
+  /**
    * 销毁聊天引擎实例
    * @description 中止请求，清理消息存储和适配器，释放资源
    */
@@ -421,7 +432,7 @@ export interface ModelParams {
 }
 
 export interface ModelServiceState extends ModelParams {
-  config?: ChatServiceConfig;
+  config: ChatServiceConfig;
 }
 
 // 聚合根状态

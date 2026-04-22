@@ -21,7 +21,7 @@ import type {
   ConnectParams,
   ConnectChallengePayload,
 } from './types';
-import { mergeOpenClawConfig } from './types/config';
+import { mergeOpenClawConfig, DEFAULT_OPENCLAW_CONFIG } from './types/config';
 import { OpenClawEventType, OpenClawConnectionState } from './types/events';
 import {
   generateUUID,
@@ -539,13 +539,13 @@ export class OpenClawAdapter extends EventEmitter {
     this.logger.debug('Received connect.challenge, sending connect request');
 
     const connectParams: ConnectParams = {
-      minProtocol: this.config.protocolVersion.min,
-      maxProtocol: this.config.protocolVersion.max,
+      minProtocol: this.config.protocolVersion.min ?? 3,
+      maxProtocol: this.config.protocolVersion.max ?? 3,
       client: {
-        id: this.config.client.id,
-        version: this.config.client.version,
+        id: this.config.client.id ?? 'webchat',
+        version: this.config.client.version ?? '1.0.0',
         platform: getPlatform(),
-        mode: this.config.client.mode,
+        mode: this.config.client.mode ?? 'webchat',
         instanceId: this.instanceId,
       },
       role: 'operator',
@@ -584,7 +584,7 @@ export class OpenClawAdapter extends EventEmitter {
       // 检查 connect 响应中是否包含历史消息
       // OpenClaw Gateway 会在 connect 响应的 payload 中附带 messages 数组，
       // 用于页面刷新后自动回填历史对话记录（无需额外 RPC 请求）
-      const connectPayload = response as Record<string, unknown>;
+      const connectPayload = response as unknown as Record<string, unknown>;
       if (Array.isArray(connectPayload?.messages) && connectPayload.messages.length > 0) {
         this.logger.info(`OpenClaw connect response contains ${connectPayload.messages.length} history messages, converting...`);
         try {

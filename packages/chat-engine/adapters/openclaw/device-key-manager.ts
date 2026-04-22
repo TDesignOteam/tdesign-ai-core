@@ -118,8 +118,8 @@ async function signWithEd25519(privateKeyHex: string, nonce: string): Promise<st
   // 导入 PKCS8 格式的私钥
   const privateKey = await crypto.subtle.importKey(
     'pkcs8',
-    privateKeyBytes.buffer,
-    'Ed25519',
+    privateKeyBytes.buffer as ArrayBuffer,
+    'Ed25519' as unknown as AlgorithmIdentifier,
     false,
     ['sign'],
   );
