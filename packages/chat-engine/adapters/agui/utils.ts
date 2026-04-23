@@ -58,11 +58,12 @@ export function extractStateKeyFromDelta(event: { type: string; delta?: any[] })
  *
  * 这是 convertHistoryMessages 和 handleMessagesSnapshot 的共享核心逻辑。
  * 处理顺序（保持原始顺序）：
- * 1. assistant 的 content（文本回复）
- * 2. assistant 的 toolCalls（工具调用，关联 tool 消息的结果）
- * 3. activity 消息（活动/状态展示）
+ * 1. reasoning 消息（转为 thinking 块，默认折叠）
+ * 2. assistant 的 content（文本回复）
+ * 3. assistant 的 toolCalls（工具调用，关联 tool 消息的结果）
+ * 4. activity 消息（活动/状态展示）
  *
- * @param messages 一组 AG-UI 标准格式的消息（assistant、tool、activity 等）
+ * @param messages 一组 AG-UI 标准格式的消息（assistant、tool、activity、reasoning 等）
  * @param toolCallMap 工具调用结果映射（通过 buildToolCallMap 构建）
  * @returns 转换后的 AIMessageContent 数组
  */
@@ -81,6 +82,25 @@ export function processMessageGroup(messages: any[], toolCallMap: Map<string, an
         const toolCallContents = processToolCalls(msg.toolCalls, toolCallMap);
         allContent.push(...toolCallContents);
       }
+    } else if (msg.role === 'reasoning') {
+      // AG-UI Reasoning 消息：转为 thinking 块，历史态默认折叠
+      // encryptedValue 透传到 ext，业务在下一轮请求中回传
+      const extraExt = msg.encryptedValue
+        ? {
+          encryptedValue: msg.encryptedValue,
+          ...(msg.subtype ? { subtype: msg.subtype } : {}),
+          ...(msg.entityId ? { entityId: msg.entityId } : {}),
+        }
+        : undefined;
+      allContent.push(
+        createThinkingContent(
+          { text: msg.content || '', title: msg.title || '思考结束' },
+          'complete',
+          'append',
+          true,
+          extraExt,
+        ),
+      );
     } else if (msg.role === 'activity') {
       // 检查是否是存储为 Activity 的 CUSTOM 事件
       if (msg.activityType === 'CUSTOM') {

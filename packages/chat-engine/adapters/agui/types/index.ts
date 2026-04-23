@@ -70,6 +70,24 @@ const ActivityMessageSchema = z.object({
   timestamp: z.number().optional(),
 });
 
+/**
+ * Reasoning 消息 Schema（AG-UI Reasoning 规范）
+ * - content: 可见的 reasoning 文本（可选，支持仅有 encryptedValue 的场景）
+ * - encryptedValue: 加密 chain-of-thought，仅用于跨轮状态延续，客户端原样回传
+ * - subtype: 'message' | 'tool-call'，encryptedValue 的归属类型（可选）
+ * - entityId: 当 subtype='tool-call' 时指向对应 toolCallId（可选）
+ * - title: 展示用的标题（非规范字段，便于 UI 展示）
+ * https://docs.ag-ui.com/concepts/events#reasoningmessage
+ */
+const ReasoningMessageSchema = BaseMessageSchema.extend({
+  role: z.literal('reasoning'),
+  content: z.string().optional(),
+  encryptedValue: z.string().optional(),
+  subtype: z.union([z.literal('message'), z.literal('tool-call')]).optional(),
+  entityId: z.string().optional(),
+  title: z.string().optional(),
+});
+
 export const AGUIMessageSchema = z.discriminatedUnion('role', [
   DeveloperMessageSchema,
   SystemMessageSchema,
@@ -77,6 +95,7 @@ export const AGUIMessageSchema = z.discriminatedUnion('role', [
   UserMessageSchema,
   ToolMessageSchema,
   ActivityMessageSchema,
+  ReasoningMessageSchema,
 ]);
 
 /**
@@ -88,6 +107,7 @@ export const HistoryMessageSchema = z.discriminatedUnion('role', [
   AssistantMessageSchema,
   ToolMessageSchema,
   ActivityMessageSchema,
+  ReasoningMessageSchema,
 ]);
 
 export const RoleSchema = z.union([
@@ -97,6 +117,7 @@ export const RoleSchema = z.union([
   z.literal('user'),
   z.literal('tool'),
   z.literal("activity"),
+  z.literal('reasoning'),
 ]);
 
 export const ContextSchema = z.object({
@@ -130,6 +151,7 @@ export type AGUIAssistantMessage = z.infer<typeof AssistantMessageSchema>;
 export type AGUIUserMessage = z.infer<typeof UserMessageSchema>;
 export type AGUIToolMessage = z.infer<typeof ToolMessageSchema>;
 export type AGUIActivityMessage = z.infer<typeof ActivityMessageSchema>;
+export type AGUIReasoningMessage = z.infer<typeof ReasoningMessageSchema>;
 export type AGUIMessage = z.infer<typeof AGUIMessageSchema>;
 export type AGUIContext = z.infer<typeof ContextSchema>;
 export type AGUITool = z.infer<typeof ToolSchema>;
@@ -142,6 +164,7 @@ export type AGUIHistoryMessage = AGUIMessage;
 export type AGUIUserHistoryMessage = AGUIUserMessage;
 export type AGUIAssistantHistoryMessage = AGUIAssistantMessage;
 export type AGUIToolHistoryMessage = AGUIToolMessage;
+export type AGUIReasoningHistoryMessage = AGUIReasoningMessage;
 
 export class AGUIError extends Error {
   constructor(message: string) {
