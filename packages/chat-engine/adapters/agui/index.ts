@@ -39,9 +39,11 @@ export class AGUIAdapter {
    *
    * ### AG-UI 协议中的消息角色
    * - `user`: 用户消息
-   * - `assistant`: AI 回复，可包含 content、reasoningContent、toolCalls
+   * - `assistant`: AI 回复，可包含 content、toolCalls
    * - `tool`: 工具调用结果，通过 toolCallId 关联到 assistant 的 toolCalls
    * - `activity`: 独立的活动/事件消息，表示代理运行过程中的中间状态
+   * - `reasoning`: AG-UI reasoning 消息（通过 REASONING_* 事件流式推送，
+   *   可能带有 `encryptedValue`，客户端应原样在下一轮请求中回传）
    *
    * ### Activity 消息的处理策略
    * Activity 在 AG-UI 中是独立的 role，不是 assistant 的附属。

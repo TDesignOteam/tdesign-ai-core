@@ -58,10 +58,9 @@ export function extractStateKeyFromDelta(event: { type: string; delta?: any[] })
  *
  * 这是 convertHistoryMessages 和 handleMessagesSnapshot 的共享核心逻辑。
  * 处理顺序（保持原始顺序）：
- * 1. assistant 的 reasoningContent（思考过程）
- * 2. assistant 的 content（文本回复）
- * 3. assistant 的 toolCalls（工具调用，关联 tool 消息的结果）
- * 4. activity 消息（活动/状态展示）
+ * 1. assistant 的 content（文本回复）
+ * 2. assistant 的 toolCalls（工具调用，关联 tool 消息的结果）
+ * 3. activity 消息（活动/状态展示）
  *
  * @param messages 一组 AG-UI 标准格式的消息（assistant、tool、activity 等）
  * @param toolCallMap 工具调用结果映射（通过 buildToolCallMap 构建）
@@ -72,14 +71,6 @@ export function processMessageGroup(messages: any[], toolCallMap: Map<string, an
 
   messages.forEach((msg: any) => {
     if (msg.role === 'assistant') {
-      // 处理 reasoningContent（支持 reasoning 和 thinking 两种类型）
-      if (msg.reasoningContent) {
-        const reasoningContentResult = processReasoningContent(msg.reasoningContent);
-        if (reasoningContentResult) {
-          allContent.push(reasoningContentResult);
-        }
-      }
-
       // 处理文本内容
       if (typeof msg.content === 'string') {
         allContent.push({ type: 'markdown', data: msg.content });
@@ -251,28 +242,12 @@ export function createAIMessageContent(
 }
 
 /**
- * 创建 reasoning 类型的 AIMessageContent
- * @param data reasoning 数据
- * @param status 状态
- * @param strategy 策略
- * @param collapsed 是否折叠
- * @returns reasoning 类型的 AIMessageContent
- */
-export function createReasoningContent(
-  data: any[],
-  status: 'streaming' | 'complete' = 'streaming',
-  strategy: 'append' | 'merge' = 'append',
-  collapsed = false,
-): any {
-  return createAIMessageContent('reasoning', data, status, strategy, { collapsed });
-}
-
-/**
  * 创建 thinking 类型的 AIMessageContent
  * @param data thinking 数据
  * @param status 状态
  * @param strategy 策略
  * @param collapsed 是否折叠
+ * @param extraExt 附加的 ext 字段（例如 reasoning 的 encryptedValue）
  * @returns thinking 类型的 AIMessageContent
  */
 export function createThinkingContent(
@@ -280,8 +255,10 @@ export function createThinkingContent(
   status: 'streaming' | 'complete' = 'streaming',
   strategy: 'append' | 'merge' = 'append',
   collapsed = false,
+  extraExt?: Record<string, any>,
 ): any {
-  return createAIMessageContent('thinking', data, status, strategy, { collapsed });
+  const ext = extraExt ? { collapsed, ...extraExt } : { collapsed };
+  return createAIMessageContent('thinking', data, status, strategy, ext);
 }
 
 /**
@@ -418,164 +395,6 @@ export function handleSuggestionToolCall(toolCall: any): any | null {
     }
   }
   return null;
-}
-
-/**
- * 更新 reasoning 上下文中的内容
- * @param reasoningData 当前 reasoning 数据
- * @param index 要更新的索引
- * @param newContent 新内容
- * @returns 更新后的 reasoning 数据
- */
-export function updateReasoningData(reasoningData: any[], index: number, newContent: any): any[] {
-  const updatedData = [...reasoningData];
-  if (index >= 0 && index < updatedData.length) {
-    updatedData[index] = newContent;
-  }
-  return updatedData;
-}
-
-/**
- * 向 reasoning 数据中添加新内容
- * @param reasoningData 当前 reasoning 数据
- * @param newContent 新内容
- * @returns 更新后的 reasoning 数据和新内容的索引
- */
-export function addToReasoningData(reasoningData: any[], newContent: any): { data: any[]; index: number } {
-  const updatedData = [...reasoningData, newContent];
-  return {
-    data: updatedData,
-    index: updatedData.length - 1,
-  };
-}
-
-/**
- * 解析 reasoningContent 字段
- * @param reasoningContent 原始 reasoningContent 数据
- * @returns 解析后的数据和类型信息
- */
-export function parseReasoningContent(reasoningContent: any): {
-  type: 'reasoning' | 'thinking';
-  data: any;
-} {
-  let parsedContent;
-
-  if (typeof reasoningContent === 'string') {
-    try {
-      parsedContent = JSON.parse(reasoningContent);
-    } catch {
-      // 解析失败时，作为简单文本处理
-      return {
-        type: 'thinking',
-        data: { text: reasoningContent, title: '思考完成' },
-      };
-    }
-  } else {
-    parsedContent = reasoningContent;
-  }
-
-  // 判断解析后的数据类型
-  if (Array.isArray(parsedContent)) {
-    return {
-      type: 'reasoning',
-      data: parsedContent,
-    };
-  }
-  return {
-    type: 'thinking',
-    data: parsedContent,
-  };
-}
-
-/**
- * 转换 reasoning 消息数组为 AIMessageContent 数组
- * @param reasoningMessages reasoning 消息数组
- * @returns 转换后的 AIMessageContent 数组
- */
-export function convertReasoningMessages(reasoningMessages: any[]): any[] {
-  const reasoningData: any[] = [];
-  const toolCallMap = new Map<string, any>();
-
-  // 第一遍：收集工具调用结果
-  reasoningMessages.forEach((msg) => {
-    if (msg.role === 'tool') {
-      toolCallMap.set(msg.toolCallId, {
-        toolCallId: msg.toolCallId,
-        result: msg.content,
-      });
-    }
-  });
-
-  // 第二遍：处理消息内容
-  reasoningMessages.forEach((msg) => {
-    if (msg.role === 'assistant') {
-      // 处理嵌套的 reasoningContent（文本思考）
-      if (msg.reasoningContent && typeof msg.reasoningContent === 'string') {
-        reasoningData.push({
-          type: 'text',
-          data: msg.reasoningContent,
-          status: 'complete',
-        });
-      }
-
-      // 处理普通内容
-      if (msg.content) {
-        reasoningData.push({
-          type: 'text', // 在 reasoning 内部，通常用 text 而不是 markdown
-          data: msg.content,
-          status: 'complete',
-        });
-      }
-
-      // 处理工具调用
-      if (msg.toolCalls && msg.toolCalls.length > 0) {
-        msg.toolCalls.forEach((toolCall: any) => {
-          const toolResult = toolCallMap.get(toolCall.id)?.result || '';
-          const toolCallData = {
-            toolCallId: toolCall.id,
-            toolCallName: toolCall.function.name,
-            args: toolCall.function.arguments,
-            result: toolResult,
-          };
-          reasoningData.push({
-            // 使用 toolCallName-toolCallId 格式，与 createToolCallContent 保持一致
-            type: `toolcall-${toolCall.function.name}-${toolCall.id}`,
-            data: toolCallData,
-            status: 'complete',
-          });
-        });
-      }
-    }
-  });
-
-  return reasoningData;
-}
-
-/**
- * 处理 reasoningContent 并创建对应的 AIMessageContent
- * @param reasoningContent 原始 reasoningContent 数据
- * @returns 创建的 AIMessageContent 或 null
- */
-export function processReasoningContent(reasoningContent: any): any | null {
-  if (!reasoningContent) return null;
-
-  const { type, data } = parseReasoningContent(reasoningContent);
-
-  if (type === 'reasoning') {
-    const reasoningData = convertReasoningMessages(data);
-    return {
-      type: 'reasoning',
-      data: reasoningData,
-      status: 'complete',
-      strategy: 'append',
-      ext: { collapsed: true },
-    };
-  }
-  return {
-    type: 'thinking',
-    status: 'complete',
-    data,
-  };
 }
 
 /**

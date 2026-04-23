@@ -123,10 +123,6 @@ export function isActivityContent(content: AIMessageContent): content is Activit
   return content.type === 'activity' || content.type.startsWith('activity-');
 }
 
-export function isReasoningContent(content: AIMessageContent) {
-  return content.type === 'reasoning';
-}
-
 /** 提取消息复制内容 */
 export function getMessageContentForCopy(message: ChatMessagesData): string {
   if (!isAIMessage(message) || !message.content) {

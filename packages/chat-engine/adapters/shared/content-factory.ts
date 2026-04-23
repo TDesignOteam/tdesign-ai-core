@@ -11,6 +11,5 @@ export {
   createMarkdownContent,
   createTextContent,
   createThinkingContent,
-  createReasoningContent,
   createSuggestionContent,
 } from '../agui/utils';

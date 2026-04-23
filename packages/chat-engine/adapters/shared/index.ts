@@ -14,7 +14,6 @@ export {
   createMarkdownContent,
   createTextContent,
   createThinkingContent,
-  createReasoningContent,
   createSuggestionContent,
 } from './content-factory';
 
