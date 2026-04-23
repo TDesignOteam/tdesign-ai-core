@@ -206,7 +206,7 @@ export class AGUIEventMapper {
    * - `REASONING_MESSAGE_START`     → append 新块（消费 pendingReasoningTitle 作为 title）
    * - `REASONING_MESSAGE_CONTENT`   → merge delta 到当前块
    * - `REASONING_MESSAGE_END`       → 释放 currentReasoningMessageId，块保持 streaming
-   * - `REASONING_MESSAGE_CHUNK`     → 新 messageId append、同 messageId merge（自动补全生命周期）
+   * - `REASONING_MESSAGE_CHUNK`     → 新 messageId append、同 messageId merge、空 delta 关闭当前消息（自动补全生命周期）
    * - `REASONING_ENCRYPTED_VALUE`   → encryptedValue 存入 thinking.ext，供业务下轮透传
    * - `REASONING_END`               → 当前块 complete，title 置为 '思考结束'
    */
@@ -259,15 +259,25 @@ export class AGUIEventMapper {
    * 处理简化模式的 REASONING_MESSAGE_CHUNK 事件
    * 自动补全 Start → Content → End 生命周期（与 handleTextMessageChunk 风格一致）
    *
-   * 关键：通过 messageId 区分不同的 reasoning 消息，
-   * messageId 变化时创建新的内容块，相同 messageId 合并内容。
+   * 关键：
+   * - 通过 messageId 区分不同的 reasoning 消息，messageId 变化 append 新块、相同 merge
+   * - 空 delta 显式关闭当前 reasoning 消息（AG-UI 规范定义的 chunk 关闭信号，仅作用于自身 messageId）
+   *   参考: https://docs.ag-ui.com/concepts/events#reasoningmessagechunk
    */
   private handleReasoningMessageChunk(event: any): AIMessageContent | null {
     const messageId = event.messageId || null;
-    if (this.currentReasoningMessageId !== messageId) {
-      return this.openReasoningBlock(messageId, event.title, event.delta || '');
+    const delta = event.delta ?? '';
+
+    // 规范: empty delta implicitly closes the message
+    if (delta === '' && messageId && this.currentReasoningMessageId === messageId) {
+      this.currentReasoningMessageId = null;
+      return createThinkingContent({ title: '思考结束' }, 'complete', 'merge', true);
     }
-    return createThinkingContent({ text: event.delta || '' }, 'streaming', 'merge', false);
+
+    if (this.currentReasoningMessageId !== messageId) {
+      return this.openReasoningBlock(messageId, event.title, delta);
+    }
+    return createThinkingContent({ text: delta }, 'streaming', 'merge', false);
   }
 
   /**
