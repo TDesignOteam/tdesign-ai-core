@@ -1,6 +1,5 @@
 /* eslint-disable no-param-reassign */
 /* eslint-disable class-methods-use-this */
-import { AGUIAdapter } from './adapters/agui';
 import { MessageStore } from './store/message';
 import type { ChatEventBusOptions, IChatEventBus } from './event-bus';
 import { ChatEngineEventType, ChatEventBus } from './event-bus';
@@ -8,10 +7,10 @@ import MessageProcessor from './processor';
 import { LLMService } from './server';
 import {
   createStreamHandler,
+  type AGUIStreamHandler,
   type IStreamHandler,
+  type OpenClawStreamHandler,
   type StreamContext,
-  AGUIStreamHandler,
-  OpenClawStreamHandler,
 } from './stream-handlers';
 import type {
   AIMessageContent,
@@ -23,103 +22,111 @@ import type {
   ChatStatus,
   IChatEngine,
   SystemMessage,
-  ToolCall,
 } from './type';
 
+/**
+ * 聊天引擎主类。
+ *
+ * 负责生命周期、消息编排、传输层连接，以及协议 StreamHandler 的调度。
+ * 业务层通常只需要使用 public 方法；协议细节（AG-UI / OpenClaw）通过
+ * {@link ChatEngine.agui} / {@link ChatEngine.openclaw} 快捷访问器或
+ * {@link ChatEngine.getStreamHandler} 获取。
+ */
 export default class ChatEngine implements IChatEngine {
-  public messageStore: MessageStore;
+  // ──────────────────────────────────────────────
+  // Fields
+  // ──────────────────────────────────────────────
 
-  /**
-   * 事件总线实例
-   * @description 用于发布/订阅引擎事件，支持无 UI 场景下的事件分发
-   */
+  /** 消息仓库，负责所有消息 CRUD 与对应事件广播 */
+  public readonly messageStore: MessageStore;
+
+  /** 事件总线，支持无 UI 场景下的事件分发 */
   public readonly eventBus: IChatEventBus;
 
-  public messageProcessor: MessageProcessor;
+  /** 消息处理器，承载内容块合并策略 */
+  public readonly messageProcessor: MessageProcessor;
 
   private llmService!: LLMService;
 
   private config!: ChatServiceConfig;
 
+  /** 流式处理策略，由协议类型决定（Strategy 模式） */
+  private streamHandler!: IStreamHandler;
+
   private lastRequestParams: ChatRequestParams | undefined;
 
   private stopReceive = false;
 
-  public aguiAdapter: AGUIAdapter | null = null;
-
-  /** 流式处理策略（由协议类型决定） */
-  private streamHandler!: IStreamHandler;
-
-  /** 是否已完成初始化（防止 React StrictMode 等场景下重复调用 init） */
+  /** 防止 React StrictMode 等场景下重复调用 init */
   private initialized = false;
 
-  /** ensureConnected 去重：正在进行中的连接 Promise */
+  /** connect() 去重：正在进行中的连接 Promise */
   private _connectingPromise: Promise<void> | null = null;
 
+  // ──────────────────────────────────────────────
+  // Constructor
+  // ──────────────────────────────────────────────
+
   constructor(eventBusOptions?: ChatEventBusOptions) {
-    this.messageProcessor = new MessageProcessor();
-    this.messageStore = new MessageStore();
     this.eventBus = new ChatEventBus(eventBusOptions);
+    this.messageProcessor = new MessageProcessor();
+    this.messageStore = new MessageStore(this.eventBus);
   }
 
-  /**
-   * 获取当前所有消息
-   * @returns 消息数组
-   * @description 返回消息存储中的所有消息
-   */
-  get messages(): ChatMessagesData[] {
+  // ──────────────────────────────────────────────
+  // Accessors
+  // ──────────────────────────────────────────────
+
+  /** 当前所有消息 */
+  public get messages(): ChatMessagesData[] {
     return this.messageStore.messages;
   }
 
-  /**
-   * 获取当前聊天状态
-   * @returns 聊天状态：'idle'、'pending'、'streaming'、'complete'、'stop'或'error'
-   * @description 返回最后一条消息的状态，如果没有消息则返回'idle'
-   */
-  get status(): ChatStatus {
+  /** 当前聊天状态（取最后一条消息的状态，无消息时为 `'idle'`） */
+  public get status(): ChatStatus {
     return this.messages.at(-1)?.status || 'idle';
   }
 
   /**
-   * 销毁聊天引擎实例
-   * @description 中止请求，清理消息存储和适配器，释放资源
+   * AG-UI 协议快捷访问器：协议匹配时返回 handler 实例，否则返回 `null`。
+   *
+   * @example
+   * engine.agui?.handleEvent(chunk, {});
+   * engine.agui?.getToolcallByName('search');
    */
-  destroy(): void {
-    // 发布销毁事件
-    this.eventBus.emit(ChatEngineEventType.ENGINE_DESTROY, {
-      timestamp: Date.now(),
-    });
-
-    // 中止当前请求
-    this.abortChat();
-
-    // 销毁 LLM 服务（彻底关闭所有连接，包括 WS 长连接）
-    this.llmService.destroy();
-
-    // 清理消息存储
-    this.messageStore.clearHistory();
-    this.messageStore.destroy();
-
-    // 清理适配器和 StreamHandler
-    this.aguiAdapter = null;
-    this.streamHandler?.destroy?.();
-
-    // 销毁事件总线
-    this.eventBus.destroy();
+  public get agui(): AGUIStreamHandler | null {
+    return this.streamHandler?.protocol === 'agui'
+      ? (this.streamHandler as AGUIStreamHandler)
+      : null;
   }
 
   /**
-   * 初始化聊天引擎
-   * @param configSetter 聊天服务配置或配置生成函数
-   * @param initialMessages 初始消息列表，用于恢复历史对话
-   * @description 设置初始消息、配置服务参数，并根据协议类型初始化适配器和 StreamHandler
+   * OpenClaw 协议快捷访问器：协议匹配时返回 handler 实例，否则返回 `null`。
+   *
+   * @example
+   * engine.openclaw?.getAdapter()?.invokeAction(...);
+   */
+  public get openclaw(): OpenClawStreamHandler | null {
+    return this.streamHandler?.protocol === 'openclaw'
+      ? (this.streamHandler as OpenClawStreamHandler)
+      : null;
+  }
+
+  // ──────────────────────────────────────────────
+  // Lifecycle
+  // ──────────────────────────────────────────────
+
+  /**
+   * 初始化聊天引擎。
+   *
+   * 设置初始消息、配置服务参数，并根据协议类型创建对应的 StreamHandler。
+   * 幂等：重复调用会被忽略（React StrictMode 友好）。
    */
   public async init(configSetter: ChatServiceConfigSetter, initialMessages?: ChatMessagesData[]) {
-    // 防止重复初始化（React StrictMode 等场景下 init 可能被调用多次）
     if (this.initialized) return;
     this.initialized = true;
 
-    // 清理上一次 init 遗留的资源（防止 React StrictMode 重复调用导致孤儿连接）
+    // 清理上一次 init 遗留的 handler（StrictMode 重复调用导致的孤儿连接）
     if (this.streamHandler) {
       try {
         await this.streamHandler.destroy?.();
@@ -127,84 +134,147 @@ export default class ChatEngine implements IChatEngine {
         // 旧连接可能尚在 CONNECTING 阶段，忽略关闭时的异常
       }
     }
-    this.aguiAdapter = null;
 
     this.messageStore.initialize(this.convertMessages(initialMessages));
     this.config = typeof configSetter === 'function' ? configSetter() : configSetter || {};
     this.llmService = new LLMService();
 
-    // 初始化 AGUI 适配器
-    if (this.config.protocol === 'agui') {
-      this.aguiAdapter = new AGUIAdapter();
-    }
-
-    // 创建协议对应的 StreamHandler（Strategy 模式）
     this.streamHandler = createStreamHandler({
       protocol: this.config.protocol,
       llmService: this.llmService,
-      aguiAdapter: this.aguiAdapter,
     });
 
-    // OpenClaw 协议：立即建立 WebSocket 连接并完成握手
-    // Gateway 会在 connect 响应中推送历史消息，通过 onHistoryLoaded 自动回填
-    if (this.config.protocol === 'openclaw' && this.config.endpoint && this.streamHandler instanceof OpenClawStreamHandler) {
-      (this.streamHandler as OpenClawStreamHandler).initConnection(this.config, (historyMessages) => {
-        if (historyMessages && historyMessages.length > 0) {
-          this.messageStore.setMessages(historyMessages, 'replace');
-          this.config.onHistoryLoaded?.(historyMessages);
-        }
-      });
-    }
+    // 协议级生命周期初始化（如 OpenClaw 预建 WS + 历史回填）
+    // fire-and-forget：init 不阻塞协议握手
+    void this.streamHandler.initialize?.(this.config, {
+      messageStore: this.messageStore,
+      eventBus: this.eventBus,
+    });
 
-    // 发布初始化事件
     this.eventBus.emit(ChatEngineEventType.ENGINE_INIT, {
       timestamp: Date.now(),
     });
   }
 
+  /** 销毁实例：中止请求、清理存储、关闭连接，释放所有资源 */
+  public destroy(): void {
+    this.eventBus.emit(ChatEngineEventType.ENGINE_DESTROY, {
+      timestamp: Date.now(),
+    });
+
+    this.abortChat();
+    this.llmService.destroy();
+    this.messageStore.clearHistory();
+    this.messageStore.destroy();
+    this.streamHandler?.destroy?.();
+    this.eventBus.destroy();
+  }
+
+  // ──────────────────────────────────────────────
+  // Connection
+  // ──────────────────────────────────────────────
+
   /**
-   * 发送用户消息并获取AI回复
-   * @param requestParams 请求参数，包含用户输入的文本和附件
-   * @param sendRequest 是否立即发送
-   * @description 创建用户消息和AI消息，并发送请求获取AI回复
+   * 建立传输层连接（幂等 + 去重 + 可选重建）。
+   *
+   * 行为按 transport 分发：
+   * - `ws`：建立 / 复用 WebSocket 连接
+   * - `sse` / `fetch`：直接 resolve，本方法为 no-op
+   *
+   * 语义：
+   * - 未传 `configOverrides`：
+   *   - 已连接 → 立即返回
+   *   - 正在建连 → 复用同一个 Promise（幂等去重）
+   *   - 未连接 → 建立新连接并等待握手完成
+   * - 传了 `configOverrides`：
+   *   - 临时合并到当前 config（不写回 `this.config`）
+   *   - 强制关闭现有连接后重建（用于切换会话等场景）
+   *
+   * 适合在用户开始输入时提前调用，让连接在发送前就绪。
+   */
+  public async connect(configOverrides?: Partial<ChatServiceConfig>): Promise<void> {
+    const config = configOverrides ? { ...this.config, ...configOverrides } : this.config;
+    const transport = LLMService.resolveTransport(config);
+    if (transport !== 'ws' || !config.endpoint) return;
+
+    // 无覆盖 + 已连接 → 幂等返回
+    if (!configOverrides && this.llmService.isWSConnected()) return;
+
+    // 有覆盖 → 强制重建：关闭现有连接并丢弃正在进行的连接 Promise
+    if (configOverrides) {
+      this.llmService.disconnectWS();
+      this._connectingPromise = null;
+    }
+
+    if (!this._connectingPromise) {
+      this._connectingPromise = this.llmService
+        .initWSConnection(config)
+        .finally(() => {
+          this._connectingPromise = null;
+        });
+    }
+    return this._connectingPromise;
+  }
+
+  /**
+   * 断开传输层连接。
+   *
+   * 先置 `stopReceive` 阻止已缓冲 chunk 继续被处理，再关闭底层连接。
+   * 下次发送消息时会自动重置 `stopReceive` 并按需建立新连接。
+   * 对 `sse` / `fetch` transport 为 no-op。
+   */
+  public disconnect(): void {
+    this.stopReceive = true;
+    this.llmService.disconnectWS();
+  }
+
+  /**
+   * 声明式更新传输层端点地址。
+   *
+   * 仅写入 `config.endpoint`，不触发重连；后续按需建连或显式
+   * {@link connect} 时会使用新值。
+   */
+  public updateEndpoint(endpoint: string): void {
+    this.config.endpoint = endpoint;
+  }
+
+  // ──────────────────────────────────────────────
+  // Messaging
+  // ──────────────────────────────────────────────
+
+  /**
+   * 发送用户消息并获取 AI 回复。
+   *
+   * 同时创建 user / assistant 两条消息；可选择是否立即发起请求。
+   * `prompt` 与 `attachments` 至少需要一个有效值。
+   *
+   * @param sendRequest 是否立即发送请求，默认 `true`
    */
   public async sendUserMessage(requestParams: ChatRequestParams, sendRequest = true) {
     const { prompt, attachments, ...customParams } = requestParams;
 
-    // 检查条件：prompt和attachments至少传入一个，且如果设置了就不能为空
     const hasValidPrompt = prompt && prompt.trim() !== '';
     const hasValidAttachments = Array.isArray(attachments) && attachments.length > 0;
-
-    // 如果两者都没有有效值，则直接返回
     if (!hasValidPrompt && !hasValidAttachments) {
-      console.warn('[ChatEngine] sendUserMessage: 必须提供有效的prompt或attachments');
+      console.warn('[ChatEngine] sendUserMessage: 必须提供有效的 prompt 或 attachments');
       return;
     }
+
     const userMessage = this.messageProcessor.createUserMessage(prompt ?? '', attachments);
     const aiMessage = this.messageProcessor.createAssistantMessage();
     this.messageStore.createMultiMessages([userMessage, aiMessage]);
-
-    // 发布消息创建事件
-    this.eventBus.emit(ChatEngineEventType.MESSAGE_CREATE, {
-      message: userMessage,
-      messages: this.messages,
-    });
 
     if (sendRequest) {
       const params = {
         ...requestParams,
         messageID: aiMessage.id,
-        ...customParams, // 透传用户自定义参数
+        ...customParams,
       };
       this.sendRequest(params);
     }
   }
 
-  /**
-   * 发送系统消息
-   * @param msg 系统消息文本内容
-   * @description 创建并存储一条系统消息，通常用于设置上下文或控制对话流程
-   */
+  /** 发送系统消息（仅落库，不触发请求，通常用于设置上下文或控制对话流程） */
   public async sendSystemMessage(msg: string) {
     const systemMessage = {
       role: 'system',
@@ -216,80 +286,148 @@ export default class ChatEngine implements IChatEngine {
       ],
     } as SystemMessage;
     this.messageStore.createMessage(systemMessage);
-
-    // 发布消息创建事件
-    this.eventBus.emit(ChatEngineEventType.MESSAGE_CREATE, {
-      message: systemMessage,
-      messages: this.messages,
-    });
   }
 
   /**
-   * 手动发送AI消息
-   * @param options 包含请求参数params、发送消息内容content和是否发送请求的标志sendRequest
-   * @description 创建并存储一条AI消息，可选择是否同时发送请求
+   * 手动创建一条 AI 消息，可选同时发起请求。
+   *
+   * @param options.params      请求参数
+   * @param options.content     初始内容块数组
+   * @param options.sendRequest 是否立即发起请求，默认 `true`
    */
   public async sendAIMessage(
     options: { params?: ChatRequestParams; content?: AIMessageContent[]; sendRequest?: boolean } = {},
   ) {
-    const { params = {}, content, sendRequest = true } = options;
-    const newAIMessage = this.messageProcessor.createAssistantMessage({
-      content,
-      status: sendRequest ? 'pending' : 'complete',
-    });
-    this.messageStore.createMessage(newAIMessage);
+    const { params, content, sendRequest = true } = options;
+    await this.dispatchAssistantMessage({ content, params, sendRequest });
+  }
 
-    // 发布消息创建事件
-    this.eventBus.emit(ChatEngineEventType.MESSAGE_CREATE, {
-      message: newAIMessage,
-      messages: this.messages,
+  /**
+   * 根据当前 transport 发送请求：
+   * - `fetch` → 批量请求
+   * - `sse` / `ws` → 流式请求
+   *
+   * 结果通过流回调或 {@link processMessageResult} 写入 store；
+   * 异常统一经 {@link emitRequestError} 广播。
+   */
+  public async sendRequest(params: ChatRequestParams) {
+    const { messageID: id } = params;
+
+    this.eventBus.emit(ChatEngineEventType.REQUEST_START, {
+      params,
+      messageId: id,
     });
 
-    if (sendRequest) {
-      params.messageID = newAIMessage.id;
-      await this.sendRequest(params);
+    try {
+      const transport = LLMService.resolveTransport(this.config);
+
+      if (transport === 'fetch') {
+        await this.handleBatchRequest(params);
+      } else {
+        this.stopReceive = false;
+        await this.handleStreamRequest(params);
+      }
+      this.lastRequestParams = params;
+    } catch (error) {
+      this.emitRequestError(id!, error, params);
+      throw error;
     }
   }
 
   /**
-   * 恢复未完成的 Agent 运行（断点续传）
+   * 处理一次消息结果并广播 `MESSAGE_UPDATE` 事件。
+   *
+   * 支持：
+   * - 单个 / 多个内容块
+   * - 增量更新（委托 MessageProcessor 合并）
+   * - 快照替换（数组带 `_isSnapshot` 标记，对应 `MESSAGES_SNAPSHOT` 语义）
+   *
+   * 一般由 StreamHandler 通过 {@link StreamContext.processMessageResult} 回调触发，
+   * 不建议业务层直接调用。
+   */
+  public processMessageResult(messageId: string, result: AIMessageContent | AIMessageContent[] | null) {
+    if (!result) return;
+
+    if (Array.isArray(result) && (result as any)._isSnapshot) {
+      // MESSAGES_SNAPSHOT：整体替换，避免与已有内容拼接冲突
+      this.messageStore.replaceContent(messageId, result);
+    } else {
+      this.messageProcessor.applyContentUpdate(this.messageStore, messageId, result);
+    }
+
+    const message = this.messageStore.getMessageByID(messageId);
+    if (message) {
+      this.eventBus.emit(ChatEngineEventType.MESSAGE_UPDATE, {
+        messageId,
+        content: result,
+        message,
+      });
+
+      // 协议级后处理（如 AG-UI 发布细粒度 activity / toolcall 事件）
+      this.streamHandler.afterMessageUpdate?.(messageId, result, {
+        messageStore: this.messageStore,
+        eventBus: this.eventBus,
+      });
+    }
+  }
+
+  /**
+   * 恢复未完成的 Agent 运行（断点续传）。
    *
    * 适用场景：用户离开页面后重新进入，后端 Agent 仍在运行。
    *
    * 流程：
-   * 1. 创建一条空的 AI 消息（用于承载后续推送的内容）
-   * 2. 调用 sendRequest 发起 SSE 连接
-   * 3. 后端推 MESSAGES_SNAPSHOT 恢复已产生的中间内容（replaceContent）
-   * 4. 后端继续推增量事件（TEXT_MESSAGE_CONTENT 等），Processor 正常 append
-   * 5. 后端推 RUN_FINISHED 结束
+   * 1. 创建一条空的 AI 消息承载后续推送
+   * 2. 发起 SSE 连接
+   * 3. 后端推 `MESSAGES_SNAPSHOT` 恢复已有内容（`replaceContent`）
+   * 4. 后端推 `TEXT_MESSAGE_CONTENT` 等增量事件，Processor 正常 append
+   * 5. 后端推 `RUN_FINISHED` 结束
    *
-   * @param params 请求参数，应包含 threadId / runId 等后端识别续传所需的信息
+   * @param params 请求参数，应包含 `threadId` / `runId` 等续传所需的信息
    * @returns 新创建的 AI 消息 ID
    */
   public async resumeRun(params: ChatRequestParams = {}): Promise<string> {
-    // 创建空的 AI 消息，状态为 pending（等待后端推送内容）
-    const newAIMessage = this.messageProcessor.createAssistantMessage({
+    return this.dispatchAssistantMessage({
       content: [],
       status: 'pending',
+      params,
+      sendRequest: true,
     });
-    this.messageStore.createMessage(newAIMessage);
-
-    // 发布消息创建事件
-    this.eventBus.emit(ChatEngineEventType.MESSAGE_CREATE, {
-      message: newAIMessage,
-      messages: this.messages,
-    });
-
-    // 发起请求，后端会通过 MESSAGES_SNAPSHOT 恢复已有内容，然后继续推增量
-    params.messageID = newAIMessage.id;
-    await this.sendRequest(params);
-
-    return newAIMessage.id;
   }
 
   /**
-   * 中止当前进行中的聊天请求
-   * @description 停止接收流式响应，关闭连接，并调用配置的onAbort回调
+   * 重新生成 AI 回复。
+   *
+   * @param keepVersion
+   *   - `false`（默认）：删除最后一条 AI 消息后创建新消息重新请求
+   *   - `true`：保留旧消息作为分支，创建分支消息重新请求
+   */
+  public async regenerateAIMessage(keepVersion = false) {
+    const { lastAIMessage } = this.messageStore;
+    if (!lastAIMessage) return;
+
+    if (!keepVersion) {
+      this.messageStore.removeMessage(lastAIMessage.id);
+    } else {
+      // TODO: 保留历史版本，创建新分支
+      this.messageStore.createMessageBranch(lastAIMessage.id);
+    }
+
+    // 复用上次请求参数（messageID 由 dispatchAssistantMessage 统一注入）
+    await this.dispatchAssistantMessage({
+      params: {
+        ...(this.lastRequestParams || {}),
+        prompt: this.lastRequestParams?.prompt ?? '',
+      },
+      sendRequest: true,
+    });
+  }
+
+  /**
+   * 中止当前进行中的聊天请求。
+   *
+   * 停止接收流式响应、关闭连接，并调用 `config.onAbort` 回调。
+   * ws 模式下通过 `config.abortRequest` 以 fire-and-forget 发送 `/stop`。
    */
   public async abortChat() {
     const transport = LLMService.resolveTransport(this.config);
@@ -301,7 +439,6 @@ export default class ChatEngine implements IChatEngine {
 
     try {
       if (transport === 'ws') {
-        // ws 模式下，通过 sendRequest 管线发送 /stop（fire-and-forget）
         if (lastAI && (lastAI.status === 'streaming' || lastAI.status === 'pending')) {
           this.handleComplete(lastAI.id, true, this.lastRequestParams || ({} as ChatRequestParams));
         }
@@ -311,30 +448,18 @@ export default class ChatEngine implements IChatEngine {
           try {
             await this.sendRequest({ ...this.config.abortRequest });
           } catch (e) {
-            console.warn('[ChatEngine] abortChat: sendRequest failed', e);
+            console.warn('[ChatEngine] abort: sendRequest failed', e);
           }
           this.lastRequestParams = savedParams;
         }
       } else {
         this.stopReceive = true;
         this.llmService.closeConnect();
-        // OpenClaw 的 abort 由 StreamHandler 管理
-        if (this.streamHandler instanceof OpenClawStreamHandler) {
-          (this.streamHandler as OpenClawStreamHandler).abort();
-        }
+        this.streamHandler.abort?.();
 
-        if (transport === 'fetch') {
-          // 只有在非流式（fetch）模式下才删除最后一条AI消息
-          if (this.messageStore.lastAIMessage?.id) {
-            const messageId = this.messageStore.lastAIMessage.id;
-            this.messageStore.removeMessage(messageId);
-
-            // 发布消息删除事件
-            this.eventBus.emit(ChatEngineEventType.MESSAGE_DELETE, {
-              messageId,
-              messages: this.messages,
-            });
-          }
+        // 非流式 fetch 模式下，删除最后一条 AI 消息（保持 UI 干净）
+        if (transport === 'fetch' && this.messageStore.lastAIMessage?.id) {
+          this.messageStore.removeMessage(this.messageStore.lastAIMessage.id);
         }
       }
     } catch (error) {
@@ -342,192 +467,100 @@ export default class ChatEngine implements IChatEngine {
     }
   }
 
+  // ──────────────────────────────────────────────
+  // Store utilities
+  // ──────────────────────────────────────────────
+
   /**
-   * 建立 WebSocket 连接
+   * 批量设置消息列表，用于加载历史消息或重置对话。
    *
-   * 关闭当前 WS 连接并建立新连接，用于切换会话等需要干净连接状态的场景。
-   * 内部委托给 LLMService.initWSConnection，复用已有的连接管理逻辑。
+   * @param mode `'replace'`（替换，默认）/ `'prepend'`（前置）/ `'append'`（追加）
    */
-  public async connectWS(configOverrides?: Partial<ChatServiceConfig>): Promise<void> {
-    const config = configOverrides ? { ...this.config, ...configOverrides } : this.config;
-    const transport = LLMService.resolveTransport(config);
-    if (transport === 'ws' && config.endpoint) {
-      await this.llmService.initWSConnection(config);
-    }
+  public setMessages(messages: ChatMessagesData[], mode: ChatMessageSetterMode = 'replace') {
+    this.messageStore.setMessages(messages, mode);
   }
 
-  /**
-   * 确保 WebSocket 连接已就绪（幂等、去重）
-   *
-   * - 已连接 → 立即返回
-   * - 正在建连 → 复用同一个 Promise，不会重复创建连接
-   * - 未连接 → 建立新连接并等待握手完成
-   *
-   * 适合在用户开始输入时提前调用，让连接在发送前就绪。
-   */
-  public async ensureConnected(): Promise<void> {
-    const transport = LLMService.resolveTransport(this.config);
-    if (transport !== 'ws' || !this.config.endpoint) return;
-
-    if (this.llmService.isWSConnected()) return;
-
-    if (!this._connectingPromise) {
-      this._connectingPromise = this.llmService.initWSConnection(this.config)
-        .finally(() => { this._connectingPromise = null; });
-    }
-    return this._connectingPromise;
+  /** 清空消息存储中的所有历史记录 */
+  public clearMessages(): void {
+    this.messageStore.clearHistory();
   }
 
-  /**
-   * 更新 WS 端点地址
-   *
-   * 声明式更新 config.endpoint，后续自动建连（handleWSStreamRequest）
-   * 和显式建连（connectWS 无参数）均使用新值。不会触发重连或影响当前连接。
-   */
-  public updateEndpoint(endpoint: string): void {
-    this.config.endpoint = endpoint;
-  }
+  // ──────────────────────────────────────────────
+  // Extension
+  // ──────────────────────────────────────────────
 
   /**
-   * 断开 WebSocket 连接。
+   * 注册内容块合并策略，用于自定义不同类型内容的增量更新逻辑。
    *
-   * 先置 stopReceive 阻止已缓冲 chunk 继续被处理，再关闭 WS 传输层。
-   * 下次发送消息时 handleWSStreamRequest 会自动重置 stopReceive 并建立新连接。
-   */
-  public disconnectWS(): void {
-    this.stopReceive = true;
-    this.llmService.disconnectWS();
-  }
-
-  /**
-   * 注册内容块合并策略
-   * @param type 内容类型，如'text'、'markdown'等
-   * @param handler 合并处理函数，接收新块和现有块，返回合并后的内容块
-   * @description 用于自定义不同类型内容的增量更新逻辑
+   * @param type    内容类型（如 `'text'` / `'markdown'`）
+   * @param handler 接收新块与现有块，返回合并后的内容块
    */
   public registerMergeStrategy<T extends AIMessageContent>(
-    type: T['type'], // 使用类型中定义的type字段作为参数类型
+    type: T['type'],
     handler: (chunk: T, existing?: T) => T,
   ) {
     this.messageProcessor.registerHandler(type, handler);
   }
 
   /**
-   * 设置消息列表
-   * @param messages 要设置的消息数组
-   * @param mode 设置模式：'replace'(替换)、'prepend'(前置)、'append'(追加)，默认为'replace'
-   * @description 用于批量更新消息，如加载历史消息或重置对话
+   * 获取当前协议对应的 StreamHandler 实例（泛型友好通用入口）。
+   *
+   * 常见协议推荐使用 {@link agui} / {@link openclaw} 快捷访问器；
+   * 本方法保留用于：
+   * - 自定义扩展协议
+   * - 需要在不关心具体协议的场景下访问基础能力（如 `protocol` 字段）
+   *
+   * 调用方需自行确保协议与期望类型匹配。
    */
-  public setMessages(messages: ChatMessagesData[], mode: ChatMessageSetterMode = 'replace') {
-    this.messageStore.setMessages(messages, mode);
+  public getStreamHandler<T extends IStreamHandler = IStreamHandler>(): T {
+    return this.streamHandler as T;
   }
 
-  /**
-   * 清空所有消息
-   * @description 清除消息存储中的所有历史记录
-   */
-  public clearMessages(): void {
-    this.messageStore.clearHistory();
+  // ──────────────────────────────────────────────
+  // Internals
+  // ──────────────────────────────────────────────
 
-    // 发布消息清空事件
-    this.eventBus.emit(ChatEngineEventType.MESSAGE_CLEAR, {
-      timestamp: Date.now(),
+  /**
+   * 新建一条 AI 消息并入 store，按需发起 `sendRequest`。
+   *
+   * 收敛 `sendAIMessage` / `resumeRun` / `regenerateAIMessage` 中重复的
+   * "createAssistantMessage → createMessage → sendRequest(带 messageID)" 模式。
+   *
+   * - `sendRequest=true`：status 默认 `'pending'`，await 等待请求链路结束
+   * - `sendRequest=false`：status 默认 `'complete'`，仅落库不发起请求
+   *
+   * @returns 新建 AI 消息的 ID
+   */
+  private async dispatchAssistantMessage(options: {
+    content?: AIMessageContent[];
+    status?: ChatMessagesData['status'];
+    params?: ChatRequestParams;
+    sendRequest?: boolean;
+  }): Promise<string> {
+    const { content, status, params, sendRequest = true } = options;
+    const aiMessage = this.messageProcessor.createAssistantMessage({
+      content,
+      status: status ?? (sendRequest ? 'pending' : 'complete'),
     });
-  }
+    this.messageStore.createMessage(aiMessage);
 
-  /**
-   * 重新生成AI回复
-   * @param keepVersion 是否保留历史版本，默认为false
-   * @description
-   * - 当keepVersion=false时：删除最后一条AI消息，创建新消息并重新请求
-   * - 当keepVersion=true时：保留旧消息，创建分支消息并重新请求
-   */
-  public async regenerateAIMessage(keepVersion = false) {
-    const { lastAIMessage } = this.messageStore;
-    if (!lastAIMessage) return;
-
-    if (!keepVersion) {
-      // 删除最后一条AI消息
-      this.messageStore.removeMessage(lastAIMessage.id);
-    } else {
-      // todo: 保留历史版本，创建新分支
-      this.messageStore.createMessageBranch(lastAIMessage.id);
+    if (sendRequest) {
+      await this.sendRequest({ ...(params || {}), messageID: aiMessage.id });
     }
-
-    // 创建新的AI消息
-    const newAIMessage = this.messageProcessor.createAssistantMessage();
-    this.messageStore.createMessage(newAIMessage);
-
-    // 重新发起请求
-    const params = {
-      ...(this.lastRequestParams || {}),
-      messageID: newAIMessage.id,
-      prompt: this.lastRequestParams?.prompt ?? '',
-    };
-
-    await this.sendRequest(params);
+    return aiMessage.id;
   }
 
-  /**
-   * 发送请求获取AI回复
-   * @param params 请求参数
-   * @description 根据配置选择流式或批量请求模式，处理响应并更新消息状态
-   */
-  public async sendRequest(params: ChatRequestParams) {
-    const { messageID: id } = params;
-
-    // 发布请求开始事件
-    this.eventBus.emit(ChatEngineEventType.REQUEST_START, {
-      params,
-      messageId: id,
-    });
-
-    try {
-      const transport = LLMService.resolveTransport(this.config);
-
-      if (transport === 'fetch') {
-        // 处理非流式批量响应模式
-        await this.handleBatchRequest(params);
-      } else {
-        // 处理流式响应模式（SSE 或 WebSocket，由 LLMService 内部分流）
-        this.stopReceive = false;
-        await this.handleStreamRequest(params);
-      }
-      this.lastRequestParams = params;
-    } catch (error) {
-      this.setMessageStatus(id!, 'error');
-
-      // 发布请求错误事件
-      this.eventBus.emit(ChatEngineEventType.REQUEST_ERROR, {
-        messageId: id!,
-        error,
-        params,
-      });
-
-      throw error;
-    }
-  }
-
-  /**
-   * 根据名称获取工具调用
-   * @param name 工具调用名称
-   * @returns 匹配的工具调用对象，如果未找到则返回undefined
-   * @description 用于获取特定名称的工具调用信息，仅在AGUI协议下可用
-   */
-  public getToolcallByName(name: string): ToolCall | undefined {
-    return this.aguiAdapter?.getToolcallByName(name);
-  }
-
+  /** 非流式批量请求：一次性拿到完整结果后写入 store 并广播完成事件 */
   private async handleBatchRequest(params: ChatRequestParams) {
     const id = params.messageID;
     if (!id) return;
-    this.setMessageStatus(id, 'pending');
+
+    this.messageStore.setMessageStatus(id, 'pending');
     const result = await this.llmService.handleBatchRequest(params, this.config);
     if (result) {
       this.processMessageResult(id, result);
-      this.setMessageStatus(id, 'complete');
+      this.messageStore.setMessageStatus(id, 'complete');
 
-      // 发布请求完成事件
       const message = this.messageStore.getMessageByID(id);
       if (message) {
         this.eventBus.emit(ChatEngineEventType.REQUEST_COMPLETE, {
@@ -537,42 +570,38 @@ export default class ChatEngine implements IChatEngine {
         });
       }
     } else {
-      this.setMessageStatus(id, 'error');
-
-      // 发布请求错误事件
-      this.eventBus.emit(ChatEngineEventType.REQUEST_ERROR, {
-        messageId: id,
-        error: new Error('Batch request returned empty result'),
-        params,
-      });
+      this.emitRequestError(id, new Error('Batch request returned empty result'), params);
     }
   }
 
-  private handleError(id: string, error: unknown) {
-    this.setMessageStatus(id, 'error');
-    this.config.onError?.(error as Error);
+  /** 流式请求：委托给 StreamHandler（Default / AGUI / OpenClaw）处理 */
+  private async handleStreamRequest(params: ChatRequestParams) {
+    const id = params.messageID;
+    if (id) {
+      this.messageStore.setMessageStatus(id, 'streaming');
+    }
 
-    // 发布请求错误事件
-    this.eventBus.emit(ChatEngineEventType.REQUEST_ERROR, {
-      messageId: id,
-      error,
-    });
+    const context = this.buildStreamContext(id);
+    await this.streamHandler.handleStream(params, context);
   }
 
+  /**
+   * 请求完成 / 中止的统一处理。
+   *
+   * 先让用户 `onComplete` 回调有机会自定义内容；否则按各内容块状态结算，
+   * 并广播 `REQUEST_COMPLETE` 或 `REQUEST_ABORT` 事件。
+   */
   private handleComplete(id: string, isAborted: boolean, params: ChatRequestParams, chunk?: unknown) {
-    // 先调用用户自定义的 onComplete 回调，让业务层决定如何处理
     const customResult = this.config.onComplete?.(isAborted, params, chunk);
-    // 如果用户返回了自定义内容，处理这些内容
     if (Array.isArray(customResult) || (customResult && 'status' in customResult)) {
       this.processMessageResult(id, customResult);
     } else {
-      // 所有消息内容块检查，只要有一个失败，消息的status就是失败
+      // 任何内容块失败，即视为整体失败
       const allContentFailed = this.messageStore.messages.find((content) => content.status === 'error');
       // eslint-disable-next-line no-nested-ternary
-      this.setMessageStatus(id, isAborted ? 'stop' : allContentFailed ? 'error' : 'complete');
+      this.messageStore.setMessageStatus(id, isAborted ? 'stop' : allContentFailed ? 'error' : 'complete');
     }
 
-    // 发布请求完成/中止事件
     const message = this.messageStore.getMessageByID(id);
     if (message) {
       if (isAborted) {
@@ -590,24 +619,28 @@ export default class ChatEngine implements IChatEngine {
     }
   }
 
-  /**
-   * 处理流式请求
-   * 委托给 StreamHandler 策略处理（Default/AGUI/OpenClaw）
-   */
-  private async handleStreamRequest(params: ChatRequestParams) {
-    const id = params.messageID;
-
-    if (id) {
-      this.setMessageStatus(id, 'streaming');
-    }
-
-    const context = this.buildStreamContext(id);
-    await this.streamHandler.handleStream(params, context);
+  /** 运行时错误兜底：回调 + 广播 */
+  private handleError(id: string, error: unknown) {
+    this.config.onError?.(error as Error);
+    this.emitRequestError(id, error);
   }
 
   /**
-   * 构建 StreamHandler 所需的上下文
+   * 统一的请求错误发布入口。
+   *
+   * 把消息状态置为 `'error'` 并广播 `REQUEST_ERROR` 事件。
+   * 被 `sendRequest` catch / `handleBatchRequest` 空结果 / `handleError` 三处共用。
    */
+  private emitRequestError(messageId: string, error: unknown, params?: ChatRequestParams) {
+    this.messageStore.setMessageStatus(messageId, 'error');
+    this.eventBus.emit(ChatEngineEventType.REQUEST_ERROR, {
+      messageId,
+      error,
+      ...(params ? { params } : {}),
+    });
+  }
+
+  /** 构建 StreamHandler 所需的上下文 */
   private buildStreamContext(messageId?: string): StreamContext {
     return {
       messageId,
@@ -621,62 +654,14 @@ export default class ChatEngine implements IChatEngine {
     };
   }
 
-  /**
-   * 统一处理消息结果
-   * 支持单个内容块、多个内容块和增量更新
-   * 支持 MESSAGES_SNAPSHOT 的 replaceContent 语义（_isSnapshot 标记）
-   */
-  public processMessageResult(messageId: string, result: AIMessageContent | AIMessageContent[] | null) {
-    if (!result) return;
-
-    // MESSAGES_SNAPSHOT 场景：使用 replaceContent 一次性替换消息内容
-    // 而非逐个 append，避免与已有内容产生拼接冲突
-    if (Array.isArray(result) && (result as any)._isSnapshot) {
-      this.messageStore.replaceContent(messageId, result);
-    } else {
-      // 委托 MessageProcessor 处理内容更新
-      this.messageProcessor.applyContentUpdate(this.messageStore, messageId, result);
-    }
-
-    // 发布消息更新事件
-    const message = this.messageStore.getMessageByID(messageId);
-    if (message) {
-      this.eventBus.emit(ChatEngineEventType.MESSAGE_UPDATE, {
-        messageId,
-        content: result,
-        message,
-      });
-
-      // AG-UI 协议：发布细粒度事件（委托给 AGUIStreamHandler）
-      if (this.streamHandler instanceof AGUIStreamHandler) {
-        (this.streamHandler as AGUIStreamHandler).emitDetailEvents(messageId, result, this.eventBus);
-      }
-    }
-  }
-
+  /** 把初始消息列表转成 store 所需的 `{ messageIds, messages }` 结构 */
   private convertMessages(messages?: ChatMessagesData[]) {
     if (!messages) return { messageIds: [], messages: [] };
-
     return {
       messageIds: messages.map((msg) => msg.id),
       messages,
     };
   }
-
-  private setMessageStatus(messageId: string, status: ChatMessagesData['status']) {
-    const previousStatus = this.messageStore.getMessageByID(messageId)?.status;
-    this.messageStore.setMessageStatus(messageId, status);
-
-    // 发布消息状态变化事件
-    if (status) {
-      this.eventBus.emit(ChatEngineEventType.MESSAGE_STATUS_CHANGE, {
-        messageId,
-        status,
-        previousStatus,
-      });
-    }
-  }
-
 }
 
 export * from './utils';

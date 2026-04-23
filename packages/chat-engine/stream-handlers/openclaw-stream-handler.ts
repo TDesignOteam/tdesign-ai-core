@@ -9,14 +9,14 @@
  *
  * OpenClaw 的 chunk.data 已经是 AIMessageContent 格式（由 OpenClawAdapter 转换）
  */
-import type { AIMessageContent, ChatRequestParams, ChatServiceConfig, SSEChunkData } from '../type';
+import type { AIMessageContent, ChatMessagesData, ChatRequestParams, ChatServiceConfig, SSEChunkData } from '../type';
 import { ChatEngineEventType } from '../event-bus';
 import { LoggerManager } from '../utils/logger';
 import {
   OpenClawAdapter,
   type OpenClawAdapterConfig,
 } from '../adapters/openclaw';
-import type { IStreamHandler, StreamContext } from './types';
+import type { IStreamHandler, StreamContext, StreamLifecycleContext, StreamProtocol } from './types';
 import type { LLMService } from '../server';
 
 export interface OpenClawStreamHandlerOptions {
@@ -25,6 +25,8 @@ export interface OpenClawStreamHandlerOptions {
 }
 
 export class OpenClawStreamHandler implements IStreamHandler {
+  readonly protocol: StreamProtocol = 'openclaw';
+
   private openclawAdapter: OpenClawAdapter | null = null;
   private llmService: LLMService;
   private logger = LoggerManager.getLogger();
@@ -34,13 +36,23 @@ export class OpenClawStreamHandler implements IStreamHandler {
   }
 
   /**
-   * 初始化：在 ChatEngine.init() 阶段预建立 WebSocket 连接
+   * 引擎初始化阶段调用：预建立 WebSocket 连接并注册回调。
    *
-   * Gateway 会在 connect 响应中推送历史消息，通过 onHistoryLoaded 自动回填。
+   * Gateway 会在 connect 响应中推送历史消息，这里直接把历史回填到
+   * messageStore，并回调业务层提供的 config.onHistoryLoaded。
    */
-  async initConnection(config: ChatServiceConfig, onHistoryLoaded?: (messages: any[]) => void): Promise<void> {
+  async initialize(config: ChatServiceConfig, context: StreamLifecycleContext): Promise<void> {
+    if (!config.endpoint) return;
+
+    const { messageStore } = context;
+
     this.ensureAdapter(config);
-    this.updateCallbacks(config, onHistoryLoaded);
+    this.updateCallbacks(config, (historyMessages: ChatMessagesData[]) => {
+      if (historyMessages && historyMessages.length > 0) {
+        messageStore.setMessages(historyMessages, 'replace');
+        config.onHistoryLoaded?.(historyMessages);
+      }
+    });
 
     try {
       if (!this.openclawAdapter!.isAuthenticated()) {
@@ -153,7 +165,7 @@ export class OpenClawStreamHandler implements IStreamHandler {
   /**
    * 更新 init 阶段的回调（连接 + 历史消息）
    */
-  private updateCallbacks(config: ChatServiceConfig, onHistoryLoaded?: (messages: any[]) => void): void {
+  private updateCallbacks(config: ChatServiceConfig, onHistoryLoaded?: (messages: ChatMessagesData[]) => void): void {
     if (!this.openclawAdapter) return;
 
     this.openclawAdapter.setCallbacks({

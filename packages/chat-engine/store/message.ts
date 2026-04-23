@@ -9,10 +9,33 @@ import type {
   UserMessage,
 } from '../type';
 import { isAIMessage, isUserMessage } from '../utils';
+import { ChatEngineEventType, type IChatEventBus } from '../event-bus';
 import ReactiveState from './reactiveState';
 
-// 专注消息生命周期管理
+/**
+ * MessageStore - 消息存储
+ *
+ * 专注消息生命周期管理；在持有 eventBus 时，会在 CRUD 操作内自动广播
+ * 对应的 MESSAGE_* 事件，调用方无需在外层再手动 emit。
+ *
+ * 事件覆盖：
+ * - createMessage / createMultiMessages / createMessageBranch → MESSAGE_CREATE（每条消息一次）
+ * - removeMessage → MESSAGE_DELETE
+ * - clearHistory → MESSAGE_CLEAR
+ * - setMessageStatus → MESSAGE_STATUS_CHANGE
+ *
+ * setMessages 不 emit（语义上属于批量替换/同步历史，非"用户新建"）。
+ * 内容增量更新（appendContent / replaceContent / updateMultipleContents）
+ * 由上层 processMessageResult 统一 emit MESSAGE_UPDATE，含原始 result 参数。
+ */
 export class MessageStore extends ReactiveState<ChatMessageStore> {
+  private eventBus?: IChatEventBus;
+
+  constructor(eventBus?: IChatEventBus) {
+    super();
+    this.eventBus = eventBus;
+  }
+
   initialize(initialState?: Partial<ChatMessageStore>) {
     super.initialize({
       messageIds: [],
@@ -27,6 +50,10 @@ export class MessageStore extends ReactiveState<ChatMessageStore> {
       draft.messageIds.push(id);
       draft.messages.push(message);
     });
+    this.eventBus?.emit(ChatEngineEventType.MESSAGE_CREATE, {
+      message,
+      messages: this.messages,
+    });
   }
 
   createMultiMessages(messages: ChatMessagesData[]) {
@@ -36,6 +63,15 @@ export class MessageStore extends ReactiveState<ChatMessageStore> {
       });
       draft.messages.push(...messages);
     });
+    if (this.eventBus) {
+      const snapshot = this.messages;
+      messages.forEach((msg) => {
+        this.eventBus!.emit(ChatEngineEventType.MESSAGE_CREATE, {
+          message: msg,
+          messages: snapshot,
+        });
+      });
+    }
   }
 
   setMessages(messages: ChatMessagesData[], mode: ChatMessageSetterMode = 'replace') {
@@ -83,6 +119,7 @@ export class MessageStore extends ReactiveState<ChatMessageStore> {
 
   // 更新消息整体状态
   setMessageStatus(messageId: string, status: ChatMessagesData['status']) {
+    const previousStatus = this.getMessageByID(messageId)?.status;
     this.setState((draft) => {
       const message = draft.messages.find((m) => m.id === messageId);
       if (message) {
@@ -96,6 +133,13 @@ export class MessageStore extends ReactiveState<ChatMessageStore> {
         }
       }
     });
+    if (status !== undefined) {
+      this.eventBus?.emit(ChatEngineEventType.MESSAGE_STATUS_CHANGE, {
+        messageId,
+        status,
+        previousStatus,
+      });
+    }
   }
 
   // 为消息设置扩展属性
@@ -123,6 +167,9 @@ export class MessageStore extends ReactiveState<ChatMessageStore> {
       draft.messageIds = [];
       draft.messages = [];
     });
+    this.eventBus?.emit(ChatEngineEventType.MESSAGE_CLEAR, {
+      timestamp: Date.now(),
+    });
   }
 
   // 删除指定消息
@@ -136,6 +183,10 @@ export class MessageStore extends ReactiveState<ChatMessageStore> {
 
       // 从消息列表删除
       draft.messages = draft.messages.filter((msg) => msg.id !== messageId);
+    });
+    this.eventBus?.emit(ChatEngineEventType.MESSAGE_DELETE, {
+      messageId,
+      messages: this.messages,
     });
   }
 

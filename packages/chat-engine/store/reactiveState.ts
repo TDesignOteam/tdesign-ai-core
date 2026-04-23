@@ -16,7 +16,7 @@ enablePatches();
  * @template T 状态对象类型，必须为object类型
  */
 export default class ReactiveState<T extends object> {
-  private currentState!: T; // 当前状态（始终为冻结对象，由 initialize() 设置）
+  private currentState!: T; // 当前状态（始终为冻结对象）
 
   private subscribers = new Set<{ handler: Subscriber<T>; paths?: string[] }>(); // 订阅者集合（包含路径过滤条件）
 

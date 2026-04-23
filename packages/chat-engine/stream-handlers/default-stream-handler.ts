@@ -6,9 +6,11 @@
 import type { ChatRequestParams, SSEChunkData } from '../type';
 import { ChatEngineEventType } from '../event-bus';
 import { LLMService } from '../server';
-import type { IStreamHandler, StreamContext } from './types';
+import type { IStreamHandler, StreamContext, StreamProtocol } from './types';
 
 export class DefaultStreamHandler implements IStreamHandler {
+  readonly protocol: StreamProtocol = 'default';
+
   private llmService: LLMService;
 
   constructor(llmService: LLMService) {

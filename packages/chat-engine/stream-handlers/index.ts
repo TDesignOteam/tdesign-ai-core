@@ -8,31 +8,29 @@ export { DefaultStreamHandler } from './default-stream-handler';
 export { AGUIStreamHandler } from './agui-stream-handler';
 export { OpenClawStreamHandler } from './openclaw-stream-handler';
 
-import type { AGUIAdapter } from '../adapters/agui';
 import { LLMService } from '../server';
-import type { IStreamHandler } from './types';
+import type { IStreamHandler, StreamProtocol } from './types';
 import { DefaultStreamHandler } from './default-stream-handler';
 import { AGUIStreamHandler } from './agui-stream-handler';
 import { OpenClawStreamHandler } from './openclaw-stream-handler';
 
 export interface CreateStreamHandlerOptions {
-  protocol?: 'default' | 'agui' | 'openclaw';
+  protocol?: StreamProtocol;
   llmService: LLMService;
-  aguiAdapter?: AGUIAdapter | null;
 }
 
 /**
  * 工厂函数：根据协议类型创建对应的 StreamHandler
+ *
+ * 协议所需的适配器（如 AGUIAdapter）由对应 handler 内部自行创建和管理，
+ * ChatEngine 不再持有协议特定适配器的引用。
  */
 export function createStreamHandler(options: CreateStreamHandlerOptions): IStreamHandler {
-  const { protocol, llmService, aguiAdapter } = options;
+  const { protocol, llmService } = options;
 
   switch (protocol) {
     case 'agui':
-      if (!aguiAdapter) {
-        throw new Error('AGUIAdapter is required for agui protocol');
-      }
-      return new AGUIStreamHandler(llmService, aguiAdapter);
+      return new AGUIStreamHandler(llmService);
 
     case 'openclaw':
       return new OpenClawStreamHandler({ llmService });

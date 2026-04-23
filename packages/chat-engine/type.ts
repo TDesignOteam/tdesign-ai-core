@@ -359,7 +359,7 @@ export interface IChatEngine {
 
   /**
    * 中止当前进行中的聊天请求
-   * @description 停止接收流式响应，关闭连接，并调用配置的onAbort回调
+   * @description 停止接收流式响应，关闭连接，并调用配置的 onAbort 回调
    */
   abortChat(): Promise<void>;
 

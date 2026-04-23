@@ -4,19 +4,64 @@
  * SSE 数据 → AGUIEventMapper.mapEvent → 用户自定义 onMessage → processMessageResult
  * 同时负责发布 AG-UI 细粒度事件（AGUI_ACTIVITY / AGUI_TOOLCALL）
  */
-import type { AGUIAdapter } from '../adapters/agui';
-import type { AIMessageContent, ChatRequestParams, SSEChunkData } from '../type';
+import { AGUIAdapter } from '../adapters/agui';
+import type { AGUIAdapterCallbacks } from '../adapters/agui';
+import type { AIMessageContent, ChatRequestParams, SSEChunkData, ToolCall } from '../type';
 import { ChatEngineEventType } from '../event-bus';
 import { LLMService } from '../server';
-import type { IStreamHandler, StreamContext } from './types';
+import type { IStreamHandler, StreamContext, StreamLifecycleContext, StreamProtocol } from './types';
 
 export class AGUIStreamHandler implements IStreamHandler {
+  readonly protocol: StreamProtocol = 'agui';
+
   private llmService: LLMService;
   private aguiAdapter: AGUIAdapter;
 
-  constructor(llmService: LLMService, aguiAdapter: AGUIAdapter) {
+  constructor(llmService: LLMService, aguiAdapter?: AGUIAdapter) {
     this.llmService = llmService;
-    this.aguiAdapter = aguiAdapter;
+    this.aguiAdapter = aguiAdapter ?? new AGUIAdapter();
+  }
+
+  /**
+   * 获取内部持有的 AGUIAdapter 实例
+   *
+   * 常见场景推荐使用 `handleEvent` / `getToolcallByName` / `resetAdapter`
+   * 等代理方法，直接访问 adapter 仅在需要其额外能力时使用：
+   *
+   *   engine.agui?.getAdapter();
+   */
+  getAdapter(): AGUIAdapter {
+    return this.aguiAdapter;
+  }
+
+  /**
+   * 处理一个 AG-UI SSE chunk，返回映射后的消息内容
+   *
+   * 相当于 `this.getAdapter().handleAGUIEvent(chunk, callbacks)`，
+   * 作为业务侧高频调用的语法糖暴露：
+   *
+   *   engine.agui?.handleEvent(chunk);
+   *   engine.agui?.handleEvent(chunk, { onRunStart, onRunError });
+   */
+  handleEvent(
+    chunk: SSEChunkData,
+    callbacks: AGUIAdapterCallbacks = {},
+  ): AIMessageContent | AIMessageContent[] | null {
+    return this.aguiAdapter.handleAGUIEvent(chunk, callbacks);
+  }
+
+  /**
+   * 按名称查找运行态 toolcall（AGUI 协议专属）
+   */
+  getToolcallByName(name: string): ToolCall | undefined {
+    return this.aguiAdapter.getToolcallByName(name);
+  }
+
+  /**
+   * 重置 adapter 内部状态，用于开启新一轮对话前的清理
+   */
+  resetAdapter(): void {
+    this.aguiAdapter.reset();
   }
 
   async handleStream(params: ChatRequestParams, context: StreamContext): Promise<void> {
@@ -106,12 +151,16 @@ export class AGUIStreamHandler implements IStreamHandler {
 
   /**
    * 发布 AG-UI 细粒度事件
-   * 根据内容类型分发到对应的事件通道
    *
-   * 从 ChatEngine.emitAGUIDetailEvents 移入此处，
-   * 因为这完全是 AG-UI 协议的事件细节分发，不应在 ChatEngine 里。
+   * 在 MESSAGE_UPDATE 之后由 ChatEngine 统一回调，无需感知协议。
+   * 根据内容类型分发到对应的事件通道（AGUI_ACTIVITY / AGUI_TOOLCALL）。
    */
-  emitDetailEvents(messageId: string, result: AIMessageContent | AIMessageContent[], eventBus: StreamContext['eventBus']) {
+  afterMessageUpdate(
+    messageId: string,
+    result: AIMessageContent | AIMessageContent[],
+    context: StreamLifecycleContext,
+  ): void {
+    const { eventBus } = context;
     const contents = Array.isArray(result) ? result : [result];
     for (const content of contents) {
       // Activity 事件
