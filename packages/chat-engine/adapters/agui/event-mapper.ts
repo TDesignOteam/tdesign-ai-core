@@ -54,13 +54,13 @@ export class AGUIEventMapper {
 
   private toolCallChunkStarted: Set<string> = new Set(); // 已自动触发 TOOL_CALL_START 的 toolCallId
 
-  // Reasoning 简化模式状态跟踪（REASONING_MESSAGE_CHUNK 生命周期）
+  // Reasoning 消息状态跟踪（和 currentTextMessageId 风格对齐）
+  // 首次出现 messageId 时 append 新块；同 messageId → merge；不同 messageId → append 新块。
   private currentReasoningMessageId: string | null = null;
 
-  // 标记当前是否处于一个 reasoning phase（REASONING_START..REASONING_END 之间）
-  // 用于让 REASONING_MESSAGE_CHUNK / REASONING_MESSAGE_START 首个事件复用 START 创建的块，
-  // 而不是再 append 一个空块。
-  private reasoningBlockOpen = false;
+  // REASONING_START 携带的 title 暂存，由首个创建块的事件（MESSAGE_START / MESSAGE_CHUNK）消费。
+  // REASONING_START 自身不再直接 append 空块，避免 CHUNK 模式下产生一个悬空的 streaming 块。
+  private pendingReasoningTitle: string | null = null;
 
   /**
    * 主入口：将SSE事件转换为AIContentChunkUpdate
@@ -136,7 +136,7 @@ export class AGUIEventMapper {
     this.currentTextMessageRole = null;
     this.toolCallChunkStarted.clear();
     this.currentReasoningMessageId = null;
-    this.reasoningBlockOpen = false;
+    this.pendingReasoningTitle = null;
     // 清理 activityManager 状态
     activityManager.clear();
   }
@@ -198,43 +198,29 @@ export class AGUIEventMapper {
    * 当前 AG-UI 规范使用 REASONING_* 事件；保留 THINKING_* 作为向后兼容的别名，
    * 两者在内部收敛为同一条 ThinkingContent（`{ text, title }`）。
    *
-   * 生命周期约定：
-   * - `*_START`              → 新建一条 thinking，status=streaming
-   * - `*_MESSAGE_START`      → 如果尚未开始则隐式新建 thinking
-   * - `*_MESSAGE_CONTENT`    → delta 追加到 thinking.text
-   * - `*_MESSAGE_END`        → 当前消息段结束，thinking 保持 streaming
-   * - `*_END`                → thinking complete
-   * - `REASONING_MESSAGE_CHUNK` → 自动补全 Start → Content → End 生命周期
-   * - `REASONING_ENCRYPTED_VALUE` → encryptedValue 存入 thinking.ext，客户端需原样回传
+   * 设计与 handleTextMessageChunk 对齐：以 `currentReasoningMessageId` 为主键，
+   * 首次出现 messageId 时 append 新块，相同 messageId merge；
+   * CHUNK / START 都是"产出新块"的入口，无需额外的 phase 开关。
+   *
+   * - `REASONING_START`             → 仅记录 title 到 pendingReasoningTitle，不创建块
+   * - `REASONING_MESSAGE_START`     → append 新块（消费 pendingReasoningTitle 作为 title）
+   * - `REASONING_MESSAGE_CONTENT`   → merge delta 到当前块
+   * - `REASONING_MESSAGE_END`       → 释放 currentReasoningMessageId，块保持 streaming
+   * - `REASONING_MESSAGE_CHUNK`     → 新 messageId append、同 messageId merge（自动补全生命周期）
+   * - `REASONING_ENCRYPTED_VALUE`   → encryptedValue 存入 thinking.ext，供业务下轮透传
+   * - `REASONING_END`               → 当前块 complete，title 置为 '思考结束'
    */
   private handleReasoningEvent(event: any): AIMessageContent | null {
     switch (event.type) {
       case AGUIEventType.REASONING_START:
       case AGUIEventType.THINKING_START:
-        // 开启一个 reasoning phase，创建一个新的 thinking 块；
-        // 后续首个 MESSAGE_START / MESSAGE_CHUNK 需要复用这个块，而不是 append 新块。
+        this.pendingReasoningTitle = event.title || '思考中...';
         this.currentReasoningMessageId = null;
-        this.reasoningBlockOpen = true;
-        return createThinkingContent({ title: event.title || '思考中...' }, 'streaming', 'append', false);
+        return null;
 
       case AGUIEventType.REASONING_MESSAGE_START:
-      case AGUIEventType.THINKING_TEXT_MESSAGE_START: {
-        const messageId = event.messageId || null;
-        // 同一 phase 内切换到新的 messageId：append 新块
-        if (messageId && this.currentReasoningMessageId && this.currentReasoningMessageId !== messageId) {
-          this.currentReasoningMessageId = messageId;
-          return createThinkingContent({ title: event.title || '思考中...' }, 'streaming', 'append', false);
-        }
-        // 裸 MESSAGE_START（没有被 REASONING_START 包裹）：主动开块
-        if (!this.reasoningBlockOpen) {
-          this.reasoningBlockOpen = true;
-          this.currentReasoningMessageId = messageId;
-          return createThinkingContent({ title: event.title || '思考中...' }, 'streaming', 'append', false);
-        }
-        // 在 phase 内首次出现 messageId：复用 START 创建的块
-        this.currentReasoningMessageId = messageId;
-        return null;
-      }
+      case AGUIEventType.THINKING_TEXT_MESSAGE_START:
+        return this.openReasoningBlock(event.messageId || null, event.title, '');
 
       case AGUIEventType.REASONING_MESSAGE_CONTENT:
       case AGUIEventType.THINKING_TEXT_MESSAGE_CONTENT:
@@ -245,38 +231,8 @@ export class AGUIEventMapper {
         this.currentReasoningMessageId = null;
         return null;
 
-      case AGUIEventType.REASONING_MESSAGE_CHUNK: {
-        const messageId = event.messageId || null;
-        // 已在 phase 内（REASONING_START 打开了块）
-        if (this.reasoningBlockOpen) {
-          // phase 内首个 chunk：复用 START 创建的块
-          if (!this.currentReasoningMessageId) {
-            this.currentReasoningMessageId = messageId;
-            return createThinkingContent({ text: event.delta || '' }, 'streaming', 'merge', false);
-          }
-          // 同一 phase 内切换到不同 messageId：append 新块
-          if (this.currentReasoningMessageId !== messageId) {
-            this.currentReasoningMessageId = messageId;
-            return createThinkingContent(
-              { text: event.delta || '', title: '思考中...' },
-              'streaming',
-              'append',
-              false,
-            );
-          }
-          // 同 messageId：merge 追加
-          return createThinkingContent({ text: event.delta || '' }, 'streaming', 'merge', false);
-        }
-        // 裸 chunk（没有 REASONING_START 包裹）：主动开块
-        this.reasoningBlockOpen = true;
-        this.currentReasoningMessageId = messageId;
-        return createThinkingContent(
-          { text: event.delta || '', title: '思考中...' },
-          'streaming',
-          'append',
-          false,
-        );
-      }
+      case AGUIEventType.REASONING_MESSAGE_CHUNK:
+        return this.handleReasoningMessageChunk(event);
 
       case AGUIEventType.REASONING_ENCRYPTED_VALUE:
         // encryptedValue 仅用于跨轮状态连续性，透传到 ext 由业务层在下一轮回传
@@ -291,12 +247,41 @@ export class AGUIEventMapper {
       case AGUIEventType.REASONING_END:
       case AGUIEventType.THINKING_END:
         this.currentReasoningMessageId = null;
-        this.reasoningBlockOpen = false;
+        this.pendingReasoningTitle = null;
         return createThinkingContent({ title: event.title || '思考结束' }, 'complete', 'merge', true);
 
       default:
         return null;
     }
+  }
+
+  /**
+   * 处理简化模式的 REASONING_MESSAGE_CHUNK 事件
+   * 自动补全 Start → Content → End 生命周期（与 handleTextMessageChunk 风格一致）
+   *
+   * 关键：通过 messageId 区分不同的 reasoning 消息，
+   * messageId 变化时创建新的内容块，相同 messageId 合并内容。
+   */
+  private handleReasoningMessageChunk(event: any): AIMessageContent | null {
+    const messageId = event.messageId || null;
+    if (this.currentReasoningMessageId !== messageId) {
+      return this.openReasoningBlock(messageId, event.title, event.delta || '');
+    }
+    return createThinkingContent({ text: event.delta || '' }, 'streaming', 'merge', false);
+  }
+
+  /**
+   * 创建新的 reasoning 内容块，消费 pendingReasoningTitle
+   */
+  private openReasoningBlock(
+    messageId: string | null,
+    title: string | undefined,
+    text: string,
+  ): AIMessageContent {
+    this.currentReasoningMessageId = messageId;
+    const resolvedTitle = title || this.pendingReasoningTitle || '思考中...';
+    this.pendingReasoningTitle = null;
+    return createThinkingContent({ text, title: resolvedTitle }, 'streaming', 'append', false);
   }
 
   /**
