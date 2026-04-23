@@ -57,6 +57,11 @@ export class AGUIEventMapper {
   // Reasoning 简化模式状态跟踪（REASONING_MESSAGE_CHUNK 生命周期）
   private currentReasoningMessageId: string | null = null;
 
+  // 标记当前是否处于一个 reasoning phase（REASONING_START..REASONING_END 之间）
+  // 用于让 REASONING_MESSAGE_CHUNK / REASONING_MESSAGE_START 首个事件复用 START 创建的块，
+  // 而不是再 append 一个空块。
+  private reasoningBlockOpen = false;
+
   /**
    * 主入口：将SSE事件转换为AIContentChunkUpdate
    *
@@ -131,6 +136,7 @@ export class AGUIEventMapper {
     this.currentTextMessageRole = null;
     this.toolCallChunkStarted.clear();
     this.currentReasoningMessageId = null;
+    this.reasoningBlockOpen = false;
     // 清理 activityManager 状态
     activityManager.clear();
   }
@@ -205,17 +211,27 @@ export class AGUIEventMapper {
     switch (event.type) {
       case AGUIEventType.REASONING_START:
       case AGUIEventType.THINKING_START:
+        // 开启一个 reasoning phase，创建一个新的 thinking 块；
+        // 后续首个 MESSAGE_START / MESSAGE_CHUNK 需要复用这个块，而不是 append 新块。
         this.currentReasoningMessageId = null;
+        this.reasoningBlockOpen = true;
         return createThinkingContent({ title: event.title || '思考中...' }, 'streaming', 'append', false);
 
       case AGUIEventType.REASONING_MESSAGE_START:
       case AGUIEventType.THINKING_TEXT_MESSAGE_START: {
         const messageId = event.messageId || null;
-        // 如果是新的 messageId（且上一段没主动结束），用 append 建新块；否则 merge 到当前块
+        // 同一 phase 内切换到新的 messageId：append 新块
         if (messageId && this.currentReasoningMessageId && this.currentReasoningMessageId !== messageId) {
           this.currentReasoningMessageId = messageId;
           return createThinkingContent({ title: event.title || '思考中...' }, 'streaming', 'append', false);
         }
+        // 裸 MESSAGE_START（没有被 REASONING_START 包裹）：主动开块
+        if (!this.reasoningBlockOpen) {
+          this.reasoningBlockOpen = true;
+          this.currentReasoningMessageId = messageId;
+          return createThinkingContent({ title: event.title || '思考中...' }, 'streaming', 'append', false);
+        }
+        // 在 phase 内首次出现 messageId：复用 START 创建的块
         this.currentReasoningMessageId = messageId;
         return null;
       }
@@ -231,17 +247,35 @@ export class AGUIEventMapper {
 
       case AGUIEventType.REASONING_MESSAGE_CHUNK: {
         const messageId = event.messageId || null;
-        // 首次或切换 messageId：append 新块；同一 messageId：merge 追加
-        if (!this.currentReasoningMessageId || this.currentReasoningMessageId !== messageId) {
-          this.currentReasoningMessageId = messageId;
-          return createThinkingContent(
-            { text: event.delta || '', title: '思考中...' },
-            'streaming',
-            'append',
-            false,
-          );
+        // 已在 phase 内（REASONING_START 打开了块）
+        if (this.reasoningBlockOpen) {
+          // phase 内首个 chunk：复用 START 创建的块
+          if (!this.currentReasoningMessageId) {
+            this.currentReasoningMessageId = messageId;
+            return createThinkingContent({ text: event.delta || '' }, 'streaming', 'merge', false);
+          }
+          // 同一 phase 内切换到不同 messageId：append 新块
+          if (this.currentReasoningMessageId !== messageId) {
+            this.currentReasoningMessageId = messageId;
+            return createThinkingContent(
+              { text: event.delta || '', title: '思考中...' },
+              'streaming',
+              'append',
+              false,
+            );
+          }
+          // 同 messageId：merge 追加
+          return createThinkingContent({ text: event.delta || '' }, 'streaming', 'merge', false);
         }
-        return createThinkingContent({ text: event.delta || '' }, 'streaming', 'merge', false);
+        // 裸 chunk（没有 REASONING_START 包裹）：主动开块
+        this.reasoningBlockOpen = true;
+        this.currentReasoningMessageId = messageId;
+        return createThinkingContent(
+          { text: event.delta || '', title: '思考中...' },
+          'streaming',
+          'append',
+          false,
+        );
       }
 
       case AGUIEventType.REASONING_ENCRYPTED_VALUE:
@@ -257,6 +291,7 @@ export class AGUIEventMapper {
       case AGUIEventType.REASONING_END:
       case AGUIEventType.THINKING_END:
         this.currentReasoningMessageId = null;
+        this.reasoningBlockOpen = false;
         return createThinkingContent({ title: event.title || '思考结束' }, 'complete', 'merge', true);
 
       default:
