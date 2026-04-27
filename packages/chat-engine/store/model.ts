@@ -8,6 +8,7 @@ export class ModelStore extends ReactiveState<ModelServiceState> {
       useSearch: false,
       useThink: false,
       model: '',
+      config: {},
       ...initialState,
     });
   }

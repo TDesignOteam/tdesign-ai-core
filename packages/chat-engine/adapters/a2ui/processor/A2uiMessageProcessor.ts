@@ -415,7 +415,7 @@ export class A2uiMessageProcessor {
     if (this.options.onSendMessage && surfaceId && componentId) {
       this.options.onSendMessage({
         userAction: {
-          name: action.name,
+          name: action.name || '',
           surfaceId,
           sourceComponentId: componentId,
           timestamp: new Date().toISOString(),
