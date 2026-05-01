@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { AGUIMessageSchema, StateSchema } from '.';
+import { AGUIMessageSchema, StateSchema } from './schema';
 
 export type ToolCallEventType =
   | 'TOOL_CALL_START'
