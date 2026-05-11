@@ -36,7 +36,7 @@
     "@json-render/core": "^0.17.0",
     "@tdesign/ai-shared": "workspace:*",
     "expr-eval": "^2.0.2",
-    "zod": "^4.3.6"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "immer": "^10.0.0",

@@ -50,7 +50,7 @@ importers:
     dependencies:
       '@json-render/core':
         specifier: ^0.17.0
-        version: 0.17.0(zod@4.3.6)
+        version: 0.17.0(zod@3.25.76)
       '@tdesign/ai-shared':
         specifier: workspace:*
         version: link:../shared
@@ -58,8 +58,8 @@ importers:
         specifier: ^2.0.2
         version: 2.0.2
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^3.25.76
+        version: 3.25.76
     devDependencies:
       immer:
         specifier: ^10.0.0
@@ -1057,8 +1057,8 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
-  zod@4.3.6:
-    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+  zod@3.25.76:
+    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
 snapshots:
 
@@ -1204,9 +1204,9 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@json-render/core@0.17.0(zod@4.3.6)':
+  '@json-render/core@0.17.0(zod@3.25.76)':
     dependencies:
-      zod: 4.3.6
+      zod: 3.25.76
 
   '@rollup/rollup-android-arm-eabi@4.60.1':
     optional: true
@@ -1936,4 +1936,4 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod@4.3.6: {}
+  zod@3.25.76: {}
