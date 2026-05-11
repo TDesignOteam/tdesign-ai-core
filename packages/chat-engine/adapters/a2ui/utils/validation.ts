@@ -56,7 +56,7 @@ const DEFAULT_OPTIONS: A2UIValidationOptions = {
  */
 export function validateComponent(
   component: unknown,
-  options: A2UIValidationOptions = {}
+  options: A2UIValidationOptions = {},
 ): A2UIValidationResult<A2UIComponent> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const errors: A2UIValidationError[] = [];
@@ -66,12 +66,14 @@ export function validateComponent(
   if (!component || typeof component !== 'object') {
     return {
       success: false,
-      errors: [{
-        type: 'INVALID_COMPONENT',
-        message: 'Component must be an object',
-        value: component,
-        recoverable: false,
-      }],
+      errors: [
+        {
+          type: 'INVALID_COMPONENT',
+          message: 'Component must be an object',
+          value: component,
+          recoverable: false,
+        },
+      ],
       repaired: false,
     };
   }
@@ -83,13 +85,15 @@ export function validateComponent(
     if (opts.strict) {
       return {
         success: false,
-        errors: [{
-          type: 'MISSING_REQUIRED_FIELD',
-          message: 'Component must have a "component" field',
-          path: 'component',
-          value: comp.component,
-          recoverable: false,
-        }],
+        errors: [
+          {
+            type: 'MISSING_REQUIRED_FIELD',
+            message: 'Component must have a "component" field',
+            path: 'component',
+            value: comp.component,
+            recoverable: false,
+          },
+        ],
         repaired: false,
       };
     }
@@ -139,10 +143,12 @@ export function validateComponent(
       if (childResult.success && childResult.data) {
         validatedChildren.push(childResult.data);
       } else {
-        errors.push(...childResult.errors.map(e => ({
-          ...e,
-          path: `children[${i}]${e.path ? '.' + e.path : ''}`,
-        })));
+        errors.push(
+          ...childResult.errors.map((e) => ({
+            ...e,
+            path: `children[${i}]${e.path ? '.' + e.path : ''}`,
+          })),
+        );
         // 宽松模式下跳过无效子组件
         if (!opts.strict && childResult.data) {
           validatedChildren.push(childResult.data);
@@ -160,7 +166,7 @@ export function validateComponent(
   }
 
   return {
-    success: errors.filter(e => !e.recoverable).length === 0,
+    success: errors.filter((e) => !e.recoverable).length === 0,
     data: comp as A2UIComponent,
     errors,
     repaired,
@@ -174,7 +180,7 @@ export function validateComponent(
  */
 export function validateOperation(
   operation: unknown,
-  options: A2UIValidationOptions = {}
+  options: A2UIValidationOptions = {},
 ): A2UIValidationResult<A2UIOperation> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const errors: A2UIValidationError[] = [];
@@ -183,12 +189,14 @@ export function validateOperation(
   if (!operation || typeof operation !== 'object') {
     return {
       success: false,
-      errors: [{
-        type: 'INVALID_OPERATION',
-        message: 'Operation must be an object',
-        value: operation,
-        recoverable: false,
-      }],
+      errors: [
+        {
+          type: 'INVALID_OPERATION',
+          message: 'Operation must be an object',
+          value: operation,
+          recoverable: false,
+        },
+      ],
       repaired: false,
     };
   }
@@ -201,13 +209,15 @@ export function validateOperation(
     if (opts.strict) {
       return {
         success: false,
-        errors: [{
-          type: 'INVALID_OPERATION',
-          message: `Invalid operation type: ${op.type}. Must be one of: ${validTypes.join(', ')}`,
-          path: 'type',
-          value: op.type,
-          recoverable: false,
-        }],
+        errors: [
+          {
+            type: 'INVALID_OPERATION',
+            message: `Invalid operation type: ${op.type}. Must be one of: ${validTypes.join(', ')}`,
+            path: 'type',
+            value: op.type,
+            recoverable: false,
+          },
+        ],
         repaired: false,
       };
     }
@@ -256,10 +266,12 @@ export function validateOperation(
     if (payloadResult.data) {
       op.payload = payloadResult.data;
     }
-    errors.push(...payloadResult.errors.map(e => ({
-      ...e,
-      path: `payload${e.path ? '.' + e.path : ''}`,
-    })));
+    errors.push(
+      ...payloadResult.errors.map((e) => ({
+        ...e,
+        path: `payload${e.path ? '.' + e.path : ''}`,
+      })),
+    );
     if (payloadResult.repaired) repaired = true;
   }
 
@@ -268,7 +280,7 @@ export function validateOperation(
   }
 
   return {
-    success: errors.filter(e => !e.recoverable).length === 0,
+    success: errors.filter((e) => !e.recoverable).length === 0,
     data: op as unknown as A2UIOperation,
     errors,
     repaired,
@@ -280,22 +292,21 @@ export function validateOperation(
 /**
  * 验证 Action 数据
  */
-export function validateAction(
-  action: unknown,
-  options: A2UIValidationOptions = {}
-): A2UIValidationResult<A2UIAction> {
+export function validateAction(action: unknown, options: A2UIValidationOptions = {}): A2UIValidationResult<A2UIAction> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const errors: A2UIValidationError[] = [];
 
   if (!action || typeof action !== 'object') {
     return {
       success: false,
-      errors: [{
-        type: 'INVALID_ACTION',
-        message: 'Action must be an object',
-        value: action,
-        recoverable: false,
-      }],
+      errors: [
+        {
+          type: 'INVALID_ACTION',
+          message: 'Action must be an object',
+          value: action,
+          recoverable: false,
+        },
+      ],
       repaired: false,
     };
   }
@@ -330,7 +341,7 @@ export function validateAction(
   }
 
   return {
-    success: errors.filter(e => !e.recoverable).length === 0,
+    success: errors.filter((e) => !e.recoverable).length === 0,
     data: act as A2UIAction,
     errors,
     repaired: false,
@@ -365,10 +376,7 @@ export function validateBindingPath(path: unknown): { valid: boolean; path?: str
 /**
  * 安全解析 JSON
  */
-export function safeParseJSON<T = unknown>(
-  json: string,
-  fallback: T
-): { success: boolean; data: T; error?: Error } {
+export function safeParseJSON<T = unknown>(json: string, fallback: T): { success: boolean; data: T; error?: Error } {
   try {
     const data = JSON.parse(json);
     return { success: true, data };
@@ -385,7 +393,7 @@ export function safeParseJSON<T = unknown>(
  */
 export function validateOperations(
   operations: unknown[],
-  options: A2UIValidationOptions = {}
+  options: A2UIValidationOptions = {},
 ): { valid: A2UIOperation[]; invalid: Array<{ index: number; errors: A2UIValidationError[] }> } {
   const valid: A2UIOperation[] = [];
   const invalid: Array<{ index: number; errors: A2UIValidationError[] }> = [];
@@ -408,7 +416,5 @@ export function validateOperations(
  * 格式化验证错误为可读字符串
  */
 export function formatValidationErrors(errors: A2UIValidationError[]): string {
-  return errors
-    .map(e => `[${e.type}]${e.path ? ` at ${e.path}` : ''}: ${e.message}`)
-    .join('\n');
+  return errors.map((e) => `[${e.type}]${e.path ? ` at ${e.path}` : ''}: ${e.message}`).join('\n');
 }

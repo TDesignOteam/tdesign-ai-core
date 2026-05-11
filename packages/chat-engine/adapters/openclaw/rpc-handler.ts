@@ -97,10 +97,7 @@ export class OpenClawRPCHandler {
   /**
    * 发送 RPC 请求
    */
-  async request<TParams extends object, TResult>(
-    method: string,
-    params: TParams,
-  ): Promise<TResult> {
+  async request<TParams extends object, TResult>(method: string, params: TParams): Promise<TResult> {
     if (!this.sendFn) {
       throw new RPCError('Send function not set', 'SEND_NOT_CONFIGURED');
     }
@@ -219,12 +216,7 @@ export class OpenClawRPCHandler {
    * @param params.payload - 用户操作数据
    * @param params.runId - 关联的运行 ID（可选）
    */
-  async nodeInvoke(params: {
-    nodeId: string;
-    action: string;
-    payload: unknown;
-    runId?: string;
-  }): Promise<unknown> {
+  async nodeInvoke(params: { nodeId: string; action: string; payload: unknown; runId?: string }): Promise<unknown> {
     return this.request(OpenClawMethod.NODE_INVOKE, params as unknown as Record<string, unknown>);
   }
 
@@ -237,10 +229,7 @@ export class OpenClawRPCHandler {
    * @param params.sessionKey - 会话标识
    * @returns 包含 sessionKey, sessionId, messages 的响应对象
    */
-  async sessionsHistory(params: {
-    sessionKey: string;
-    [key: string]: unknown;
-  }): Promise<unknown> {
+  async sessionsHistory(params: { sessionKey: string; [key: string]: unknown }): Promise<unknown> {
     return this.request(OpenClawMethod.SESSIONS_HISTORY, params as unknown as Record<string, unknown>);
   }
 

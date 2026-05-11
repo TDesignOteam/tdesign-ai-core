@@ -1,14 +1,14 @@
 /**
  * Surface 状态管理器（框架无关）
- * 
+ *
  * 职责：
  * 1. 缓存已创建的 Surface Schema（跨消息/跨轮次）
  * 2. 提供订阅机制，当 Surface 数据更新时通知已渲染的组件
- * 
+ *
  * 使用场景：
  * - 第一轮对话：createSurface + updateComponents → 创建完整 UI，注册到缓存
  * - 后续轮次：仅 updateDataModel → 更新缓存中的数据，通知订阅者重渲染
- * 
+ *
  * 设计原则：
  * 1. 服务端是状态的单一数据源（updateDataModel 来自服务端）
  * 2. 本模块只负责存储和订阅，不负责 A2UI → JsonRender 的转换
@@ -54,7 +54,7 @@ class SurfaceStateManager {
 
   /**
    * 注册 Surface（由创建型消息调用）
-   * 
+   *
    * @param surfaceId Surface ID
    * @param schema 转换后的 json-render Schema
    * @param catalogId 可选的 Catalog ID
@@ -67,9 +67,9 @@ class SurfaceStateManager {
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    
+
     this.surfaces.set(surfaceId, cache);
-    
+
     if (this.debug) {
       console.log('[SurfaceStateManager] 注册 Surface:', {
         surfaceId,
@@ -80,7 +80,7 @@ class SurfaceStateManager {
 
   /**
    * 更新 Surface 数据（由更新型消息调用）
-   * 
+   *
    * @param surfaceId Surface ID
    * @param path JSON Pointer 路径
    * @param op 操作类型
@@ -117,13 +117,13 @@ class SurfaceStateManager {
 
     // 异步通知订阅者
     this.notifySubscribersAsync(surfaceId, cache.schema);
-    
+
     return true;
   }
 
   /**
    * 订阅 Surface 状态变化
-   * 
+   *
    * @param surfaceId Surface ID
    * @param subscriber 订阅者回调
    * @returns 取消订阅函数
@@ -178,7 +178,7 @@ class SurfaceStateManager {
         console.log('[SurfaceStateManager] 执行通知订阅者:', { surfaceId });
       }
 
-      currentSubs.forEach(subscriber => {
+      currentSubs.forEach((subscriber) => {
         try {
           subscriber(schema);
         } catch (e) {
@@ -222,11 +222,11 @@ class SurfaceStateManager {
   deleteSurface(surfaceId: string): boolean {
     this.subscribers.delete(surfaceId);
     const deleted = this.surfaces.delete(surfaceId);
-    
+
     if (this.debug && deleted) {
       console.log('[SurfaceStateManager] 删除 Surface:', surfaceId);
     }
-    
+
     return deleted;
   }
 
@@ -244,8 +244,8 @@ class SurfaceStateManager {
   /**
    * 获取缓存统计信息
    */
-  getStats(): { 
-    count: number; 
+  getStats(): {
+    count: number;
     surfaces: Array<{ id: string; elementsCount: number; updatedAt: number; subscriberCount: number }>;
   } {
     const surfaces = Array.from(this.surfaces.entries()).map(([id, cache]) => ({

@@ -1,13 +1,13 @@
 /**
  * A2UI 消息处理器 v2
  * 完全按照 A2UI v0.9 协议实现
- * 
+ *
  * 支持四种消息类型：
  * - createSurface: 创建 Surface
  * - updateComponents: 更新组件
  * - updateDataModel: 更新数据模型
  * - deleteSurface: 删除 Surface
- * 
+ *
  * 实现 External Store 模式，支持 useSyncExternalStore
  */
 
@@ -58,7 +58,7 @@ interface InternalSurface {
 
 /**
  * A2UI 消息处理器
- * 
+ *
  * 核心功能：
  * 1. 处理 A2UI v0.9 协议消息
  * 2. 管理 Surface 生命周期
@@ -71,7 +71,7 @@ export class A2uiMessageProcessor {
   private listeners = new Set<SurfaceListener>();
   private pathResolver = new PathResolver();
   private options: A2uiMessageProcessorOptions;
-  
+
   // 缓存的快照，避免 useSyncExternalStore 无限循环
   private cachedSnapshot: SurfaceSnapshot = new Map();
   private snapshotVersion = 0;
@@ -117,7 +117,7 @@ export class A2uiMessageProcessor {
    */
   private updateCachedSnapshot(): void {
     const snapshot = new Map<string, A2UISurface>();
-    
+
     this.surfaces.forEach((internal, id) => {
       snapshot.set(id, {
         id: internal.id,
@@ -130,7 +130,7 @@ export class A2uiMessageProcessor {
         updatedAt: internal.updatedAt,
       });
     });
-    
+
     this.cachedSnapshot = snapshot;
     this.snapshotVersion++;
   }
@@ -210,7 +210,7 @@ export class A2uiMessageProcessor {
    */
   private handleUpdateComponents(payload: { surfaceId: string; components: A2UIComponentBase[] }): void {
     let surface = this.surfaces.get(payload.surfaceId);
-    
+
     // 如果 Surface 不存在，自动创建（容错处理）
     if (!surface) {
       console.warn(`[A2UI] Surface ${payload.surfaceId} not found, auto-creating`);
@@ -310,11 +310,11 @@ export class A2uiMessageProcessor {
 
     surface.dataStore.set(path, value);
     surface.updatedAt = Date.now();
-    
+
     // 只更新快照，不重建组件树
     this.updateCachedSnapshot();
     this.listeners.forEach((listener) => listener());
-    
+
     // 触发回调
     this.options.onDataChange?.(surfaceId, path, value);
   }
@@ -338,11 +338,7 @@ export class A2uiMessageProcessor {
       return;
     }
 
-    surface.componentTree = new ComponentTree(
-      surface.components,
-      surface.dataStore,
-      this.pathResolver
-    );
+    surface.componentTree = new ComponentTree(surface.components, surface.dataStore, this.pathResolver);
   }
 
   // ============= 数据访问（供 React 组件使用）=============
@@ -395,18 +391,20 @@ export class A2uiMessageProcessor {
   dispatchAction(action: A2UIAction, surfaceId?: string, componentId?: string): void {
     // 调用外部回调
     if (this.options.onAction) {
-      const context = surfaceId ? {
-        surfaceId,
-        componentId,
-        updateData: (path: string, value: unknown) => {
-          this.updateDataValue(surfaceId, path, value);
-        },
-        getData: (path?: string) => {
-          const surface = this.surfaces.get(surfaceId);
-          if (!surface) return undefined;
-          return path ? surface.dataStore.get(path) : surface.dataStore.getSnapshot();
-        },
-      } : undefined;
+      const context = surfaceId
+        ? {
+            surfaceId,
+            componentId,
+            updateData: (path: string, value: unknown) => {
+              this.updateDataValue(surfaceId, path, value);
+            },
+            getData: (path?: string) => {
+              const surface = this.surfaces.get(surfaceId);
+              if (!surface) return undefined;
+              return path ? surface.dataStore.get(path) : surface.dataStore.getSnapshot();
+            },
+          }
+        : undefined;
 
       this.options.onAction(action, context);
     }

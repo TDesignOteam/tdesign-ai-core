@@ -11,12 +11,7 @@ import type { AIMessageContent, TextContent, ToolCall } from '../../type';
 import type { OpenClawEventFrame, ChatEventPayload, AgentEventPayload } from './types';
 import { OpenClawEventType, ChatEventState, AgentStreamType, AgentDataType } from './types/events';
 
-import {
-  createToolCallContent,
-  mergeStringContent,
-  updateToolCall,
-  handleSuggestionToolCall,
-} from '../shared';
+import { createToolCallContent, mergeStringContent, updateToolCall, handleSuggestionToolCall } from '../shared';
 
 /**
  * 事件映射结果
@@ -171,7 +166,6 @@ export class OpenClawEventMapper {
       case AgentStreamType.TOOL:
         return this.handleToolStream(data);
 
-
       case AgentStreamType.LIFECYCLE:
         // lifecycle/system 流是 agent 生命周期事件，不包含文本内容，跳过
         console.log(`[OpenClaw EventMapper] Skipping ${stream} stream event`);
@@ -267,7 +261,7 @@ export class OpenClawEventMapper {
 
     // 优先使用 delta（增量），因为 ChatEngine 的 text handler 会拼接内容
     // 如果没有 delta（首条消息），则使用全量 text
-    const contentData = (typeof delta === 'string') ? delta : text;
+    const contentData = typeof delta === 'string' ? delta : text;
 
     if (!contentData) {
       return { content: null, isFinal: false, hasError: false };
@@ -447,7 +441,11 @@ export class OpenClawEventMapper {
    * OpenClaw 实际行为：start 阶段就包含完整的 args 对象（不是 JSON 字符串）
    * 因此直接序列化 args 并创建 toolcall 内容
    */
-  private handleToolCallStart(toolCallId: string, toolCallName: string, data: AgentEventPayload['data']): EventMapResult {
+  private handleToolCallStart(
+    toolCallId: string,
+    toolCallName: string,
+    data: AgentEventPayload['data'],
+  ): EventMapResult {
     // OpenClaw 的 args 在 start 阶段是完整对象，需要序列化为 JSON 字符串
     const rawArgs = data?.args;
     let argsStr = '';

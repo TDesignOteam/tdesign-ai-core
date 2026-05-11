@@ -108,7 +108,7 @@ export type ActivityData<TContent = Record<string, any>> = {
   activityType: string;
   messageId?: string;
   content: TContent;
-   /** 增量更新信息 */
+  /** 增量更新信息 */
   deltaInfo?: {
     fromIndex: number;
     toIndex: number;

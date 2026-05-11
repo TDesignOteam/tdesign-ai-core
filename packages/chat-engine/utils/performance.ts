@@ -17,10 +17,8 @@ export class PerformanceMonitor {
    */
   start(): (elementCount: number, deltaInfo?: { fromIndex: number; toIndex: number }) => PerformanceMetrics {
     const startTime = performance.now();
-    
-    return (
-      elementCount: number,
-    ): PerformanceMetrics => {
+
+    return (elementCount: number): PerformanceMetrics => {
       const endTime = performance.now();
       const renderTime = endTime - startTime;
 
@@ -92,7 +90,7 @@ export class PerformanceMonitor {
    * 获取平均渲染时间
    */
   getAverageRenderTime(): number {
-    const renderMetrics = this.metrics.filter(m => m.renderTime > 0);
+    const renderMetrics = this.metrics.filter((m) => m.renderTime > 0);
     if (renderMetrics.length === 0) return 0;
 
     const totalTime = renderMetrics.reduce((sum, m) => sum + m.renderTime, 0);
@@ -103,7 +101,7 @@ export class PerformanceMonitor {
    * 获取平均更新时间
    */
   getAverageUpdateTime(): number {
-    const updateMetrics = this.metrics.filter(m => m.updateTime > 0);
+    const updateMetrics = this.metrics.filter((m) => m.updateTime > 0);
     if (updateMetrics.length === 0) return 0;
 
     const totalTime = updateMetrics.reduce((sum, m) => sum + m.updateTime, 0);
@@ -118,7 +116,7 @@ export class PerformanceMonitor {
     if (recentMetrics.length === 0) return 0;
 
     const timeField = type === 'render' ? 'renderTime' : 'updateTime';
-    const validMetrics = recentMetrics.filter(m => m[timeField] > 0);
+    const validMetrics = recentMetrics.filter((m) => m[timeField] > 0);
     if (validMetrics.length === 0) return 0;
 
     const totalTime = validMetrics.reduce((sum, m) => sum + m[timeField], 0);
@@ -129,8 +127,8 @@ export class PerformanceMonitor {
    * 获取性能统计摘要
    */
   getSummary() {
-    const renderMetrics = this.metrics.filter(m => m.renderTime > 0);
-    const updateMetrics = this.metrics.filter(m => m.updateTime > 0);
+    const renderMetrics = this.metrics.filter((m) => m.renderTime > 0);
+    const updateMetrics = this.metrics.filter((m) => m.updateTime > 0);
 
     return {
       totalOperations: this.metrics.length,
@@ -166,9 +164,9 @@ export class PerformanceMonitor {
   printSummary(): void {
     const summary = this.getSummary();
     console.log('[json-render Performance Summary]', {
-      '总操作次数': summary.totalOperations,
-      '渲染操作': summary.renderOperations,
-      '更新操作': summary.updateOperations,
+      总操作次数: summary.totalOperations,
+      渲染操作: summary.renderOperations,
+      更新操作: summary.updateOperations,
       '平均渲染时间(ms)': summary.avgRenderTime.toFixed(2),
       '平均更新时间(ms)': summary.avgUpdateTime.toFixed(2),
       '最近10次渲染时间(ms)': summary.recentAvgRenderTime.toFixed(2),
@@ -195,7 +193,10 @@ export const PERFORMANCE_THRESHOLDS: PerformanceThresholds = {
 /**
  * 检查性能并发出警告
  */
-export function checkPerformance(metric: PerformanceMetrics, thresholds: PerformanceThresholds = PERFORMANCE_THRESHOLDS): void {
+export function checkPerformance(
+  metric: PerformanceMetrics,
+  thresholds: PerformanceThresholds = PERFORMANCE_THRESHOLDS,
+): void {
   if (metric.renderTime > thresholds.renderTime) {
     console.warn(
       `[json-render Performance Warning] 渲染耗时 ${metric.renderTime.toFixed(2)}ms，超过阈值 ${thresholds.renderTime}ms`,

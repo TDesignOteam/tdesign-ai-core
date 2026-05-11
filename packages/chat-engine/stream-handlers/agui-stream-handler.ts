@@ -43,10 +43,7 @@ export class AGUIStreamHandler implements IStreamHandler {
    *   engine.agui?.handleEvent(chunk);
    *   engine.agui?.handleEvent(chunk, { onRunStart, onRunError });
    */
-  handleEvent(
-    chunk: SSEChunkData,
-    callbacks: AGUIAdapterCallbacks = {},
-  ): AIMessageContent | AIMessageContent[] | null {
+  handleEvent(chunk: SSEChunkData, callbacks: AGUIAdapterCallbacks = {}): AIMessageContent | AIMessageContent[] | null {
     return this.aguiAdapter.handleAGUIEvent(chunk, callbacks);
   }
 

@@ -87,10 +87,10 @@ export function processMessageGroup(messages: any[], toolCallMap: Map<string, an
       // encryptedValue 透传到 ext，业务在下一轮请求中回传
       const extraExt = msg.encryptedValue
         ? {
-          encryptedValue: msg.encryptedValue,
-          ...(msg.subtype ? { subtype: msg.subtype } : {}),
-          ...(msg.entityId ? { entityId: msg.entityId } : {}),
-        }
+            encryptedValue: msg.encryptedValue,
+            ...(msg.subtype ? { subtype: msg.subtype } : {}),
+            ...(msg.entityId ? { entityId: msg.entityId } : {}),
+          }
         : undefined;
       allContent.push(
         createThinkingContent(
@@ -180,7 +180,6 @@ export function handleCustomEvent(event: any): any {
     status: 'complete',
   };
 }
-
 
 /**
  * 解析SSE数据
@@ -435,7 +434,7 @@ export function processToolCalls(toolCalls: any[], toolCallMap: Map<string, any>
       };
     }
 
-    const parsedResult = typeof toolResult === 'string' ? parseSSEData(toolResult) ?? toolResult : toolResult;
+    const parsedResult = typeof toolResult === 'string' ? (parseSSEData(toolResult) ?? toolResult) : toolResult;
 
     const toolCallData = {
       toolCallId: toolCall.id,

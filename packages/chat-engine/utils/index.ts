@@ -16,12 +16,12 @@ import { applyPatchImmutable, type Operation } from './immutable-patch';
 
 /**
  * 应用JSON Patch操作到状态对象
- * 
+ *
  * 使用 Immutable Patch + Structural Sharing：
  * - 只重建被修改路径上的节点
  * - 未修改的节点保持原引用
  * - 配合 React.memo 使用时，未变化的组件不会重渲染
- * 
+ *
  * @param state 原始状态对象
  * @param delta 包含patch操作的数组
  * @returns 更新后的新状态对象（结构共享）

@@ -1,7 +1,7 @@
 /**
  * A2UI v0.9 协议类型定义
  * 用于 A2UI → json-render 转换
- * 
+ *
  * 参考：A2UI Protocol v0.9 Specification
  * https://a2ui.dev/specification/0.9/
  */
@@ -43,10 +43,12 @@ export interface A2UIComponent {
   /** 单子组件 ID */
   child?: string;
   /** 多子组件 ID 数组，或模板配置 */
-  children?: string[] | {
-    path: string;
-    componentId: string;
-  };
+  children?:
+    | string[]
+    | {
+        path: string;
+        componentId: string;
+      };
   /** 其他组件特定属性 */
   [key: string]: any;
 }
