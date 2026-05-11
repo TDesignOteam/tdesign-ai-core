@@ -37,7 +37,7 @@ export interface A2uiMessageProcessorOptions {
   /** 用户行为消息发送回调 */
   onSendMessage?: (message: UserActionMessage) => void;
   /** 数据变更回调 */
-  onDataChange?: (surfaceId: string, path: string, value: unknown) => void;
+  onDataChange?: (surfaceId: string, path: string, value: any) => void;
   /** 验证错误回调 */
   onValidationError?: (errors: Array<{ type: string; message: string; path?: string }>) => void;
 }
@@ -249,7 +249,7 @@ export class A2uiMessageProcessor {
     surfaceId: string;
     path?: string;
     op?: 'add' | 'replace' | 'remove';
-    value?: unknown;
+    value?: any;
   }): void {
     const surface = this.surfaces.get(payload.surfaceId);
     if (!surface) {
@@ -287,10 +287,10 @@ export class A2uiMessageProcessor {
 
     // 检查是否有组件的 children 使用了这个路径作为 template
     for (const component of surface.components.values()) {
-      const children = (component as any).children;
+      const children = component.children as { componentId: string; path: string } | undefined;
       if (children && typeof children === 'object' && !Array.isArray(children)) {
         // A2UI v0.9 格式: { componentId, path }
-        const templatePath = (children as any).path;
+        const templatePath = children.path;
         if (templatePath && (path.startsWith(templatePath) || templatePath.startsWith(path))) {
           return true;
         }
@@ -304,7 +304,7 @@ export class A2uiMessageProcessor {
    * 只更新数据模型，不重建组件树（性能优化）
    * 适用于不影响组件结构的数据更新（如表单输入）
    */
-  updateDataOnly(surfaceId: string, path: string, value: unknown): void {
+  updateDataOnly(surfaceId: string, path: string, value: any): void {
     const surface = this.surfaces.get(surfaceId);
     if (!surface) return;
 
@@ -349,7 +349,7 @@ export class A2uiMessageProcessor {
    * @param path 数据路径
    * @param dataContextPath 当前组件的数据上下文
    */
-  getData(surfaceId: string, path: string, dataContextPath: string = ''): unknown {
+  getData(surfaceId: string, path: string, dataContextPath: string = ''): any {
     const surface = this.surfaces.get(surfaceId);
     if (!surface) return undefined;
 
@@ -360,7 +360,7 @@ export class A2uiMessageProcessor {
   /**
    * 设置数据（双向绑定）
    */
-  setData(surfaceId: string, path: string, dataContextPath: string, value: unknown): void {
+  setData(surfaceId: string, path: string, dataContextPath: string, value: any): void {
     const surface = this.surfaces.get(surfaceId);
     if (!surface) return;
 
@@ -379,7 +379,7 @@ export class A2uiMessageProcessor {
   /**
    * 更新数据值（简化接口，不需要 dataContextPath）
    */
-  updateDataValue(surfaceId: string, path: string, value: unknown): void {
+  updateDataValue(surfaceId: string, path: string, value: any): void {
     this.setData(surfaceId, path, '', value);
   }
 
@@ -395,7 +395,7 @@ export class A2uiMessageProcessor {
         ? {
             surfaceId,
             componentId,
-            updateData: (path: string, value: unknown) => {
+            updateData: (path: string, value: any) => {
               this.updateDataValue(surfaceId, path, value);
             },
             getData: (path?: string) => {
@@ -473,7 +473,7 @@ export class A2uiMessageProcessor {
   /**
    * 直接设置整个数据模型
    */
-  setSurfaceData(surfaceId: string, data: Record<string, unknown>): void {
+  setSurfaceData(surfaceId: string, data: Record<string, any>): void {
     const surface = this.surfaces.get(surfaceId);
     if (!surface) return;
 
@@ -486,7 +486,7 @@ export class A2uiMessageProcessor {
   /**
    * 合并数据（保留用户输入）
    */
-  mergeSurfaceData(surfaceId: string, data: Record<string, unknown>): void {
+  mergeSurfaceData(surfaceId: string, data: Record<string, any>): void {
     const surface = this.surfaces.get(surfaceId);
     if (!surface) return;
 

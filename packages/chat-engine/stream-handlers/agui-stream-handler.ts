@@ -9,6 +9,7 @@ import type { AGUIAdapterCallbacks } from '../adapters/agui';
 import type { AIMessageContent, ChatRequestParams, SSEChunkData, ToolCall } from '../type';
 import { ChatEngineEventType } from '../event-bus';
 import { LLMService } from '../server';
+import { isActivityContent, isToolCallContent } from '../utils';
 import type { IStreamHandler, StreamContext, StreamLifecycleContext, StreamProtocol } from './types';
 
 export class AGUIStreamHandler implements IStreamHandler {
@@ -66,23 +67,21 @@ export class AGUIStreamHandler implements IStreamHandler {
 
     await this.llmService.handleStreamRequest(params, {
       ...config,
-      // @ts-ignore
+      // @ts-expect-error: LLMService stream callback type is narrower than AG-UI's onMessage hook
       onMessage: (_chunk: SSEChunkData) => {
         if (context.getStopReceive() || !messageId) return null;
         let chunk = _chunk;
         if (config.onChunk) {
-          // @ts-ignore
+          // @ts-expect-error: AG-UI onChunk can return null to drop a chunk
           chunk = config.onChunk(chunk);
           if (!chunk) {
             return;
           }
         }
 
-        let result: AIMessageContent | AIMessageContent[] | null = null;
-
         // SSE 数据 → AGUIEventMapper.mapEvent → 用户自定义 onMessage(解析后数据 + 原始 chunk)
         // 首先使用 AGUI 适配器进行通用协议解析
-        result = this.aguiAdapter.handleAGUIEvent(chunk, {
+        let result: AIMessageContent | AIMessageContent[] | null = this.aguiAdapter.handleAGUIEvent(chunk, {
           onRunStart: (event) => {
             // 重置适配器状态，确保新一轮对话从干净状态开始
             this.aguiAdapter.reset();
@@ -161,19 +160,19 @@ export class AGUIStreamHandler implements IStreamHandler {
     const contents = Array.isArray(result) ? result : [result];
     for (const content of contents) {
       // Activity 事件
-      if ((content as any).data?.activityType) {
+      if (isActivityContent(content)) {
         eventBus.emit(ChatEngineEventType.AGUI_ACTIVITY, {
-          activityType: (content as any).data.activityType,
+          activityType: content.data.activityType,
           messageId,
-          content: (content as any)?.data?.content,
+          content: content.data.content,
         });
       }
 
       // ToolCall 事件
-      if ((content as any)?.data?.eventType?.startsWith('TOOL_CALL')) {
+      if (isToolCallContent(content) && content.data.eventType?.startsWith('TOOL_CALL')) {
         eventBus.emit(ChatEngineEventType.AGUI_TOOLCALL, {
-          toolCall: (content as any).data,
-          eventType: (content as any).data.eventType,
+          toolCall: content.data,
+          eventType: content.data.eventType,
         });
       }
     }

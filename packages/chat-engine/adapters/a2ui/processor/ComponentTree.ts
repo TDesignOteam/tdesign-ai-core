@@ -45,13 +45,13 @@ export class ComponentTree {
     };
 
     // 处理 children
-    const children = (component as any).children as ChildrenProperty | undefined;
+    const children = component.children as ChildrenProperty | undefined;
     if (children) {
       resolved.resolvedChildren = this.resolveChildren(children, dataContextPath);
     }
 
     // 处理 child (Card, Button 等单子组件)
-    const child = (component as any).child as string | undefined;
+    const child = component.child as string | undefined;
     if (child && typeof child === 'string') {
       const resolvedChild = this.buildTree(child, dataContextPath);
       if (resolvedChild) {
@@ -60,7 +60,7 @@ export class ComponentTree {
     }
 
     // 处理 tabItems
-    const tabItems = (component as any).tabItems as Array<{ title: any; child: string }> | undefined;
+    const tabItems = component.tabItems as Array<{ title: any; child: string }> | undefined;
     if (tabItems && Array.isArray(tabItems)) {
       resolved.resolvedChildren = tabItems
         .map((item) => this.buildTree(item.child, dataContextPath))

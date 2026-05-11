@@ -11,7 +11,7 @@ import type { UIElement } from '@json-render/core';
 export interface JsonRenderSchema {
   root: string;
   elements: Record<string, UIElement>;
-  data?: Record<string, unknown>;
+  data?: Record<string, any>;
 }
 
 /**

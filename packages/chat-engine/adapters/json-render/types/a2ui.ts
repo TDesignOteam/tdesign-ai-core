@@ -86,7 +86,7 @@ export interface A2UIUpdateDataModel {
   /** 操作类型 */
   op?: 'add' | 'replace' | 'remove';
   /** 数据值 */
-  value?: unknown;
+  value?: any;
 }
 
 /**
@@ -120,5 +120,5 @@ export interface A2UISurfaceState {
   /** 组件 Map（由 updateComponents 累积） */
   components: Map<string, A2UIComponent>;
   /** 数据模型（由 updateDataModel 累积） */
-  dataModel: Record<string, unknown>;
+  dataModel: Record<string, any>;
 }

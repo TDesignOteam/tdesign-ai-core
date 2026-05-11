@@ -100,7 +100,7 @@ export class SSEParser {
         // 尝试解析JSON，失败则保持原始字符串
         let data: any;
         try {
-          data = JSON.parse(this.currentEvent.data);
+          data = JSON.parse(this.currentEvent.data) as any;
         } catch {
           data = this.currentEvent.data;
         }

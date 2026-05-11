@@ -20,20 +20,20 @@ function parsePath(path: string): string[] {
  * 支持 JSON Pointer 风格的路径访问
  */
 export class DataStore {
-  private data: Record<string, unknown> = {};
+  private data: Record<string, any> = {};
 
   /**
    * 获取指定路径的值
    * @param path JSON Pointer 路径 (如 "/user/name")
    */
-  get(path: string): unknown {
+  get(path: string): any {
     const segments = parsePath(path);
 
     if (segments.length === 0) {
       return this.data;
     }
 
-    let current: unknown = this.data;
+    let current: any = this.data;
     for (const segment of segments) {
       if (current === null || current === undefined) {
         return undefined;
@@ -41,7 +41,7 @@ export class DataStore {
       if (typeof current !== 'object') {
         return undefined;
       }
-      current = (current as Record<string, unknown>)[segment];
+      current = (current as Record<string, any>)[segment];
     }
 
     return current;
@@ -52,13 +52,13 @@ export class DataStore {
    * @param path JSON Pointer 路径
    * @param value 要设置的值
    */
-  set(path: string, value: unknown): void {
+  set(path: string, value: any): void {
     const segments = parsePath(path);
 
     if (segments.length === 0) {
       // 设置整个数据对象
       if (typeof value === 'object' && value !== null) {
-        this.data = { ...(value as Record<string, unknown>) };
+        this.data = { ...(value as Record<string, any>) };
       }
       return;
     }
@@ -70,7 +70,7 @@ export class DataStore {
   /**
    * 深度设置值（不可变方式）
    */
-  private setDeep(obj: Record<string, unknown>, segments: string[], value: unknown): Record<string, unknown> {
+  private setDeep(obj: Record<string, any>, segments: string[], value: any): Record<string, any> {
     if (segments.length === 0) {
       return obj;
     }
@@ -85,7 +85,7 @@ export class DataStore {
       // 递归设置
       const existing = obj[head];
       const nested =
-        typeof existing === 'object' && existing !== null ? { ...(existing as Record<string, unknown>) } : {};
+        typeof existing === 'object' && existing !== null ? { ...(existing as Record<string, any>) } : {};
       newObj[head] = this.setDeep(nested, tail, value);
     }
 
@@ -110,7 +110,7 @@ export class DataStore {
   /**
    * 深度删除值（不可变方式）
    */
-  private removeDeep(obj: Record<string, unknown>, segments: string[]): Record<string, unknown> {
+  private removeDeep(obj: Record<string, any>, segments: string[]): Record<string, any> {
     if (segments.length === 0) {
       return obj;
     }
@@ -125,7 +125,7 @@ export class DataStore {
       // 递归删除
       const existing = obj[head];
       if (typeof existing === 'object' && existing !== null) {
-        newObj[head] = this.removeDeep(existing as Record<string, unknown>, tail);
+        newObj[head] = this.removeDeep(existing as Record<string, any>, tail);
       }
     }
 
@@ -137,7 +137,7 @@ export class DataStore {
    * @param path 路径
    * @param value 要合并的值
    */
-  merge(path: string, value: unknown): void {
+  merge(path: string, value: any): void {
     const existing = this.get(path);
 
     if (
@@ -149,7 +149,7 @@ export class DataStore {
       !Array.isArray(value)
     ) {
       // 两者都是对象，进行深度合并
-      const merged = this.deepMerge(existing as Record<string, unknown>, value as Record<string, unknown>);
+      const merged = this.deepMerge(existing as Record<string, any>, value as Record<string, any>);
       this.set(path, merged);
     } else if (existing === undefined) {
       // 不存在则直接设置
@@ -161,7 +161,7 @@ export class DataStore {
   /**
    * 深度合并对象
    */
-  private deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+  private deepMerge(target: Record<string, any>, source: Record<string, any>): Record<string, any> {
     const result = { ...target };
 
     for (const [key, value] of Object.entries(source)) {
@@ -179,7 +179,7 @@ export class DataStore {
         !Array.isArray(value)
       ) {
         // 递归合并对象
-        result[key] = this.deepMerge(existing as Record<string, unknown>, value as Record<string, unknown>);
+        result[key] = this.deepMerge(existing as Record<string, any>, value as Record<string, any>);
       }
       // 已存在且不是对象，保留原值
     }
@@ -190,7 +190,7 @@ export class DataStore {
   /**
    * 获取完整数据快照
    */
-  getSnapshot(): Record<string, unknown> {
+  getSnapshot(): Record<string, any> {
     return this.data;
   }
 
@@ -212,7 +212,7 @@ export class DataStore {
 /**
  * 创建 DataStore 实例
  */
-export function createDataStore(initialData?: Record<string, unknown>): DataStore {
+export function createDataStore(initialData?: Record<string, any>): DataStore {
   const store = new DataStore();
   if (initialData) {
     store.set('/', initialData);

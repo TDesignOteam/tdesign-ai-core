@@ -11,17 +11,16 @@ import EventEmitter from '../../utils/eventEmitter';
 import { LoggerManager } from '../../utils/logger';
 import { WebSocketClient, type WebSocketClientConfig, WebSocketConnectionState } from '../../server/websocket-client';
 import type { AIMessageContent, ChatRequestParams, SSEChunkData } from '../../type';
-import { OpenClawEventMapper, type EventMapResult } from './event-mapper';
-import { OpenClawRPCHandler, RPCError } from './rpc-handler';
+import { OpenClawEventMapper } from './event-mapper';
+import { OpenClawRPCHandler } from './rpc-handler';
 import type {
   OpenClawConfig,
-  OpenClawFrame,
   OpenClawEventFrame,
   OpenClawResponseFrame,
   ConnectParams,
   ConnectChallengePayload,
 } from './types';
-import { mergeOpenClawConfig, DEFAULT_OPENCLAW_CONFIG } from './types/config';
+import { mergeOpenClawConfig } from './types/config';
 import { OpenClawEventType, OpenClawConnectionState } from './types/events';
 import { generateUUID, parseFrame, getPlatform, getUserAgent, getLocale, formatWebSocketUrl } from './utils';
 
@@ -116,7 +115,7 @@ export class OpenClawAdapter extends EventEmitter {
   private deviceKeyManager: DeviceKeyManager | null = null;
 
   /** 动态传入的认证信息，用于 connect 握手（一次性使用） */
-  private pendingAuth: Record<string, unknown> | null = null;
+  private pendingAuth: Record<string, any> | null = null;
 
   constructor(config: OpenClawAdapterConfig) {
     super();
@@ -145,7 +144,7 @@ export class OpenClawAdapter extends EventEmitter {
    * 传入的 auth 会在下一次 connect 握手时使用（一次性），
    * 用于从 onRequest 动态获取 token 等认证信息。
    */
-  setConnectAuth(auth: Record<string, unknown>): void {
+  setConnectAuth(auth: Record<string, any>): void {
     this.pendingAuth = auth;
   }
 
@@ -235,7 +234,7 @@ export class OpenClawAdapter extends EventEmitter {
   /**
    * 发送聊天消息
    */
-  async sendMessage(params: ChatRequestParams, requestParams?: Record<string, unknown>): Promise<void> {
+  async sendMessage(params: ChatRequestParams, requestParams?: Record<string, any>): Promise<void> {
     if (this.connectionState !== OpenClawConnectionState.AUTHENTICATED) {
       throw new Error('Not authenticated. Please connect first.');
     }
@@ -245,7 +244,8 @@ export class OpenClawAdapter extends EventEmitter {
     this.eventMapper.reset();
 
     // 合并用户自定义参数（剔除 auth，auth 仅用于 connect 握手）
-    const { auth: _auth, ...sendParams } = requestParams || {};
+    const sendParams = { ...(requestParams || {}) } as Record<string, any>;
+    delete sendParams.auth;
     const chatParams = {
       message: params.prompt || '',
       idempotencyKey: generateUUID(),
@@ -313,7 +313,7 @@ export class OpenClawAdapter extends EventEmitter {
    * />
    * ```
    */
-  async invokeAction(params: { nodeId: string; action: string; payload: unknown }): Promise<unknown> {
+  async invokeAction(params: { nodeId: string; action: string; payload: any }): Promise<any> {
     if (this.connectionState !== OpenClawConnectionState.AUTHENTICATED) {
       throw new Error('Not authenticated. Please connect first.');
     }
@@ -417,7 +417,7 @@ export class OpenClawAdapter extends EventEmitter {
   private setupEventHandlers(): void {
     if (!this.wsClient) return;
 
-    this.wsClient.on('message', (event: { event: string; data: unknown }) => {
+    this.wsClient.on('message', (event: { event: string; data: any }) => {
       this.handleWebSocketMessage(event.data);
     });
 
@@ -449,7 +449,7 @@ export class OpenClawAdapter extends EventEmitter {
   /**
    * 处理 WebSocket 消息
    */
-  private handleWebSocketMessage(data: unknown): void {
+  private handleWebSocketMessage(data: any): void {
     // DEBUG: 打印所有原始 WebSocket 消息（排查真实 OpenClaw 返回格式）
     const rawStr = typeof data === 'string' ? data : JSON.stringify(data);
     console.log(`[OpenClaw RAW] ${rawStr.slice(0, 800)}`);
@@ -460,9 +460,8 @@ export class OpenClawAdapter extends EventEmitter {
       return;
     }
 
-    console.log(
-      `[OpenClaw Frame] type="${frame.type}", event=${(frame as any).event}, isStreaming=${this.isStreaming}`,
-    );
+      const frameWithEvent = frame as OpenClawEventFrame & { event?: string };
+      console.log(`[OpenClaw Frame] type="${frame.type}", event=${frameWithEvent.event}, isStreaming=${this.isStreaming}`);
 
     // 处理响应帧
     if (frame.type === 'res') {
@@ -489,7 +488,7 @@ export class OpenClawAdapter extends EventEmitter {
     }
 
     // 忽略心跳、健康检查等非业务事件
-    if (event === OpenClawEventType.HEALTH || event === OpenClawEventType.HEARTBEAT || event === ('tick' as any)) {
+    if (event === OpenClawEventType.HEALTH || event === OpenClawEventType.HEARTBEAT || event === 'tick') {
       console.log(`[OpenClaw] Skipping non-business event: "${event}"`);
       return;
     }
@@ -585,7 +584,7 @@ export class OpenClawAdapter extends EventEmitter {
       // 检查 connect 响应中是否包含历史消息
       // OpenClaw Gateway 会在 connect 响应的 payload 中附带 messages 数组，
       // 用于页面刷新后自动回填历史对话记录（无需额外 RPC 请求）
-      const connectPayload = response as unknown as Record<string, unknown>;
+      const connectPayload = response as unknown as Record<string, any>;
       if (Array.isArray(connectPayload?.messages) && connectPayload.messages.length > 0) {
         this.logger.info(
           `OpenClaw connect response contains ${connectPayload.messages.length} history messages, converting...`,

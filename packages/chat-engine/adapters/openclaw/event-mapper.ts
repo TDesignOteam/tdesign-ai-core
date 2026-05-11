@@ -126,7 +126,7 @@ export class OpenClawEventMapper {
    * 此时所有文本已通过 agent 事件累积完毕，
    * 所以 final 只需标记完成状态，不应再输出全量内容。
    */
-  private handleChatFinal(_message?: ChatEventPayload['message']): EventMapResult {
+  private handleChatFinal(): EventMapResult {
     // 重置缓冲区
     this.textBuffer = '';
 
@@ -416,7 +416,7 @@ export class OpenClawEventMapper {
     // OpenClaw 使用 phase 字段（不是 state），工具名使用 name 字段（不是 toolCallName）
     const phase = (data.phase || data.state) as string;
     const toolCallId = data.toolCallId as string;
-    const toolCallName = (data.name || data.toolCallName || 'unknown') as string;
+    const toolCallName = (data.name || data.toolCallName || 'any') as string;
 
     switch (phase) {
       case 'start':
@@ -456,7 +456,7 @@ export class OpenClawEventMapper {
     this.toolCallMap[toolCallId] = {
       eventType: 'TOOL_CALL_START',
       toolCallId,
-      toolCallName: toolCallName || 'unknown',
+      toolCallName: toolCallName || 'any',
       parentMessageId: (data?.parentMessageId as string) || '',
       args: argsStr,
     };
@@ -505,7 +505,7 @@ export class OpenClawEventMapper {
   private handleToolCallResult(toolCallId: string, data: AgentEventPayload['data']): EventMapResult {
     if (!this.toolCallMap[toolCallId]) {
       // 如果之前没有 start 事件，先创建 toolcall 记录
-      const toolCallName = (data?.name || data?.toolCallName || 'unknown') as string;
+      const toolCallName = (data?.name || data?.toolCallName || 'any') as string;
       this.toolCallMap[toolCallId] = {
         eventType: 'TOOL_CALL_START',
         toolCallId,
@@ -582,7 +582,7 @@ export class OpenClawEventMapper {
     }
 
     const toolCallId = data.toolCallId as string;
-    const toolCallName = (data.name || data.toolCallName || 'unknown') as string;
+    const toolCallName = (data.name || data.toolCallName || 'any') as string;
 
     // 如果还没有这个 toolCall 的记录，当作 start 处理
     if (!this.toolCallMap[toolCallId]) {
@@ -607,10 +607,10 @@ export class OpenClawEventMapper {
   /**
    * 映射通用事件
    */
-  private mapGenericEvent(_event: string, payload: unknown): EventMapResult {
+  private mapGenericEvent(_event: string, payload: any): EventMapResult {
     // 尝试从 payload 中提取有用信息
     if (typeof payload === 'object' && payload !== null) {
-      const p = payload as Record<string, unknown>;
+      const p = payload as Record<string, any>;
       const text = p.text || p.content || p.message;
       if (typeof text === 'string') {
         return {

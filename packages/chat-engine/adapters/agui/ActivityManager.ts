@@ -1,5 +1,6 @@
 import { ActivityData } from '../../type';
 import { applyJsonPatch } from '../../utils';
+import type { Operation } from '../../utils/immutable-patch';
 
 /**
  * Activity 状态管理器
@@ -37,7 +38,7 @@ export interface ActivityManager {
     type: string;
     activityType: string;
     content?: any;
-    patch?: any[];
+    patch?: Operation[];
     messageId?: string;
   }) => ActivityData | null;
   /**
@@ -88,7 +89,7 @@ export class ActivityManagerImpl implements ActivityManager {
     type: string;
     activityType: string;
     content?: any;
-    patch?: any[];
+    patch?: Operation[];
     messageId?: string;
   }): ActivityData | null {
     const { activityType, messageId } = event;
@@ -107,7 +108,11 @@ export class ActivityManagerImpl implements ActivityManager {
     if (event.type === 'ACTIVITY_DELTA') {
       // DELTA: 增量更新
       const isFirstDelta = !this.activities[activityType];
-      let currentActivity = this.activities[activityType];
+      let currentActivity: ActivityData = this.activities[activityType] || {
+        activityType,
+        content: this.inferInitialContent(event.patch),
+        messageId,
+      };
 
       // 如果没有 snapshot，自动初始化空的 activity（纯增量模式）
       if (isFirstDelta) {
@@ -159,7 +164,7 @@ export class ActivityManagerImpl implements ActivityManager {
   /**
    * 根据 JSON Patch 路径推断初始内容结构
    */
-  private inferInitialContent(patch: any[] | undefined): Record<string, any> {
+  private inferInitialContent(patch: Operation[] | undefined): Record<string, any> {
     if (!patch || !Array.isArray(patch) || patch.length === 0) {
       return {};
     }

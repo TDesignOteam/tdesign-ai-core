@@ -91,7 +91,7 @@ class SurfaceStateManager {
     surfaceId: string,
     path: string | undefined,
     op: 'add' | 'replace' | 'remove' = 'replace',
-    value?: unknown,
+    value?: any,
   ): boolean {
     const cache = this.surfaces.get(surfaceId);
     if (!cache) {

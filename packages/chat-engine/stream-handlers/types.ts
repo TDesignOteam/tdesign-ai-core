@@ -31,9 +31,9 @@ export interface StreamContext {
   /** 处理消息结果（内容更新 + 事件发布） */
   processMessageResult: (messageId: string, result: AIMessageContent | AIMessageContent[] | null) => void;
   /** 错误处理 */
-  handleError: (messageId: string, error: unknown) => void;
+  handleError: (messageId: string, error: any) => void;
   /** 完成处理 */
-  handleComplete: (messageId: string, isAborted: boolean, params: ChatRequestParams, chunk?: unknown) => void;
+  handleComplete: (messageId: string, isAborted: boolean, params: ChatRequestParams, chunk?: any) => void;
   /** 消息存储（用于获取消息） */
   messageStore: MessageStore;
   /** 事件总线 */

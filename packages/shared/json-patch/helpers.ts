@@ -5,22 +5,22 @@
  */
 
 const _hasOwnProperty = Object.prototype.hasOwnProperty;
-export function hasOwnProperty(obj: any, key: string | number) {
+export function hasOwnProperty(obj: object, key: string | number) {
   return _hasOwnProperty.call(obj, key);
 }
-export function _objectKeys(obj: any) {
+export function _objectKeys(obj: Record<string, any> | any[]) {
   if (Array.isArray(obj)) {
-    const keys = new Array(obj.length);
+    const keys: string[] = new Array(obj.length);
     for (let k = 0; k < keys.length; k++) {
-      keys[k] = '' + k;
+      keys[k] = String(k);
     }
     return keys;
   }
   if (Object.keys) {
-    return Object.keys(obj);
+    return Object.keys(obj as object);
   }
-  let keys = [];
-  for (let i in obj) {
+  const keys: string[] = [];
+  for (const i in obj) {
     if (hasOwnProperty(obj, i)) {
       keys.push(i);
     }
@@ -33,12 +33,12 @@ export function _objectKeys(obj: any) {
  * @param  {any} obj value to clone
  * @return {any} cloned obj
  */
-export function _deepClone(obj: any) {
+export function _deepClone<T>(obj: T): T {
   switch (typeof obj) {
     case 'object':
-      return JSON.parse(JSON.stringify(obj)); //Faster than ES5 clone - http://jsperf.com/deep-cloning-of-objects/5
+      return JSON.parse(JSON.stringify(obj)) as T; //Faster than ES5 clone - http://jsperf.com/deep-cloning-of-objects/5
     case 'undefined':
-      return null; //this is how JSON.stringify behaves for array items
+      return null as T; //this is how JSON.stringify behaves for array items
     default:
       return obj; //no need to clone primitives
   }
@@ -77,13 +77,12 @@ export function unescapePathComponent(path: string): string {
 }
 
 export function _getPathRecursive(root: Record<string, any>, obj: any): string {
-  let found;
-  for (let key in root) {
+  for (const key in root) {
     if (hasOwnProperty(root, key)) {
       if (root[key] === obj) {
         return escapePathComponent(key) + '/';
-      } else if (typeof root[key] === 'object') {
-        found = _getPathRecursive(root[key], obj);
+      } else if (typeof root[key] === 'object' && root[key] !== null) {
+        const found = _getPathRecursive(root[key] as Record<string, any>, obj);
         if (found != '') {
           return escapePathComponent(key) + '/' + found;
         }
@@ -118,10 +117,10 @@ export function hasUndefined(obj: any): boolean {
         }
       }
     } else if (typeof obj === 'object') {
-      const objKeys = _objectKeys(obj);
+      const objKeys = _objectKeys(obj as Record<string, any>);
       const objKeysLength = objKeys.length;
-      for (var i = 0; i < objKeysLength; i++) {
-        if (hasUndefined(obj[objKeys[i]])) {
+      for (let i = 0; i < objKeysLength; i++) {
+        if (hasUndefined((obj as Record<string, any>)[objKeys[i]])) {
           return true;
         }
       }

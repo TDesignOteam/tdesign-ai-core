@@ -81,7 +81,7 @@ export class OpenClawStreamHandler implements IStreamHandler {
       const requestParams = (await config.onRequest?.(params)) || {};
 
       // 发送消息（requestParams 包含用户自定义的 sessionKey、token 等）
-      await this.openclawAdapter!.sendMessage(params, requestParams as Record<string, unknown>);
+      await this.openclawAdapter!.sendMessage(params, requestParams as Record<string, any>);
     } catch (error) {
       if (messageId) {
         context.handleError(messageId, error);
@@ -130,9 +130,9 @@ export class OpenClawStreamHandler implements IStreamHandler {
       // 用空的 params 调用 onRequest，仅获取 auth 信息
       const requestParams = await config.onRequest({ prompt: '' } as ChatRequestParams);
       if (requestParams) {
-        const { auth } = requestParams as Record<string, unknown>;
+        const { auth } = requestParams as Record<string, any>;
         if (auth && typeof auth === 'object') {
-          this.openclawAdapter.setConnectAuth(auth as Record<string, unknown>);
+          this.openclawAdapter.setConnectAuth(auth as Record<string, any>);
         }
       }
     } catch (error) {

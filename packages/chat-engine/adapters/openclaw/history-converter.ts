@@ -52,8 +52,8 @@ export interface OpenClawHistoryContentItem {
   // toolCall 类型
   id?: string;
   name?: string;
-  arguments?: Record<string, unknown>;
-  [key: string]: unknown;
+  arguments?: Record<string, any>;
+  [key: string]: any;
 }
 
 /**
@@ -377,7 +377,7 @@ function getToolCallName(name: string, options?: ConvertHistoryOptions): string 
   if (options?.toolCallNameMap && name in options.toolCallNameMap) {
     return options.toolCallNameMap[name];
   }
-  return name || 'unknown';
+  return name || 'any';
 }
 
 /**

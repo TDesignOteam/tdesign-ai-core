@@ -47,8 +47,12 @@ const TYPE_MAPPING: Record<string, string> = {
  * 将 A2UI v0.9 组件属性转换为 json-render 组件属性
  */
 function mapProps(component: A2UIComponent): Record<string, any> {
-  // 排除 A2UI 特有字段，保留其他属性
-  const { id, component: componentType, weight, child, children, ...restProps } = component;
+  const componentType = component.component;
+  const { id, component: _component, weight, child, children, ...restProps } = component;
+  void id;
+  void _component;
+  void child;
+  void children;
 
   const mappedProps: Record<string, any> = { ...restProps };
 
@@ -71,7 +75,7 @@ function mapProps(component: A2UIComponent): Record<string, any> {
       // A2UI action 格式转换：{ name, context } → { name, params }
       // context 中的 { path: "/xxx" } 会在运行时被 Button 组件解析
       if (mappedProps.action && typeof mappedProps.action === 'object') {
-        const a2uiAction = mappedProps.action as { name: string; context?: Record<string, unknown> };
+        const a2uiAction = mappedProps.action as { name: string; context?: Record<string, any> };
         mappedProps.action = {
           name: a2uiAction.name,
           // 将 context 转为 params，保留动态绑定引用供运行时解析
@@ -226,7 +230,7 @@ function buildSurfaceState(messages: A2UIMessage[]): A2UISurfaceState | null {
 
       if (operation === 'replace' && (path === '/' || !path)) {
         // 替换整个数据模型
-        surfaceState.dataModel = value as Record<string, unknown>;
+        surfaceState.dataModel = value as Record<string, any>;
       } else if (operation === 'replace' && path) {
         // 替换指定路径
         setValueByPath(surfaceState.dataModel, path, value);
@@ -252,22 +256,23 @@ function buildSurfaceState(messages: A2UIMessage[]): A2UISurfaceState | null {
  * 根据 JSON Pointer 路径设置值
  * 支持数组索引路径（如 /list/0/name）
  */
-function setValueByPath(obj: Record<string, unknown>, path: string, value: unknown): void {
+function setValueByPath(obj: Record<string, any>, path: string, value: any): void {
   const parts = path.split('/').filter(Boolean);
-  let current: any = obj;
+  let current: Record<string, any> | any[] = obj;
 
   for (let i = 0; i < parts.length - 1; i++) {
     const key = parts[i];
     const nextKey = parts[i + 1];
-    if (!(key in current)) {
+    const currentObject = current as Record<string, any>;
+    if (!(key in currentObject)) {
       // 如果下一个 key 是数字，创建数组；否则创建对象
-      current[key] = /^\d+$/.test(nextKey) ? [] : {};
+      currentObject[key] = /^\d+$/.test(nextKey) ? [] : {};
     }
-    current = current[key];
+    current = currentObject[key] as Record<string, any> | any[];
   }
 
   if (parts.length > 0) {
-    current[parts[parts.length - 1]] = value;
+    (current as Record<string, any>)[parts[parts.length - 1]] = value;
   }
 }
 
@@ -275,14 +280,15 @@ function setValueByPath(obj: Record<string, unknown>, path: string, value: unkno
  * 根据 JSON Pointer 路径删除值
  * 支持数组索引路径
  */
-function deleteValueByPath(obj: Record<string, unknown>, path: string): void {
+function deleteValueByPath(obj: Record<string, any>, path: string): void {
   const parts = path.split('/').filter(Boolean);
-  let current: any = obj;
+  let current: Record<string, any> | any[] = obj;
 
   for (let i = 0; i < parts.length - 1; i++) {
     const key = parts[i];
-    if (!(key in current)) return;
-    current = current[key];
+    const currentObject = current as Record<string, any>;
+    if (!(key in currentObject)) return;
+    current = currentObject[key] as Record<string, any> | any[];
   }
 
   if (parts.length > 0) {
@@ -291,7 +297,7 @@ function deleteValueByPath(obj: Record<string, unknown>, path: string): void {
       // 数组元素删除
       current.splice(parseInt(lastKey, 10), 1);
     } else {
-      delete current[lastKey];
+      delete (current as Record<string, any>)[lastKey];
     }
   }
 }
@@ -385,14 +391,14 @@ export function applyA2UIDataUpdate(
   schema: JsonRenderSchema,
   path: string | undefined,
   op: 'add' | 'replace' | 'remove' = 'replace',
-  value?: unknown,
+  value?: any,
 ): JsonRenderSchema {
   const newData = { ...schema.data };
 
   if (op === 'replace' && (path === '/' || !path)) {
     return {
       ...schema,
-      data: value as Record<string, unknown>,
+      data: value as Record<string, any>,
     };
   }
 
