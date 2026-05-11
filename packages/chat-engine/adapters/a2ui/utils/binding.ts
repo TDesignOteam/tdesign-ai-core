@@ -26,16 +26,12 @@ export function isExprBinding(value: unknown): value is ExprBinding {
 /**
  * 解析绑定值
  */
-export function resolveBinding<T>(
-  value: Bindable<T>,
-  data: Record<string, unknown>,
-  contextPath = '/'
-): T {
+export function resolveBinding<T>(value: Bindable<T>, data: Record<string, unknown>, contextPath = '/'): T {
   // 表达式绑定
   if (isExprBinding(value)) {
     return resolveExprBinding(value, data, contextPath) as T;
   }
-  
+
   // 路径绑定
   if (isPathBinding(value)) {
     return resolvePathBinding(value.path, data, contextPath) as T;
@@ -48,14 +44,10 @@ export function resolveBinding<T>(
 /**
  * 解析路径绑定
  */
-export function resolvePathBinding(
-  path: string,
-  data: Record<string, unknown>,
-  contextPath: string
-): unknown {
+export function resolvePathBinding(path: string, data: Record<string, unknown>, contextPath: string): unknown {
   // 处理路径
   let fullPath = path;
-  
+
   if (!path.startsWith('/')) {
     // 相对路径，与 contextPath 结合
     if (!contextPath || contextPath === '/') {
@@ -85,13 +77,9 @@ export function resolvePathBinding(
  * 解析表达式绑定
  * 使用 expr-eval 库进行安全的表达式求值
  */
-export function resolveExprBinding(
-  binding: ExprBinding,
-  data: Record<string, unknown>,
-  contextPath: string
-): unknown {
+export function resolveExprBinding(binding: ExprBinding, data: Record<string, unknown>, contextPath: string): unknown {
   const { expr, vars = {}, format } = binding;
-  
+
   // 解析所有变量
   const resolvedVars: Record<string, unknown> = {};
   for (const [key, varBinding] of Object.entries(vars)) {
@@ -103,16 +91,16 @@ export function resolveExprBinding(
       resolvedVars[key] = varBinding;
     }
   }
-  
+
   // 执行表达式
   try {
     const result = evaluateExpression(expr, resolvedVars);
-    
+
     // 应用格式化
     if (format && typeof result === 'number') {
       return formatValue(result, format);
     }
-    
+
     return result;
   } catch (e) {
     console.warn('Expression evaluation error:', e);
@@ -123,14 +111,11 @@ export function resolveExprBinding(
 /**
  * 使用 expr-eval 进行安全的表达式求值
  */
-export function evaluateExpression(
-  expr: string,
-  vars: Record<string, unknown>
-): unknown {
+export function evaluateExpression(expr: string, vars: Record<string, unknown>): unknown {
   // 预处理变量
   const processedVars: Values = {};
   let hasString = false;
-  
+
   for (const [key, value] of Object.entries(vars)) {
     if (Array.isArray(value)) {
       processedVars[key] = value.length;
@@ -148,14 +133,14 @@ export function evaluateExpression(
       hasString = true;
     }
   }
-  
+
   // 检测是否为字符串拼接表达式
   const hasStringLiteral = /"[^"]*"/.test(expr);
-  
+
   if (hasString || hasStringLiteral) {
     return evaluateStringExpression(expr, processedVars);
   }
-  
+
   // 纯数学表达式
   const parsedExpr = parser.parse(expr);
   return parsedExpr.evaluate(processedVars);
@@ -164,12 +149,9 @@ export function evaluateExpression(
 /**
  * 处理包含字符串的表达式
  */
-function evaluateStringExpression(
-  expr: string,
-  vars: Values
-): unknown {
+function evaluateStringExpression(expr: string, vars: Values): unknown {
   let processedExpr = expr;
-  
+
   // 替换变量
   for (const [key, value] of Object.entries(vars)) {
     const regex = new RegExp(`\\b${key}\\b`, 'g');
@@ -179,7 +161,7 @@ function evaluateStringExpression(
       processedExpr = processedExpr.replace(regex, `"${value}"`);
     }
   }
-  
+
   // 安全检查
   const dangerousPatterns = [
     /\beval\b/i,
@@ -197,13 +179,13 @@ function evaluateStringExpression(
     /\bfetch\b/i,
     /\bXMLHttpRequest\b/i,
   ];
-  
+
   for (const pattern of dangerousPatterns) {
     if (pattern.test(processedExpr)) {
       throw new Error('Unsafe expression: contains forbidden pattern');
     }
   }
-  
+
   // eslint-disable-next-line no-new-func
   return new Function(`return (${processedExpr})`)();
 }

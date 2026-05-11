@@ -28,7 +28,7 @@ export class DataStore {
    */
   get(path: string): unknown {
     const segments = parsePath(path);
-    
+
     if (segments.length === 0) {
       return this.data;
     }
@@ -58,7 +58,7 @@ export class DataStore {
     if (segments.length === 0) {
       // 设置整个数据对象
       if (typeof value === 'object' && value !== null) {
-        this.data = { ...value as Record<string, unknown> };
+        this.data = { ...(value as Record<string, unknown>) };
       }
       return;
     }
@@ -70,11 +70,7 @@ export class DataStore {
   /**
    * 深度设置值（不可变方式）
    */
-  private setDeep(
-    obj: Record<string, unknown>,
-    segments: string[],
-    value: unknown
-  ): Record<string, unknown> {
+  private setDeep(obj: Record<string, unknown>, segments: string[], value: unknown): Record<string, unknown> {
     if (segments.length === 0) {
       return obj;
     }
@@ -88,9 +84,8 @@ export class DataStore {
     } else {
       // 递归设置
       const existing = obj[head];
-      const nested = typeof existing === 'object' && existing !== null
-        ? { ...existing as Record<string, unknown> }
-        : {};
+      const nested =
+        typeof existing === 'object' && existing !== null ? { ...(existing as Record<string, unknown>) } : {};
       newObj[head] = this.setDeep(nested, tail, value);
     }
 
@@ -115,10 +110,7 @@ export class DataStore {
   /**
    * 深度删除值（不可变方式）
    */
-  private removeDeep(
-    obj: Record<string, unknown>,
-    segments: string[]
-  ): Record<string, unknown> {
+  private removeDeep(obj: Record<string, unknown>, segments: string[]): Record<string, unknown> {
     if (segments.length === 0) {
       return obj;
     }
@@ -147,17 +139,17 @@ export class DataStore {
    */
   merge(path: string, value: unknown): void {
     const existing = this.get(path);
-    
+
     if (
-      typeof existing === 'object' && existing !== null &&
-      typeof value === 'object' && value !== null &&
-      !Array.isArray(existing) && !Array.isArray(value)
+      typeof existing === 'object' &&
+      existing !== null &&
+      typeof value === 'object' &&
+      value !== null &&
+      !Array.isArray(existing) &&
+      !Array.isArray(value)
     ) {
       // 两者都是对象，进行深度合并
-      const merged = this.deepMerge(
-        existing as Record<string, unknown>,
-        value as Record<string, unknown>
-      );
+      const merged = this.deepMerge(existing as Record<string, unknown>, value as Record<string, unknown>);
       this.set(path, merged);
     } else if (existing === undefined) {
       // 不存在则直接设置
@@ -169,10 +161,7 @@ export class DataStore {
   /**
    * 深度合并对象
    */
-  private deepMerge(
-    target: Record<string, unknown>,
-    source: Record<string, unknown>
-  ): Record<string, unknown> {
+  private deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
     const result = { ...target };
 
     for (const [key, value] of Object.entries(source)) {
@@ -182,15 +171,15 @@ export class DataStore {
         // 新字段，直接设置
         result[key] = value;
       } else if (
-        typeof existing === 'object' && existing !== null &&
-        typeof value === 'object' && value !== null &&
-        !Array.isArray(existing) && !Array.isArray(value)
+        typeof existing === 'object' &&
+        existing !== null &&
+        typeof value === 'object' &&
+        value !== null &&
+        !Array.isArray(existing) &&
+        !Array.isArray(value)
       ) {
         // 递归合并对象
-        result[key] = this.deepMerge(
-          existing as Record<string, unknown>,
-          value as Record<string, unknown>
-        );
+        result[key] = this.deepMerge(existing as Record<string, unknown>, value as Record<string, unknown>);
       }
       // 已存在且不是对象，保留原值
     }

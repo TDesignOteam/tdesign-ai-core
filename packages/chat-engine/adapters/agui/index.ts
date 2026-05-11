@@ -1,5 +1,12 @@
 /* eslint-disable class-methods-use-this */
-import type { AIMessageContent, ChatMessagesData, ChatRequestParams, SSEChunkData, ToolCall, UserMessageContent } from '../../type';
+import type {
+  AIMessageContent,
+  ChatMessagesData,
+  ChatRequestParams,
+  SSEChunkData,
+  ToolCall,
+  UserMessageContent,
+} from '../../type';
 import { AGUIEventMapper } from './event-mapper';
 import type { BaseEvent, RunErrorEvent, RunFinishedEvent, RunStartedEvent } from './types/events';
 import { AGUIEventType } from './types/events';
@@ -168,10 +175,10 @@ export class AGUIAdapter {
         // 开始新的组
         currentUserMessage = msg as AGUIUserHistoryMessage;
       } else if (
-        msg.role === 'assistant'
-        || msg.role === 'tool'
-        || msg.role === 'activity'
-        || msg.role === 'reasoning'
+        msg.role === 'assistant' ||
+        msg.role === 'tool' ||
+        msg.role === 'activity' ||
+        msg.role === 'reasoning'
       ) {
         // 收集助手消息、工具调用结果、活动消息、reasoning 消息到当前组
         currentGroupMessages.push(msg);

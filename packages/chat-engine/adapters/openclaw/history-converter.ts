@@ -37,13 +37,7 @@
  *   timestamp: number,
  * }
  */
-import type {
-  ChatMessagesData,
-  AIMessageContent,
-  TextContent,
-  UserMessage,
-  AIMessage,
-} from '../../type';
+import type { ChatMessagesData, AIMessageContent, TextContent, UserMessage, AIMessage } from '../../type';
 import { createToolCallContent } from '../shared';
 import { generateUUID } from './utils';
 

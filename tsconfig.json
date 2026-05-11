@@ -10,13 +10,6 @@
       "@tdesign/ai-chat-engine/*": ["packages/chat-engine/*"]
     }
   },
-  "include": [
-    "packages/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "**/dist",
-    "**/*.test.ts"
-  ]
+  "include": ["packages/**/*.ts"],
+  "exclude": ["node_modules", "dist", "**/dist", "**/*.test.ts"]
 }

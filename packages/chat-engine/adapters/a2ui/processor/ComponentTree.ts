@@ -2,7 +2,7 @@
  * A2UI ComponentTree
  * 将平铺的组件列表转换为嵌套的组件树
  * 参考 @a2ui/core ComponentTree 实现
- * 
+ *
  * 支持两种 children 模式 (A2UI v0.9 规范)：
  * 1. 直接引用: children: ["comp1", "comp2"]
  * 2. Template 模式: children: { componentId: "comp1", path: "/items" }
@@ -22,7 +22,7 @@ export class ComponentTree {
   constructor(
     private components: Map<string, A2UIComponentBase>,
     private dataStore: DataStore,
-    private pathResolver: PathResolver
+    private pathResolver: PathResolver,
   ) {
     this.root = this.buildTree('root', '/');
   }
@@ -73,10 +73,7 @@ export class ComponentTree {
   /**
    * 解析 children 属性
    */
-  private resolveChildren(
-    children: ChildrenProperty,
-    dataContextPath: string
-  ): ResolvedComponent[] {
+  private resolveChildren(children: ChildrenProperty, dataContextPath: string): ResolvedComponent[] {
     // 模式1: 直接引用数组
     if (Array.isArray(children)) {
       return children
@@ -102,11 +99,7 @@ export class ComponentTree {
    * 解析 Template 模式的 children
    * Template 会根据 dataPath 指向的数组长度，创建多个子组件实例
    */
-  private resolveTemplate(
-    templateId: string,
-    dataPath: string,
-    parentContextPath: string
-  ): ResolvedComponent[] {
+  private resolveTemplate(templateId: string, dataPath: string, parentContextPath: string): ResolvedComponent[] {
     // 解析数据路径
     const resolvedDataPath = this.pathResolver.resolve(dataPath, parentContextPath);
     const data = this.dataStore.get(resolvedDataPath);
@@ -117,10 +110,12 @@ export class ComponentTree {
     }
 
     // 为数组中的每个元素创建一个组件实例
-    return data.map((_, index) => {
-      const itemContextPath = `${resolvedDataPath}/${index}`;
-      return this.buildTree(templateId, itemContextPath);
-    }).filter((c): c is ResolvedComponent => c !== null);
+    return data
+      .map((_, index) => {
+        const itemContextPath = `${resolvedDataPath}/${index}`;
+        return this.buildTree(templateId, itemContextPath);
+      })
+      .filter((c): c is ResolvedComponent => c !== null);
   }
 
   /**
@@ -151,13 +146,10 @@ export class ComponentTree {
     this.traverseNode(this.root, callback);
   }
 
-  private traverseNode(
-    node: ResolvedComponent | null,
-    callback: (component: ResolvedComponent) => void
-  ): void {
+  private traverseNode(node: ResolvedComponent | null, callback: (component: ResolvedComponent) => void): void {
     if (!node) return;
     callback(node);
-    
+
     if (node.resolvedChildren) {
       for (const child of node.resolvedChildren) {
         this.traverseNode(child, callback);

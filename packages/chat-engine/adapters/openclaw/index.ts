@@ -23,14 +23,7 @@ import type {
 } from './types';
 import { mergeOpenClawConfig, DEFAULT_OPENCLAW_CONFIG } from './types/config';
 import { OpenClawEventType, OpenClawConnectionState } from './types/events';
-import {
-  generateUUID,
-  parseFrame,
-  getPlatform,
-  getUserAgent,
-  getLocale,
-  formatWebSocketUrl,
-} from './utils';
+import { generateUUID, parseFrame, getPlatform, getUserAgent, getLocale, formatWebSocketUrl } from './utils';
 
 import {
   convertOpenClawHistory,
@@ -320,11 +313,7 @@ export class OpenClawAdapter extends EventEmitter {
    * />
    * ```
    */
-  async invokeAction(params: {
-    nodeId: string;
-    action: string;
-    payload: unknown;
-  }): Promise<unknown> {
+  async invokeAction(params: { nodeId: string; action: string; payload: unknown }): Promise<unknown> {
     if (this.connectionState !== OpenClawConnectionState.AUTHENTICATED) {
       throw new Error('Not authenticated. Please connect first.');
     }
@@ -359,7 +348,7 @@ export class OpenClawAdapter extends EventEmitter {
       throw new Error('Not authenticated. Please connect first.');
     }
 
-    const response = await this.rpcHandler.sessionsHistory({ sessionKey }) as OpenClawHistoryResponse;
+    const response = (await this.rpcHandler.sessionsHistory({ sessionKey })) as OpenClawHistoryResponse;
     return convertOpenClawHistoryResponse(response, options);
   }
 
@@ -440,7 +429,9 @@ export class OpenClawAdapter extends EventEmitter {
     this.wsClient.on('complete', (isAborted: boolean) => {
       console.warn(`[OpenClaw] WebSocket complete event! isAborted=${isAborted}, isStreaming=${this.isStreaming}`);
       if (this.isStreaming) {
-        console.warn('[OpenClaw] ⚠️ WebSocket closed while still streaming! This caused onComplete to fire prematurely.');
+        console.warn(
+          '[OpenClaw] ⚠️ WebSocket closed while still streaming! This caused onComplete to fire prematurely.',
+        );
         this.isStreaming = false;
         this.callbacks.onComplete?.(isAborted, this.currentRequestParams || undefined);
       }
@@ -469,7 +460,9 @@ export class OpenClawAdapter extends EventEmitter {
       return;
     }
 
-    console.log(`[OpenClaw Frame] type="${frame.type}", event=${(frame as any).event}, isStreaming=${this.isStreaming}`);
+    console.log(
+      `[OpenClaw Frame] type="${frame.type}", event=${(frame as any).event}, isStreaming=${this.isStreaming}`,
+    );
 
     // 处理响应帧
     if (frame.type === 'res') {
@@ -496,19 +489,24 @@ export class OpenClawAdapter extends EventEmitter {
     }
 
     // 忽略心跳、健康检查等非业务事件
-    if (event === OpenClawEventType.HEALTH || event === OpenClawEventType.HEARTBEAT || event === 'tick' as any) {
+    if (event === OpenClawEventType.HEALTH || event === OpenClawEventType.HEARTBEAT || event === ('tick' as any)) {
       console.log(`[OpenClaw] Skipping non-business event: "${event}"`);
       return;
     }
 
     // DEBUG: 打印所有业务事件，帮助排查真实 OpenClaw 的返回格式
-    console.log(`[OpenClaw Event] event="${event}", isStreaming=${this.isStreaming}, payload=`, JSON.stringify(payload).slice(0, 500));
+    console.log(
+      `[OpenClaw Event] event="${event}", isStreaming=${this.isStreaming}, payload=`,
+      JSON.stringify(payload).slice(0, 500),
+    );
 
     // 流式消息事件
     if (this.isStreaming) {
       const result = this.eventMapper.mapEvent(frame);
 
-      console.log(`[OpenClaw mapResult] content=${result.content ? JSON.stringify(result.content).slice(0, 200) : 'null'}, isFinal=${result.isFinal}, hasError=${result.hasError}`);
+      console.log(
+        `[OpenClaw mapResult] content=${result.content ? JSON.stringify(result.content).slice(0, 200) : 'null'}, isFinal=${result.isFinal}, hasError=${result.hasError}`,
+      );
 
       if (result.content) {
         this.callbacks.onMessage?.(result.content);
@@ -525,7 +523,10 @@ export class OpenClawAdapter extends EventEmitter {
       }
     } else {
       // 非流式状态下收到了业务事件，打印警告帮助排查
-      console.warn(`[OpenClaw] Received event "${event}" but isStreaming=false, event may be lost. Payload:`, JSON.stringify(payload).slice(0, 300));
+      console.warn(
+        `[OpenClaw] Received event "${event}" but isStreaming=false, event may be lost. Payload:`,
+        JSON.stringify(payload).slice(0, 300),
+      );
     }
   }
 
@@ -549,7 +550,7 @@ export class OpenClawAdapter extends EventEmitter {
         instanceId: this.instanceId,
       },
       role: 'operator',
-      scopes: ["operator.read", "operator.write", "operator.admin", "operator.approvals", "operator.pairing"],
+      scopes: ['operator.read', 'operator.write', 'operator.admin', 'operator.approvals', 'operator.pairing'],
       // scopes: ['operator.read', 'operator.write'],
       userAgent: getUserAgent(),
       locale: getLocale(),
@@ -586,7 +587,9 @@ export class OpenClawAdapter extends EventEmitter {
       // 用于页面刷新后自动回填历史对话记录（无需额外 RPC 请求）
       const connectPayload = response as unknown as Record<string, unknown>;
       if (Array.isArray(connectPayload?.messages) && connectPayload.messages.length > 0) {
-        this.logger.info(`OpenClaw connect response contains ${connectPayload.messages.length} history messages, converting...`);
+        this.logger.info(
+          `OpenClaw connect response contains ${connectPayload.messages.length} history messages, converting...`,
+        );
         try {
           const historyResponse = {
             sessionKey: (connectPayload.sessionKey as string) || '',

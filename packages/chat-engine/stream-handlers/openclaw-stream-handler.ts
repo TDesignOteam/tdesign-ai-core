@@ -12,10 +12,7 @@
 import type { AIMessageContent, ChatMessagesData, ChatRequestParams, ChatServiceConfig, SSEChunkData } from '../type';
 import { ChatEngineEventType } from '../event-bus';
 import { LoggerManager } from '../utils/logger';
-import {
-  OpenClawAdapter,
-  type OpenClawAdapterConfig,
-} from '../adapters/openclaw';
+import { OpenClawAdapter, type OpenClawAdapterConfig } from '../adapters/openclaw';
 import type { IStreamHandler, StreamContext, StreamLifecycleContext, StreamProtocol } from './types';
 import type { LLMService } from '../server';
 

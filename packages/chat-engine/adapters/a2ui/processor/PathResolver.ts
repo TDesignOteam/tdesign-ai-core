@@ -68,7 +68,7 @@ export class PathResolver {
   getParent(path: string): string {
     const normalized = this.normalize(path);
     const lastSlash = normalized.lastIndexOf('/');
-    
+
     if (lastSlash <= 0) {
       return '/';
     }
@@ -83,7 +83,7 @@ export class PathResolver {
   getBasename(path: string): string {
     const normalized = this.normalize(path);
     const lastSlash = normalized.lastIndexOf('/');
-    
+
     return normalized.slice(lastSlash + 1);
   }
 
@@ -92,7 +92,7 @@ export class PathResolver {
    */
   join(...paths: string[]): string {
     if (paths.length === 0) return '/';
-    
+
     return this.normalize(paths.join('/'));
   }
 

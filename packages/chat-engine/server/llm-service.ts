@@ -188,7 +188,7 @@ export class LLMService implements ILLMService {
 
   /**
    * WebSocket 流式请求
-   * 
+   *
    * WS 消息格式需兼容 SSEChunkData（{ event, data }），
    * 以便上层 StreamHandler（AGUIStreamHandler / DefaultStreamHandler）无感知地处理。
    *

@@ -152,7 +152,11 @@ export class WebSocketClient extends EventEmitter {
    * 关闭连接
    */
   async close(): Promise<void> {
-    if (this.state === WebSocketConnectionState.DISCONNECTED || this.state === WebSocketConnectionState.CLOSING || this.state === WebSocketConnectionState.CLOSED) {
+    if (
+      this.state === WebSocketConnectionState.DISCONNECTED ||
+      this.state === WebSocketConnectionState.CLOSING ||
+      this.state === WebSocketConnectionState.CLOSED
+    ) {
       return;
     }
 
@@ -358,7 +362,9 @@ export class WebSocketClient extends EventEmitter {
     this.retryCount++;
     const delay = this.config.retryInterval * Math.pow(1.5, this.retryCount - 1);
 
-    this.logger.info(`WebSocket ${this.connectionId} reconnecting in ${delay}ms (attempt ${this.retryCount}/${this.config.maxRetries})`);
+    this.logger.info(
+      `WebSocket ${this.connectionId} reconnecting in ${delay}ms (attempt ${this.retryCount}/${this.config.maxRetries})`,
+    );
 
     this.reconnectTimer = setTimeout(() => {
       if (!this.manualClose && this.state !== WebSocketConnectionState.CONNECTED) {

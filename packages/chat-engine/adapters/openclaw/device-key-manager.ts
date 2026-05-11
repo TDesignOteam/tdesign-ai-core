@@ -164,13 +164,7 @@ async function signWithHmac(privateKeyHex: string, nonce: string): Promise<strin
   const encoder = new TextEncoder();
   const keyData = encoder.encode(privateKeyHex);
 
-  const key = await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
+  const key = await crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
 
   const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(nonce));
   return bytesToHex(new Uint8Array(signature));
@@ -222,9 +216,7 @@ export class DeviceKeyManager {
       logger.debug(`Device auth: restored key pair for device ${stored.deviceId}`);
     } else {
       // 生成新密钥对
-      this.keyPair = this.useEd25519
-        ? await generateEd25519KeyPair()
-        : await generateHmacKeyPair();
+      this.keyPair = this.useEd25519 ? await generateEd25519KeyPair() : await generateHmacKeyPair();
 
       this.saveToStorage(this.keyPair);
       logger.info(`Device auth: generated new key pair, deviceId=${this.keyPair.deviceId}`);
