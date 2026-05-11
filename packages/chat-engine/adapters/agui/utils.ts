@@ -4,6 +4,32 @@
  * 包含与类无关的纯函数，用于处理AGUI协议相关逻辑
  */
 
+import type { AIMessageContent } from '../../type';
+
+type SnapshotContentArray = AIMessageContent[] & { _isSnapshot?: boolean };
+
+type AGUIMessageLike = {
+  role: 'assistant' | 'reasoning' | 'activity' | 'tool' | 'user';
+  content?: any;
+  toolCalls?: Array<{ id: string; function: { name: string; arguments: string } }>;
+  toolCallId?: string;
+  encryptedValue?: string;
+  subtype?: string;
+  entityId?: string;
+  title?: string;
+  activityType?: string;
+};
+
+type ToolCallRecord = {
+  toolCallId: string;
+  toolCallName: string;
+  args?: string;
+  result?: string;
+  parentMessageId?: string;
+  eventType?: string;
+  ext?: Record<string, any>;
+};
+
 /**
  * 合并字符串内容，处理JSON和普通字符串
  * @param existing 现有内容
@@ -30,7 +56,7 @@ export function mergeStringContent(existing: string | undefined, delta: string):
 
     // 其他情况，直接替换
     return delta;
-  } catch (error) {
+  } catch {
     // 不是有效的JSON，按普通字符串处理
     return existing + delta;
   }
@@ -41,7 +67,7 @@ export function mergeStringContent(existing: string | undefined, delta: string):
  * @param event delta事件对象
  * @returns stateKey或null
  */
-export function extractStateKeyFromDelta(event: { type: string; delta?: any[] }): string | null {
+export function extractStateKeyFromDelta(event: { type: string; delta?: Array<{ path?: string }> }): string | null {
   if (event.type === 'STATE_DELTA' && event.delta && event.delta.length > 0) {
     // 从第一个delta操作的路径中提取stateKey
     const firstDelta = event.delta[0];
@@ -67,10 +93,10 @@ export function extractStateKeyFromDelta(event: { type: string; delta?: any[] })
  * @param toolCallMap 工具调用结果映射（通过 buildToolCallMap 构建）
  * @returns 转换后的 AIMessageContent 数组
  */
-export function processMessageGroup(messages: any[], toolCallMap: Map<string, any>): any[] {
-  const allContent: any[] = [];
+export function processMessageGroup(messages: AGUIMessageLike[], toolCallMap: Map<string, ToolCallRecord>): AIMessageContent[] {
+  const allContent: AIMessageContent[] = [];
 
-  messages.forEach((msg: any) => {
+  messages.forEach((msg) => {
     if (msg.role === 'assistant') {
       // 处理文本内容
       if (typeof msg.content === 'string') {
@@ -85,6 +111,7 @@ export function processMessageGroup(messages: any[], toolCallMap: Map<string, an
     } else if (msg.role === 'reasoning') {
       // AG-UI Reasoning 消息：转为 thinking 块，历史态默认折叠
       // encryptedValue 透传到 ext，业务在下一轮请求中回传
+      const reasoningContent = typeof msg.content === 'string' ? msg.content : '';
       const extraExt = msg.encryptedValue
         ? {
             encryptedValue: msg.encryptedValue,
@@ -94,7 +121,7 @@ export function processMessageGroup(messages: any[], toolCallMap: Map<string, an
         : undefined;
       allContent.push(
         createThinkingContent(
-          { text: msg.content || '', title: msg.title || '思考结束' },
+          { text: reasoningContent, title: msg.title || '思考结束' },
           'complete',
           'append',
           true,
@@ -104,14 +131,15 @@ export function processMessageGroup(messages: any[], toolCallMap: Map<string, an
     } else if (msg.role === 'activity') {
       // 检查是否是存储为 Activity 的 CUSTOM 事件
       if (msg.activityType === 'CUSTOM') {
-        const customContent: any = {
+        const activityContent = msg.content as { name?: string; value?: any } | undefined;
+        const customContent = {
           type: 'custom',
           data: {
-            name: msg.content?.name || '',
-            value: msg.content?.value,
+            name: activityContent?.name || '',
+            value: activityContent?.value,
           },
           status: 'complete',
-        };
+        } as AIMessageContent;
         allContent.push(customContent);
       } else {
         // 普通 Activity 处理
@@ -119,7 +147,7 @@ export function processMessageGroup(messages: any[], toolCallMap: Map<string, an
           type: `activity-${msg.activityType}`,
           data: {
             activityType: msg.activityType,
-            content: msg.content,
+            content: msg.content as Record<string, any>,
           },
           status: 'complete',
         });
@@ -143,15 +171,15 @@ export function processMessageGroup(messages: any[], toolCallMap: Map<string, an
  * @param messages 消息数组（来自 MESSAGES_SNAPSHOT 事件的 messages 字段，AG-UI 标准格式）
  * @returns 处理后的消息内容数组，带 _isSnapshot 标记用于区分快照 vs 增量
  */
-export function handleMessagesSnapshot(messages: any[]): any[] {
+export function handleMessagesSnapshot(messages: AGUIMessageLike[]): SnapshotContentArray {
   if (!messages || messages.length === 0) return [];
 
   const toolCallMap = buildToolCallMap(messages);
-  const result = processMessageGroup(messages, toolCallMap);
+  const result = processMessageGroup(messages, toolCallMap) as SnapshotContentArray;
 
   // 标记为快照结果，让上层使用 replaceContent 语义
   if (result.length > 0) {
-    (result as any)._isSnapshot = true;
+    result._isSnapshot = true;
   }
 
   return result;
@@ -163,13 +191,13 @@ export function handleMessagesSnapshot(messages: any[]): any[] {
  * @param event 自定义事件对象
  * @returns 处理结果
  */
-export function handleCustomEvent(event: any): any {
+export function handleCustomEvent(event: { name?: string; value?: any }): AIMessageContent {
   if (event.name === 'suggestion') {
     return {
       type: 'suggestion',
-      data: event.value || [],
+      data: (event.value as any[]) || [],
       status: 'complete',
-    };
+    } as AIMessageContent;
   }
   return {
     type: 'custom',
@@ -178,7 +206,7 @@ export function handleCustomEvent(event: any): any {
       value: event.value,
     },
     status: 'complete',
-  };
+  } as AIMessageContent;
 }
 
 /**
@@ -203,8 +231,8 @@ export function parseSSEData(data: any): any {
  * @param event 事件对象
  * @returns 是否为有效事件
  */
-export function isValidEvent(event: any): boolean {
-  return event && typeof event === 'object' && event.type;
+export function isValidEvent(event: any): event is { type: string } {
+  return !!event && typeof event === 'object' && 'type' in event;
 }
 
 /**
@@ -244,14 +272,14 @@ export function createAIMessageContent(
   data: any,
   status: 'pending' | 'streaming' | 'complete' | 'error' = 'complete',
   strategy: 'append' | 'merge' = 'append',
-  ext?: any,
-): any {
-  const content: any = {
+  ext?: Record<string, any>,
+): AIMessageContent {
+  const content = {
     type,
     data,
     status,
     strategy,
-  };
+  } as AIMessageContent;
 
   if (ext) {
     content.ext = ext;
@@ -270,12 +298,12 @@ export function createAIMessageContent(
  * @returns thinking 类型的 AIMessageContent
  */
 export function createThinkingContent(
-  data: any,
+  data: { text?: string; title?: string },
   status: 'streaming' | 'complete' = 'streaming',
   strategy: 'append' | 'merge' = 'append',
   collapsed = false,
   extraExt?: Record<string, any>,
-): any {
+): AIMessageContent {
   const ext = extraExt ? { collapsed, ...extraExt } : { collapsed };
   return createAIMessageContent('thinking', data, status, strategy, ext);
 }
@@ -292,10 +320,10 @@ export function createThinkingContent(
  * - toolCallId: 用于区分同名工具的不同调用实例，支持并行工具调用
  */
 export function createToolCallContent(
-  toolCall: any,
+  toolCall: { toolCallName: string; toolCallId: string },
   status: 'pending' | 'streaming' | 'complete' = 'pending',
   strategy?: 'append' | 'merge',
-): any {
+): AIMessageContent {
   // 根据 toolCallName 和 toolCallId 生成唯一的 type
   // 这样同名工具的不同调用实例会有不同的 type，支持并行工具调用场景
   const type = `toolcall-${toolCall.toolCallName}-${toolCall.toolCallId}`;
@@ -325,7 +353,7 @@ export function createActivityContent(
   status: 'streaming' | 'complete' = 'complete',
   strategy: 'append' | 'merge' = 'append',
   deltaInfo?: { fromIndex: number; toIndex: number },
-): any {
+): AIMessageContent {
   // 使用 activity-${activityType} 格式，支持并行不同类型的 Activity
   const type = `activity-${activityType}`;
 
@@ -356,7 +384,7 @@ export function createMarkdownContent(
   status: 'streaming' | 'complete' = 'complete',
   strategy: 'append' | 'merge' = 'append',
   role?: 'assistant' | 'system',
-): any {
+): AIMessageContent {
   const notAssistant = role && role !== 'assistant';
   // TODO: 这里对于textchunk中设置了role的情况delta没做合并（暂时type=`${role}-text`业务自行处理)
   const content = createAIMessageContent(notAssistant ? `${role}-text` : 'markdown', data, status, strategy);
@@ -371,7 +399,7 @@ export function createMarkdownContent(
  * @param data suggestion 数据
  * @returns suggestion 类型的 AIMessageContent
  */
-export function createSuggestionContent(data: any[]): any {
+export function createSuggestionContent(data: any[]): AIMessageContent {
   return createAIMessageContent('suggestion', data, 'complete', 'append');
 }
 
@@ -381,7 +409,7 @@ export function createSuggestionContent(data: any[]): any {
  * @param status 状态
  * @returns text 类型的 AIMessageContent
  */
-export function createTextContent(data: string, status: 'streaming' | 'complete' | 'error' = 'complete'): any {
+export function createTextContent(data: string, status: 'streaming' | 'complete' | 'error' = 'complete'): AIMessageContent {
   return createAIMessageContent('text', data, status, 'append');
 }
 
@@ -391,7 +419,7 @@ export function createTextContent(data: string, status: 'streaming' | 'complete'
  * @param updates 更新内容
  * @returns 更新后的工具调用
  */
-export function updateToolCall(existingToolCall: any, updates: Partial<any>): any {
+export function updateToolCall<T extends Record<string, any>>(existingToolCall: T, updates: Partial<T>): T {
   return {
     ...existingToolCall,
     ...updates,
@@ -403,7 +431,7 @@ export function updateToolCall(existingToolCall: any, updates: Partial<any>): an
  * @param toolCall 工具调用对象
  * @returns suggestion 内容或 null
  */
-export function handleSuggestionToolCall(toolCall: any): any | null {
+export function handleSuggestionToolCall(toolCall: { toolCallName?: string; result?: string }): AIMessageContent | null {
   if (toolCall.toolCallName === 'suggestion') {
     try {
       const suggestionData = JSON.parse(toolCall.result || '{}') || [];
@@ -422,7 +450,7 @@ export function handleSuggestionToolCall(toolCall: any): any | null {
  * @param toolCallMap 工具调用结果映射
  * @returns 创建的 AIMessageContent 数组
  */
-export function processToolCalls(toolCalls: any[], toolCallMap: Map<string, any>): any[] {
+export function processToolCalls(toolCalls: Array<{ id: string; function: { name: string; arguments: string } }>, toolCallMap: Map<string, ToolCallRecord>): AIMessageContent[] {
   return toolCalls.map((toolCall) => {
     const toolResult = toolCallMap.get(toolCall.id)?.result || '';
 
@@ -456,8 +484,8 @@ export function processToolCalls(toolCalls: any[], toolCallMap: Map<string, any>
  * @param historyMessages 历史消息数组
  * @returns 工具调用结果映射
  */
-export function buildToolCallMap(historyMessages: any[]): Map<string, any> {
-  const toolCallMap = new Map<string, any>();
+export function buildToolCallMap(historyMessages: AGUIMessageLike[]): Map<string, ToolCallRecord> {
+  const toolCallMap = new Map<string, ToolCallRecord>();
 
   historyMessages.forEach((msg) => {
     if (msg.role === 'tool') {

@@ -85,7 +85,7 @@ export interface ChatEngineEventPayloadMap {
   };
   [ChatEngineEventType.REQUEST_STREAM]: {
     messageId: string;
-    chunk: unknown;
+    chunk: any;
     content?: AIMessageContent | AIMessageContent[] | null;
   };
   [ChatEngineEventType.REQUEST_COMPLETE]: {
@@ -95,7 +95,7 @@ export interface ChatEngineEventPayloadMap {
   };
   [ChatEngineEventType.REQUEST_ERROR]: {
     messageId: string;
-    error: Error | unknown;
+    error: Error | any;
     params?: ChatRequestParams;
   };
   [ChatEngineEventType.REQUEST_ABORT]: {
@@ -115,13 +115,13 @@ export interface ChatEngineEventPayloadMap {
     timestamp: number;
   };
   [ChatEngineEventType.AGUI_RUN_ERROR]: {
-    error: Error | unknown;
+    error: Error | any;
     runId?: string;
   };
   [ChatEngineEventType.AGUI_STATE_UPDATE]: {
     stateKey: string;
-    state: unknown;
-    previousState?: unknown;
+    state: any;
+    previousState?: any;
   };
   [ChatEngineEventType.AGUI_TOOLCALL]: {
     toolCall: ToolCall;
@@ -130,20 +130,20 @@ export interface ChatEngineEventPayloadMap {
   [ChatEngineEventType.AGUI_ACTIVITY]: {
     activityType: string;
     messageId?: string;
-    content: unknown;
+    content: any;
   };
 
   // 自定义事件
   [ChatEngineEventType.CUSTOM]: {
     eventName: string;
-    data: unknown;
+    data: any;
   };
 }
 
 /**
  * 事件回调函数类型
  */
-export type EventCallback<T = unknown> = (payload: T) => void;
+export type EventCallback<T = any> = (payload: T) => void;
 
 /**
  * 取消订阅函数类型
@@ -153,7 +153,7 @@ export type UnsubscribeFn = () => void;
 /**
  * 事件过滤器类型
  */
-export type EventFilter<T = unknown> = (payload: T) => boolean;
+export type EventFilter<T = any> = (payload: T) => boolean;
 
 /**
  * 事件总线配置
@@ -181,7 +181,7 @@ export interface ChatEventBusOptions {
  */
 export interface EventHistoryItem {
   event: ChatEngineEventType | string;
-  payload: unknown;
+  payload: any;
   timestamp: number;
 }
 
@@ -244,14 +244,14 @@ export interface IChatEventBus {
    * @param eventName 自定义事件名
    * @param callback 回调函数
    */
-  onCustom<T = unknown>(eventName: string, callback: EventCallback<T>): UnsubscribeFn;
+  onCustom<T = any>(eventName: string, callback: EventCallback<T>): UnsubscribeFn;
 
   /**
    * 发布自定义事件
    * @param eventName 自定义事件名
    * @param data 数据
    */
-  emitCustom<T = unknown>(eventName: string, data: T): void;
+  emitCustom<T = any>(eventName: string, data: T): void;
 
   /**
    * 获取事件历史记录

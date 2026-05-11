@@ -15,7 +15,7 @@ export type OpenClawMessageType = 'req' | 'res' | 'event';
 /**
  * OpenClaw 请求帧
  */
-export interface OpenClawRequestFrame<TParams = Record<string, unknown>> {
+export interface OpenClawRequestFrame<TParams = Record<string, any>> {
   type: 'req';
   /** 请求唯一标识，用于匹配响应 */
   id: string;
@@ -28,7 +28,7 @@ export interface OpenClawRequestFrame<TParams = Record<string, unknown>> {
 /**
  * OpenClaw 响应帧
  */
-export interface OpenClawResponseFrame<TPayload = unknown> {
+export interface OpenClawResponseFrame<TPayload = any> {
   type: 'res';
   /** 请求唯一标识，与请求帧的 id 对应 */
   id: string;
@@ -43,7 +43,7 @@ export interface OpenClawResponseFrame<TPayload = unknown> {
 /**
  * OpenClaw 事件帧
  */
-export interface OpenClawEventFrame<TPayload = unknown> {
+export interface OpenClawEventFrame<TPayload = any> {
   type: 'event';
   /** 事件名称 */
   event: string;
@@ -62,14 +62,14 @@ export interface OpenClawError {
   /** 错误消息 */
   message: string;
   /** 详细信息 */
-  details?: unknown;
+  details?: any;
 }
 
 /**
  * OpenClaw 消息帧（联合类型）
  */
-export type OpenClawFrame<T = unknown> =
-  | OpenClawRequestFrame<T extends Record<string, unknown> ? T : Record<string, unknown>>
+export type OpenClawFrame<T = any> =
+  | OpenClawRequestFrame<T extends Record<string, any> ? T : Record<string, any>>
   | OpenClawResponseFrame<T>
   | OpenClawEventFrame<T>;
 
@@ -100,7 +100,7 @@ export interface ConnectParams {
   /** 认证信息（可选，由 onRequest 传入） */
   auth?: {
     token?: string;
-    [key: string]: unknown;
+    [key: string]: any;
   };
   /** 设备身份信息（由 DeviceKeyManager 自动生成） */
   device?: {
@@ -139,7 +139,7 @@ export interface ConnectResponse {
   /** 会话标识（Gateway 推送历史消息时附带） */
   sessionKey?: string;
   /** 历史消息（Gateway 在 connect 响应中主动推送，用于页面刷新后回填） */
-  messages?: Array<Record<string, unknown>>;
+  messages?: Array<Record<string, any>>;
   /** 思考级别（Gateway 附带） */
   thinkingLevel?: string;
 }
@@ -155,7 +155,7 @@ export interface ChatSendParams {
   /** 幂等键 */
   idempotencyKey?: string;
   /** 其他自定义参数 */
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 /**
@@ -196,7 +196,7 @@ export interface ChatEventPayload {
     content: Array<{
       type: string;
       text?: string;
-      [key: string]: unknown;
+      [key: string]: any;
     }>;
   };
   /** 错误消息 */
@@ -234,7 +234,7 @@ export interface AgentEventPayload {
     text?: string;
     /** 本次增量文本 */
     delta?: string;
-    [key: string]: unknown;
+    [key: string]: any;
   };
   /** payload 内序号（agent 事件流内的顺序） */
   seq?: number;

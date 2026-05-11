@@ -9,12 +9,18 @@
  *   If the path does not exist or is null/undefined, it will be initialized with the value.
  *   Example: {"op": "append", "path": "/content", "value": "示例"}
  */
-declare var require: any;
-
 import { PatchError, _deepClone, isInteger, unescapePathComponent, hasUndefined } from './helpers';
 
 export const JsonPatchError = PatchError;
 export const deepClone = _deepClone;
+
+type JsonObject = Record<string, any>;
+type JsonContainer = JsonObject | any[];
+type PatchOpContext = {
+  path: string;
+  value?: any;
+  from?: string;
+};
 
 export type Operation =
   | AddOperation<any>
@@ -89,77 +95,82 @@ export interface PatchResult<T> extends Array<OperationResult<T>> {
  to its dedicated function in efficient way.
  */
 
-type PatchOpFn = (this: any, obj: any, key: any, document: any) => any;
+type PatchOpFn = (this: PatchOpContext, obj: JsonContainer, key: string | number, document: any) => OperationResult<any>;
 
 /* The operations applicable to an object */
 const objOps: Record<string, PatchOpFn> = {
-  add: function (this: any, obj: any, key: any, document: any) {
-    obj[key] = this.value;
+  add: function (this: PatchOpContext, obj: JsonContainer, key: string | number, document: any) {
+    (obj as JsonObject)[String(key)] = this.value;
     return { newDocument: document };
   },
-  remove: function (this: any, obj: any, key: any, document: any) {
-    var removed = obj[key];
-    delete obj[key];
+  remove: function (this: PatchOpContext, obj: JsonContainer, key: string | number, document: any) {
+    const target = obj as JsonObject;
+    const removed = target[String(key)];
+    delete target[String(key)];
     return { newDocument: document, removed };
   },
-  replace: function (this: any, obj: any, key: any, document: any) {
-    var removed = obj[key];
-    obj[key] = this.value;
+  replace: function (this: PatchOpContext, obj: JsonContainer, key: string | number, document: any) {
+    const target = obj as JsonObject;
+    const removed = target[String(key)];
+    target[String(key)] = this.value;
     return { newDocument: document, removed };
   },
-  move: function (this: any, obj: any, key: any, document: any) {
+  move: function (this: PatchOpContext, obj: JsonContainer, key: string | number, document: any) {
     let removed = getValueByPointer(document, this.path);
 
     if (removed) {
       removed = _deepClone(removed);
     }
 
-    const originalValue = applyOperation(document, { op: 'remove', path: this.from }).removed;
+    const originalValue = applyOperation(document, { op: 'remove', path: this.from as string }).removed;
 
     applyOperation(document, { op: 'add', path: this.path, value: originalValue });
 
     return { newDocument: document, removed };
   },
-  copy: function (this: any, obj: any, key: any, document: any) {
-    const valueToCopy = getValueByPointer(document, this.from);
+  copy: function (this: PatchOpContext, obj: JsonContainer, key: string | number, document: any) {
+    const valueToCopy = getValueByPointer(document, this.from as string);
     applyOperation(document, { op: 'add', path: this.path, value: _deepClone(valueToCopy) });
     return { newDocument: document };
   },
-  test: function (this: any, obj: any, key: any, document: any) {
-    return { newDocument: document, test: _areEquals(obj[key], this.value) };
+  test: function (this: PatchOpContext, obj: JsonContainer, key: string | number, document: any) {
+    return { newDocument: document, test: _areEquals((obj as JsonObject)[String(key)], this.value) };
   },
-  _get: function (this: any, obj: any, key: any, document: any) {
-    this.value = obj[key];
+  _get: function (this: PatchOpContext, obj: JsonContainer, key: string | number, document: any) {
+    this.value = (obj as JsonObject)[String(key)];
     return { newDocument: document };
   },
-  append: function (this: any, obj: any, key: any, document: any) {
-    const existing = obj[key];
+  append: function (this: PatchOpContext, obj: JsonContainer, key: string | number, document: any) {
+    const target = obj as JsonObject;
+    const existing = target[String(key)];
     if (existing === undefined || existing === null) {
-      obj[key] = this.value;
+      target[String(key)] = this.value;
     } else {
-      obj[key] = String(existing) + this.value;
+      target[String(key)] = String(existing) + String(this.value);
     }
     return { newDocument: document };
   },
 };
 
 /* The operations applicable to an array. Many are the same as for the object */
-var arrOps: Record<string, PatchOpFn> = {
-  add: function (this: any, arr: any, i: any, document: any) {
-    if (isInteger(i)) {
-      arr.splice(i, 0, this.value);
+const arrOps: Record<string, PatchOpFn> = {
+  add: function (this: PatchOpContext, arr: JsonContainer, i: string | number, document: any) {
+    if (isInteger(String(i))) {
+      (arr as any[]).splice(Number(i), 0, this.value);
     } else {
-      arr[i] = this.value;
+      (arr as JsonObject)[String(i)] = this.value;
     }
     return { newDocument: document, index: i };
   },
-  remove: function (this: any, arr: any, i: any, document: any) {
-    var removedList = arr.splice(i, 1);
+  remove: function (this: PatchOpContext, arr: JsonContainer, i: string | number, document: any) {
+    const removedList = (arr as any[]).splice(Number(i), 1);
     return { newDocument: document, removed: removedList[0] };
   },
-  replace: function (this: any, arr: any, i: any, document: any) {
-    var removed = arr[i];
-    arr[i] = this.value;
+  replace: function (this: PatchOpContext, arr: JsonContainer, i: string | number, document: any) {
+    const target = arr as any[];
+    const index = Number(i);
+    const removed = target[index];
+    target[index] = this.value;
     return { newDocument: document, removed };
   },
   move: objOps.move,
@@ -181,7 +192,7 @@ export function getValueByPointer(document: any, pointer: string): any {
   if (pointer == '') {
     return document;
   }
-  var getOriginalDestination = <GetOperation<any>>{ op: '_get', path: pointer };
+  const getOriginalDestination: GetOperation<any> = { op: '_get', path: pointer, value: undefined };
   applyOperation(document, getOriginalDestination);
   return getOriginalDestination.value;
 }
@@ -216,7 +227,7 @@ export function applyOperation<T>(
   }
   /* ROOT OPERATIONS */
   if (operation.path === '') {
-    let returnValue: OperationResult<T> = { newDocument: document };
+    const returnValue: OperationResult<T> = { newDocument: document };
     if (operation.op === 'add') {
       returnValue.newDocument = operation.value;
       return returnValue;
@@ -242,7 +253,7 @@ export function applyOperation<T>(
     } else if (operation.op === 'remove') {
       // a remove on root
       returnValue.removed = document;
-      returnValue.newDocument = null as any;
+      returnValue.newDocument = null as unknown as T;
       return returnValue;
     } else if (operation.op === '_get') {
       operation.value = document;
@@ -250,9 +261,9 @@ export function applyOperation<T>(
     } else if (operation.op === 'append') {
       const existing = document;
       if (existing === undefined || existing === null) {
-        returnValue.newDocument = operation.value as any as T;
+        returnValue.newDocument = operation.value as T;
       } else {
-        returnValue.newDocument = (String(existing) + operation.value) as any as T;
+        returnValue.newDocument = (String(existing) + String(operation.value)) as T;
       }
       return returnValue;
     } else {
@@ -275,19 +286,19 @@ export function applyOperation<T>(
     }
     const path = operation.path || '';
     const keys = path.split('/');
-    let obj: any = document;
+    let obj: JsonContainer = document as JsonContainer;
     let t = 1; //skip empty element - http://jsperf.com/to-shift-or-not-to-shift
-    let len = keys.length;
-    let existingPathFragment = undefined;
+    const len = keys.length;
+    let existingPathFragment: string | undefined = undefined;
     let key: string | number;
-    let validateFunction;
+    let validateFunction: Validator<any>;
     if (typeof validateOperation == 'function') {
       validateFunction = validateOperation;
     } else {
       validateFunction = validator;
     }
     while (true) {
-      key = keys[t];
+      key = keys[t] ?? '';
       if (key && key.indexOf('~') != -1) {
         key = unescapePathComponent(key);
       }
@@ -303,7 +314,7 @@ export function applyOperation<T>(
 
       if (validateOperation) {
         if (existingPathFragment === undefined) {
-          if (obj[key] === undefined) {
+          if ((obj as JsonObject)[String(key)] === undefined) {
             existingPathFragment = keys.slice(0, t).join('/');
           } else if (t == len - 1) {
             existingPathFragment = operation.path;
@@ -328,7 +339,7 @@ export function applyOperation<T>(
             );
           } // only parse key when it's an integer for `arr.prop` to work
           else if (isInteger(key)) {
-            key = ~~key;
+            key = ~~Number(key);
           }
         }
         if (t >= len) {
@@ -356,7 +367,7 @@ export function applyOperation<T>(
           return returnValue;
         }
       }
-      obj = obj[key];
+      obj = (obj as JsonObject)[String(key)] as JsonContainer;
       // If we have more keys in the path, but the next value isn't a non-null object,
       // throw an OPERATION_PATH_UNRESOLVABLE error instead of iterating again.
       if (validateOperation && t < len && (!obj || typeof obj !== 'object')) {
@@ -497,8 +508,8 @@ export function validator(operation: Operation, index: number, document?: any, e
     );
   } else if (document) {
     if (operation.op == 'add' || operation.op == 'append') {
-      var pathLen = operation.path.split('/').length;
-      var existingPathLen = existingPathFragment!.split('/').length;
+      const pathLen = operation.path.split('/').length;
+      const existingPathLen = existingPathFragment!.split('/').length;
       if (pathLen !== existingPathLen + 1 && pathLen !== existingPathLen) {
         throw new JsonPatchError(
           'Cannot perform an `add` or `append` operation at the desired path',
@@ -508,7 +519,7 @@ export function validator(operation: Operation, index: number, document?: any, e
           document,
         );
       }
-    } else if (operation.op === 'replace' || operation.op === 'remove' || <any>operation.op === '_get') {
+    } else if (operation.op === 'replace' || operation.op === 'remove' || operation.op === '_get') {
       if (operation.path !== existingPathFragment) {
         throw new JsonPatchError(
           'Cannot perform the operation at a path that does not exist',
@@ -519,8 +530,8 @@ export function validator(operation: Operation, index: number, document?: any, e
         );
       }
     } else if (operation.op === 'move' || operation.op === 'copy') {
-      var existingValue: any = { op: '_get', path: operation.from, value: undefined };
-      var error = validate([existingValue], document);
+      const existingValue: GetOperation<any> = { op: '_get', path: operation.from, value: undefined };
+      const error = validate([existingValue], document);
       if (error && error.name === 'OPERATION_PATH_UNRESOLVABLE') {
         throw new JsonPatchError(
           'Cannot perform the operation from a path that does not exist',
@@ -555,7 +566,7 @@ export function validate<T>(
       applyPatch(_deepClone(document), _deepClone(sequence), externalValidator || true);
     } else {
       externalValidator = externalValidator || validator;
-      for (var i = 0; i < sequence.length; i++) {
+      for (let i = 0; i < sequence.length; i++) {
         externalValidator!(sequence[i], i, document!, undefined!);
       }
     }
@@ -594,31 +605,32 @@ export function _areEquals(a: any, b: any): boolean {
   if (a === b) return true;
 
   if (a && b && typeof a == 'object' && typeof b == 'object') {
-    var arrA = Array.isArray(a),
-      arrB = Array.isArray(b),
-      i,
-      length,
-      key;
+    const arrA = Array.isArray(a);
+    const arrB = Array.isArray(b);
 
     if (arrA && arrB) {
-      length = a.length;
-      if (length != b.length) return false;
-      for (i = length; i-- !== 0; ) if (!_areEquals(a[i], b[i])) return false;
+      const left = a as any[];
+      const right = b as any[];
+      const length = left.length;
+      if (length != right.length) return false;
+      for (let i = length; i-- !== 0; ) if (!_areEquals(left[i], right[i])) return false;
       return true;
     }
 
     if (arrA != arrB) return false;
 
-    var keys = Object.keys(a);
-    length = keys.length;
+    const left = a as JsonObject;
+    const right = b as JsonObject;
+    const keys = Object.keys(left);
+    const length = keys.length;
 
-    if (length !== Object.keys(b).length) return false;
+    if (length !== Object.keys(right).length) return false;
 
-    for (i = length; i-- !== 0; ) if (!b.hasOwnProperty(keys[i])) return false;
+    for (let i = length; i-- !== 0; ) if (!Object.prototype.hasOwnProperty.call(right, keys[i])) return false;
 
-    for (i = length; i-- !== 0; ) {
-      key = keys[i];
-      if (!_areEquals(a[key], b[key])) return false;
+    for (let i = length; i-- !== 0; ) {
+      const key = keys[i];
+      if (!_areEquals(left[key], right[key])) return false;
     }
 
     return true;

@@ -1,5 +1,6 @@
 /* eslint-disable class-methods-use-this */
 import type { AIMessageContent, SSEChunkData, ToolCall } from '../../type';
+import type { AGUIHistoryMessage } from './types';
 import {
   AGUIEventType,
   isActivityEvent,
@@ -23,6 +24,36 @@ import {
   parseSSEData,
   updateToolCall,
 } from './utils';
+
+type AGUIEventLike = {
+  type: string;
+  messageId?: string | null;
+  role?: 'assistant' | 'system' | 'reasoning';
+  delta?: string;
+  title?: string;
+  toolCallId?: string;
+  toolCallName?: string;
+  parentMessageId?: string;
+  activityType?: string;
+  content?: string;
+  patch?: Array<{ path?: string }>;
+  messages?: AGUIHistoryMessage[];
+  name?: string;
+  value?: any;
+  error?: string;
+  state?: any;
+  snapshot?: any;
+  data?: {
+    text?: string;
+    delta?: string;
+    type?: string;
+    title?: string;
+  } & Record<string, any>;
+  encryptedValue?: string;
+  subtype?: string;
+  entityId?: string;
+  runId?: string;
+};
 
 /**
  * AGUIEventMapper
@@ -69,7 +100,7 @@ export class AGUIEventMapper {
    */
   mapEvent(chunk: SSEChunkData): AIMessageContent | AIMessageContent[] | null {
     // 处理data字段，可能是字符串或已解析的对象
-    const event = parseSSEData(chunk.data);
+    const event = parseSSEData(chunk.data) as AGUIEventLike | null;
 
     if (!event?.type) return null;
 
@@ -148,7 +179,7 @@ export class AGUIEventMapper {
    * 1. 标准模式：TEXT_MESSAGE_START → TEXT_MESSAGE_CONTENT → TEXT_MESSAGE_END
    * 2. 简化模式：仅发送 TEXT_MESSAGE_CHUNK，自动补全生命周期
    */
-  private handleTextMessageEvent(event: any): AIMessageContent | null {
+  private handleTextMessageEvent(event: AGUIEventLike): AIMessageContent | null {
     switch (event.type) {
       case AGUIEventType.TEXT_MESSAGE_START:
         this.currentTextMessageId = event.messageId || null; // 标记当前消息 ID
@@ -176,7 +207,7 @@ export class AGUIEventMapper {
    * 关键：通过 messageId 区分不同的文本块，
    * 当 messageId 变化时创建新的内容块
    */
-  private handleTextMessageChunk(event: any): AIMessageContent | null {
+  private handleTextMessageChunk(event: AGUIEventLike): AIMessageContent | null {
     const messageId = event.messageId || 'default';
     const role = event?.role || 'assistant';
 
@@ -210,7 +241,7 @@ export class AGUIEventMapper {
    * - `REASONING_ENCRYPTED_VALUE`   → encryptedValue 存入 thinking.ext，供业务下轮透传
    * - `REASONING_END`               → 当前块 complete，title 置为 '思考结束'
    */
-  private handleReasoningEvent(event: any): AIMessageContent | null {
+  private handleReasoningEvent(event: AGUIEventLike): AIMessageContent | null {
     switch (event.type) {
       case AGUIEventType.REASONING_START:
       case AGUIEventType.THINKING_START:
@@ -262,7 +293,7 @@ export class AGUIEventMapper {
    * - 空 delta 显式关闭当前 reasoning 消息（AG-UI 规范定义的 chunk 关闭信号，仅作用于自身 messageId）
    *   参考: https://docs.ag-ui.com/concepts/events#reasoningmessagechunk
    */
-  private handleReasoningMessageChunk(event: any): AIMessageContent | null {
+  private handleReasoningMessageChunk(event: AGUIEventLike): AIMessageContent | null {
     const messageId = event.messageId || null;
     const delta = event.delta ?? '';
 
@@ -295,7 +326,7 @@ export class AGUIEventMapper {
    * 1. 标准模式：TOOL_CALL_START → TOOL_CALL_ARGS → TOOL_CALL_END
    * 2. 简化模式：仅发送 TOOL_CALL_CHUNK，自动补全生命周期
    */
-  private handleToolCallEvent(event: any): AIMessageContent | null {
+  private handleToolCallEvent(event: AGUIEventLike): AIMessageContent | null {
     switch (event.type) {
       case AGUIEventType.TOOL_CALL_START:
         return this.handleToolCallStart(event);
@@ -322,8 +353,8 @@ export class AGUIEventMapper {
    *
    * 注意：不同 activityType 的活动是独立管理的，互不影响
    */
-  private handleActivityEvent(event: any): AIMessageContent | null {
-    const activityType = event.activityType || 'unknown';
+  private handleActivityEvent(event: AGUIEventLike): AIMessageContent | null {
+    const activityType = event.activityType || 'any';
     // 委托给 activityManager 处理
     const activityData = activityManager.handleActivityEvent(event);
     if (!activityData) {
@@ -347,7 +378,7 @@ export class AGUIEventMapper {
   /**
    * 处理状态事件
    */
-  private handleStateEvent(event: any): null {
+  private handleStateEvent(event: AGUIEventLike): null {
     stateManager.handleStateEvent(event);
     return null;
   }
@@ -355,10 +386,10 @@ export class AGUIEventMapper {
   /**
    * 处理其他事件
    */
-  private handleOtherEvent(event: any): AIMessageContent | AIMessageContent[] | null {
+  private handleOtherEvent(event: AGUIEventLike): AIMessageContent | AIMessageContent[] | null {
     switch (event.type) {
       case AGUIEventType.MESSAGES_SNAPSHOT:
-        return handleMessagesSnapshot(event.messages);
+        return handleMessagesSnapshot(event.messages || []);
       case AGUIEventType.CUSTOM:
         return handleCustomEvent(event);
       case AGUIEventType.RUN_ERROR:
@@ -371,7 +402,7 @@ export class AGUIEventMapper {
   /**
    * 处理工具调用开始事件
    */
-  private handleToolCallStart(event: any): AIMessageContent | null {
+  private handleToolCallStart(event: AGUIEventLike): AIMessageContent | null {
     // 标记已显式开始（防止后续 chunk 重复触发 start）
     this.toolCallChunkStarted.add(event.toolCallId);
 
@@ -390,7 +421,7 @@ export class AGUIEventMapper {
   /**
    * 处理工具调用参数事件
    */
-  private handleToolCallArgs(event: any): AIMessageContent | null {
+  private handleToolCallArgs(event: AGUIEventLike): AIMessageContent | null {
     if (!this.toolCallMap[event.toolCallId]) return null;
 
     const currentArgs = this.toolCallMap[event.toolCallId].args || '';
@@ -415,7 +446,7 @@ export class AGUIEventMapper {
    * - delta: 参数增量内容
    * - parentMessageId: 父消息ID（可选）
    */
-  private handleToolCallChunk(event: any): AIMessageContent | null {
+  private handleToolCallChunk(event: AGUIEventLike): AIMessageContent | null {
     // 生成或使用 toolCallId
     const toolCallId = event.toolCallId || `auto_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
@@ -433,7 +464,7 @@ export class AGUIEventMapper {
       this.toolCallMap[toolCallId] = {
         eventType: 'TOOL_CALL_START',
         toolCallId,
-        toolCallName: event.toolCallName || 'unknown',
+        toolCallName: event.toolCallName || 'any',
         parentMessageId: event.parentMessageId || '',
         args: event.delta || '', // 第一个 chunk 的 delta 作为初始 args
       };
@@ -458,7 +489,7 @@ export class AGUIEventMapper {
   /**
    * 处理工具调用结果事件
    */
-  private handleToolCallResult(event: any): AIMessageContent | null {
+  private handleToolCallResult(event: AGUIEventLike): AIMessageContent | null {
     if (!this.toolCallMap[event.toolCallId]) return null;
 
     const currentResult = this.toolCallMap[event.toolCallId].result || '';
@@ -482,7 +513,7 @@ export class AGUIEventMapper {
   /**
    * 处理工具调用结束事件
    */
-  private handleToolCallEnd(event: any) {
+  private handleToolCallEnd(event: AGUIEventLike) {
     // 标记工具调用结束
     this.toolCallEnded.add(event.toolCallId);
 

@@ -12,21 +12,21 @@ const parser = new Parser();
 /**
  * 判断是否为路径绑定
  */
-export function isPathBinding(value: unknown): value is PathBinding {
+export function isPathBinding(value: any): value is PathBinding {
   return typeof value === 'object' && value !== null && 'path' in value && !('expr' in value);
 }
 
 /**
  * 判断是否为表达式绑定
  */
-export function isExprBinding(value: unknown): value is ExprBinding {
+export function isExprBinding(value: any): value is ExprBinding {
   return typeof value === 'object' && value !== null && 'expr' in value;
 }
 
 /**
  * 解析绑定值
  */
-export function resolveBinding<T>(value: Bindable<T>, data: Record<string, unknown>, contextPath = '/'): T {
+export function resolveBinding<T>(value: Bindable<T>, data: Record<string, any>, contextPath = '/'): T {
   // 表达式绑定
   if (isExprBinding(value)) {
     return resolveExprBinding(value, data, contextPath) as T;
@@ -44,7 +44,7 @@ export function resolveBinding<T>(value: Bindable<T>, data: Record<string, unkno
 /**
  * 解析路径绑定
  */
-export function resolvePathBinding(path: string, data: Record<string, unknown>, contextPath: string): unknown {
+export function resolvePathBinding(path: string, data: Record<string, any>, contextPath: string): any {
   // 处理路径
   let fullPath = path;
 
@@ -61,13 +61,13 @@ export function resolvePathBinding(path: string, data: Record<string, unknown>, 
   fullPath = fullPath.replace(/\/+/g, '/');
 
   const segments = fullPath.split('/').filter(Boolean);
-  let result: unknown = data;
+  let result: any = data;
 
   for (const segment of segments) {
     if (result === null || result === undefined) {
       return undefined;
     }
-    result = (result as Record<string, unknown>)[segment];
+    result = (result as Record<string, any>)[segment];
   }
 
   return result;
@@ -77,11 +77,11 @@ export function resolvePathBinding(path: string, data: Record<string, unknown>, 
  * 解析表达式绑定
  * 使用 expr-eval 库进行安全的表达式求值
  */
-export function resolveExprBinding(binding: ExprBinding, data: Record<string, unknown>, contextPath: string): unknown {
+export function resolveExprBinding(binding: ExprBinding, data: Record<string, any>, contextPath: string): any {
   const { expr, vars = {}, format } = binding;
 
   // 解析所有变量
-  const resolvedVars: Record<string, unknown> = {};
+  const resolvedVars: Record<string, any> = {};
   for (const [key, varBinding] of Object.entries(vars)) {
     if (isPathBinding(varBinding)) {
       resolvedVars[key] = resolvePathBinding(varBinding.path, data, contextPath);
@@ -111,7 +111,7 @@ export function resolveExprBinding(binding: ExprBinding, data: Record<string, un
 /**
  * 使用 expr-eval 进行安全的表达式求值
  */
-export function evaluateExpression(expr: string, vars: Record<string, unknown>): unknown {
+export function evaluateExpression(expr: string, vars: Record<string, any>): any {
   // 预处理变量
   const processedVars: Values = {};
   let hasString = false;
@@ -149,7 +149,7 @@ export function evaluateExpression(expr: string, vars: Record<string, unknown>):
 /**
  * 处理包含字符串的表达式
  */
-function evaluateStringExpression(expr: string, vars: Values): unknown {
+function evaluateStringExpression(expr: string, vars: Values): any {
   let processedExpr = expr;
 
   // 替换变量

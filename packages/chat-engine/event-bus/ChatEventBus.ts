@@ -225,7 +225,7 @@ export class ChatEventBus implements IChatEventBus {
   /**
    * 订阅自定义事件
    */
-  onCustom<T = unknown>(eventName: string, callback: EventCallback<T>): UnsubscribeFn {
+  onCustom<T = any>(eventName: string, callback: EventCallback<T>): UnsubscribeFn {
     this.checkDestroyed();
 
     const key = `custom:${eventName}`;
@@ -245,7 +245,7 @@ export class ChatEventBus implements IChatEventBus {
   /**
    * 发布自定义事件
    */
-  emitCustom<T = unknown>(eventName: string, data: T): void {
+  emitCustom<T = any>(eventName: string, data: T): void {
     if (this.destroyed) return;
 
     const key = `custom:${eventName}`;
@@ -334,7 +334,7 @@ export class ChatEventBus implements IChatEventBus {
     return this.listenerCount(event) > 0;
   }
 
-  private recordHistory(event: ChatEngineEventType | string, payload: unknown): void {
+  private recordHistory(event: ChatEngineEventType | string, payload: any): void {
     this.history.push({
       event,
       payload,

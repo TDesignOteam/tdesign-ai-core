@@ -117,22 +117,29 @@ export class AGUIAdapter {
     const processUserContent = (content: any): UserMessageContent[] => {
       // 如果 content 已经是数组格式，需要做字段适配
       if (Array.isArray(content)) {
-        return content.map((item: any) => {
+        return content.map((item) => {
+          if (typeof item !== 'object' || item === null) {
+            return {
+              type: 'text' as const,
+              data: String(item),
+            };
+          }
+          const typedItem = item as { data?: any; type?: string; text?: any };
           // 如果已经有 data 字段，说明已经是 ChatEngine 格式
-          if (item.data !== undefined) {
+          if (typedItem.data !== undefined) {
             return item as UserMessageContent;
           }
           // 后端返回的格式用 text 字段存储文本，需要映射为 data 字段
-          if (item.type === 'text' && item.text !== undefined) {
+          if (typedItem.type === 'text' && typedItem.text !== undefined) {
             return {
               type: 'text' as const,
-              data: item.text,
+              data: typedItem.text,
             };
           }
           // 其他类型的数组元素，尝试用 text 字段兜底
           return {
-            type: item.type || 'text',
-            data: item.text || item.data || '',
+            type: (typedItem.type || 'text') as UserMessageContent['type'],
+            data: typedItem.text || typedItem.data || '',
           } as UserMessageContent;
         });
       }
@@ -140,7 +147,7 @@ export class AGUIAdapter {
       return [
         {
           type: 'text',
-          data: content,
+          data: typeof content === 'string' ? content : String(content ?? ''),
         },
       ];
     };

@@ -46,27 +46,27 @@ export const stringArrayOrPathSchema = z.union([z.array(z.string()), PathBinding
 /**
  * A2UI Action - 服务端定义的用户交互
  * 支持两种格式：
- * 1. A2UI v0.9 规范格式：{ name: string, context?: Record<string, unknown> }
- * 2. 简化格式（向后兼容）：{ type: string, payload?: unknown }
+ * 1. A2UI v0.9 规范格式：{ name: string, context?: Record<string, any> }
+ * 2. 简化格式（向后兼容）：{ type: string, payload?: any }
  */
 export const A2UIActionSchema = z
   .object({
     // A2UI v0.9 标准字段
     name: z.string().optional(),
-    context: z.record(z.unknown()).optional(),
+    context: z.record(z.any()).optional(),
     // 向后兼容字段
     type: z.string().optional(),
-    payload: z.unknown().optional(),
+    payload: z.any().optional(),
   })
   .refine((data) => data.name || data.type, { message: 'Action must have either name or type' });
 
 export interface A2UIAction {
   /** A2UI v0.9 标准字段 */
   name?: string;
-  context?: Record<string, unknown>;
+  context?: Record<string, any>;
   /** 向后兼容字段 */
   type?: string;
-  payload?: unknown;
+  payload?: any;
 }
 
 /**
@@ -78,7 +78,7 @@ export interface UserActionMessage {
     surfaceId: string;
     sourceComponentId: string;
     timestamp: string;
-    context: Record<string, unknown>;
+    context: Record<string, any>;
   };
 }
 
@@ -88,8 +88,8 @@ export interface UserActionMessage {
 export interface ActionContext {
   surfaceId: string;
   componentId?: string;
-  updateData: (path: string, value: unknown) => void;
-  getData: (path?: string) => unknown;
+  updateData: (path: string, value: any) => void;
+  getData: (path?: string) => any;
 }
 
 /**
@@ -128,7 +128,7 @@ export type ChildrenProperty = z.infer<typeof childrenPropertySchema>;
 export interface A2UIComponentBase {
   id: string;
   component: string;
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 // ============= Display Components =============
@@ -441,7 +441,7 @@ export interface UpdateDataModelMessage {
     surfaceId: string;
     path?: string;
     op?: 'add' | 'replace' | 'remove';
-    value?: unknown;
+    value?: any;
   };
 }
 
@@ -504,7 +504,7 @@ export interface A2UISurface {
   /** 解析后的组件树根节点 */
   root: ResolvedComponent | null;
   /** 数据模型 */
-  data: Record<string, unknown>;
+  data: Record<string, any>;
   /** 骨架屏提示 */
   skeletonHint?: SkeletonHint;
   updatedAt?: number;
@@ -518,13 +518,13 @@ export interface A2UIOperation {
   type: A2UIOperationType;
   surfaceId: string;
   componentId?: string;
-  payload?: A2UIComponent | Partial<A2UIComponent> | A2UIAction | Record<string, unknown>;
+  payload?: A2UIComponent | Partial<A2UIComponent> | A2UIAction | Record<string, any>;
 }
 
 export interface A2UIMessage {
   surfaceId: string;
   operations: A2UIOperation[];
-  data?: Record<string, unknown>;
+  data?: Record<string, any>;
 }
 
 // ============= Zod Schema (运行时验证) =============
@@ -577,7 +577,7 @@ export const A2UISurfaceSchema = z.object({
   catalogId: z.string().optional(),
   state: z.enum(['active', 'closed', 'pending']),
   root: z.any().nullable(),
-  data: z.record(z.unknown()).optional(),
+  data: z.record(z.any()).optional(),
   skeletonHint: z
     .object({
       layout: z.enum(['form', 'card', 'list', 'simple', 'wizard']).optional(),

@@ -36,10 +36,10 @@ function parsePath(path: string): string[] {
  * 获取嵌套值
  */
 function getByPath(obj: any, path: string[]): any {
-  let current = obj;
+  let current = obj as Record<string, any> | any[];
   for (const key of path) {
     if (current == null) return undefined;
-    current = current[key];
+    current = (current as Record<string, any>)[key];
   }
   return current;
 }
@@ -50,11 +50,11 @@ function getByPath(obj: any, path: string[]): any {
  */
 function setByPath<T>(obj: T, path: string[], value: any): T {
   if (path.length === 0) {
-    return value;
+    return value as T;
   }
 
   const [head, ...tail] = path;
-  const current = obj as any;
+  const current = obj as Record<string, any> | any[];
 
   // 判断当前层是数组还是对象
   const isArray = Array.isArray(current);
@@ -63,24 +63,24 @@ function setByPath<T>(obj: T, path: string[], value: any): T {
   if (tail.length === 0) {
     // 到达目标位置，设置值
     if (isArray) {
-      const newArr = [...current];
+      const newArr = [...(current as any[])];
       newArr[index as number] = value;
       return newArr as unknown as T;
     } else {
-      return { ...current, [head]: value };
+      return { ...(current as Record<string, any>), [head]: value } as T;
     }
   }
 
   // 递归处理子路径
-  const child = current[head];
+  const child = (current as Record<string, any>)[head];
   const newChild = setByPath(child, tail, value);
 
   if (isArray) {
-    const newArr = [...current];
+    const newArr = [...(current as any[])];
     newArr[index as number] = newChild;
     return newArr as unknown as T;
   } else {
-    return { ...current, [head]: newChild };
+    return { ...(current as Record<string, any>), [head]: newChild } as T;
   }
 }
 
@@ -93,33 +93,34 @@ function removeByPath<T>(obj: T, path: string[]): T {
   }
 
   const [head, ...tail] = path;
-  const current = obj as any;
+  const current = obj as Record<string, any> | any[];
   const isArray = Array.isArray(current);
 
   if (tail.length === 0) {
     // 到达目标位置，删除值
     if (isArray) {
       const index = parseInt(head, 10);
-      const newArr = [...current];
+      const newArr = [...(current as any[])];
       newArr.splice(index, 1);
       return newArr as unknown as T;
     } else {
-      const { [head]: _, ...rest } = current;
+      const rest = { ...(current as Record<string, any>) };
+      delete rest[head];
       return rest as T;
     }
   }
 
   // 递归处理子路径
-  const child = current[head];
+  const child = (current as Record<string, any>)[head];
   const newChild = removeByPath(child, tail);
 
   if (isArray) {
     const index = parseInt(head, 10);
-    const newArr = [...current];
+    const newArr = [...(current as any[])];
     newArr[index] = newChild;
     return newArr as unknown as T;
   } else {
-    return { ...current, [head]: newChild };
+    return { ...(current as Record<string, any>), [head]: newChild } as T;
   }
 }
 

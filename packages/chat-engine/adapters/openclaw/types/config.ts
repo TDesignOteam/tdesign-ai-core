@@ -74,7 +74,7 @@ export interface OpenClawConfig {
    */
   auth?: {
     token?: string;
-    [key: string]: unknown;
+    [key: string]: any;
   };
 }
 

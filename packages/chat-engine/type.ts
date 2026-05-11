@@ -129,7 +129,7 @@ export interface ChatBaseMessage {
 
 // 类型扩展机制
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-empty-interface
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   interface AIContentTypeOverrides {}
 }
 
@@ -304,7 +304,7 @@ export interface DefaultEngineCallbacks {
 export interface ChatServiceConfig extends ChatNetworkConfig, DefaultEngineCallbacks {}
 
 // 联合类型支持静态配置和动态生成
-export type ChatServiceConfigSetter = ChatServiceConfig | ((params?: any) => ChatServiceConfig);
+export type ChatServiceConfigSetter = ChatServiceConfig | ((params?: ChatRequestParams) => ChatServiceConfig);
 
 // 统一的引擎接口
 export interface IChatEngine {
@@ -314,7 +314,7 @@ export interface IChatEngine {
    * @param messages 初始消息列表，用于恢复历史对话
    * @description 必须在使用其他方法前调用此方法进行初始化
    */
-  init(config?: any, messages?: ChatMessagesData[]): void;
+  init(config?: ChatServiceConfig | ChatServiceConfigSetter, messages?: ChatMessagesData[]): void;
 
   /**
    * 发送用户消息并获取AI回复
@@ -438,7 +438,7 @@ export interface ChatState {
 
 export type ChatMessageSetterMode = 'replace' | 'prepend' | 'append';
 
-export type AIContentHandler<T extends ChatBaseContent<any, any>> = (chunk: T, existing?: T) => T;
+export type AIContentHandler<T extends ChatBaseContent<string, any>> = (chunk: T, existing?: T) => T;
 
 export interface ContentTypeDefinition<T extends string = string, D = any> {
   type: T;
@@ -446,4 +446,4 @@ export interface ContentTypeDefinition<T extends string = string, D = any> {
   renderer?: ContentRenderer<ChatBaseContent<T, D>>;
 }
 
-export type ContentRenderer<T extends ChatBaseContent<any, any>> = (content: T) => unknown;
+export type ContentRenderer<T extends ChatBaseContent<string, any>> = (content: T) => any;

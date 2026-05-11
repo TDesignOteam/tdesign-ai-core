@@ -1,4 +1,5 @@
 import { applyJsonPatch } from '../../utils';
+import type { Operation } from '../../utils/immutable-patch';
 
 /**
  * 状态管理器
@@ -33,7 +34,7 @@ export interface StateManager {
   /**
    * 处理AG-UI状态事件，自动从事件中提取stateKey
    */
-  handleStateEvent: (event: { type: string; snapshot?: any; delta?: any[] }) => void;
+  handleStateEvent: (event: { type: string; snapshot?: any; delta?: Operation[] }) => void;
   /**
    * 清理所有状态和订阅
    */
@@ -140,14 +141,14 @@ export class StateManagerImpl implements StateManager {
    * 处理AG-UI状态事件
    * 自动从事件中提取stateKey，无需外部传递
    */
-  handleStateEvent(event: { type: string; snapshot?: any; delta?: any[] }): void {
+  handleStateEvent(event: { type: string; snapshot?: any; delta?: Operation[] }): void {
     if (event.type === 'STATE_SNAPSHOT') {
       // 处理STATE_SNAPSHOT：立即更新
-      if (event.snapshot && typeof event.snapshot === 'object') {
-        Object.entries(event.snapshot).forEach(([stateKey, stateData]) => {
-          this.setState(stateKey, stateData);
-        });
-      }
+        if (event.snapshot && typeof event.snapshot === 'object') {
+          Object.entries(event.snapshot as Record<string, any>).forEach(([stateKey, stateData]) => {
+            this.setState(stateKey, stateData);
+          });
+        }
     } else if (event.type === 'STATE_DELTA') {
       // 处理STATE_DELTA：立即更新
       if (event.delta && Array.isArray(event.delta)) {

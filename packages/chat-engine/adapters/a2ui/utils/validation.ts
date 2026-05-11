@@ -14,13 +14,13 @@ export type A2UIValidationErrorType =
   | 'INVALID_ACTION'
   | 'MISSING_REQUIRED_FIELD'
   | 'TYPE_MISMATCH'
-  | 'UNKNOWN_COMPONENT_TYPE';
+  | 'ANY_COMPONENT_TYPE';
 
 export interface A2UIValidationError {
   type: A2UIValidationErrorType;
   message: string;
   path?: string;
-  value?: unknown;
+  value?: any;
   recoverable: boolean;
 }
 
@@ -55,7 +55,7 @@ const DEFAULT_OPTIONS: A2UIValidationOptions = {
  * 验证并修复组件数据
  */
 export function validateComponent(
-  component: unknown,
+  component: any,
   options: A2UIValidationOptions = {},
 ): A2UIValidationResult<A2UIComponent> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
@@ -78,7 +78,7 @@ export function validateComponent(
     };
   }
 
-  const comp = component as Record<string, unknown>;
+  const comp = component as Record<string, any>;
 
   // 必须有 component 字段
   if (!comp.component || typeof comp.component !== 'string') {
@@ -121,8 +121,8 @@ export function validateComponent(
   // 检查组件类型是否已知
   if (opts.knownComponentTypes && !opts.knownComponentTypes.includes(comp.component as string)) {
     errors.push({
-      type: 'UNKNOWN_COMPONENT_TYPE',
-      message: `Unknown component type: ${comp.component}`,
+      type: 'ANY_COMPONENT_TYPE',
+      message: `Any component type: ${comp.component}`,
       path: 'component',
       value: comp.component,
       recoverable: true,
@@ -179,7 +179,7 @@ export function validateComponent(
  * 验证并修复操作数据
  */
 export function validateOperation(
-  operation: unknown,
+  operation: any,
   options: A2UIValidationOptions = {},
 ): A2UIValidationResult<A2UIOperation> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
@@ -201,7 +201,7 @@ export function validateOperation(
     };
   }
 
-  const op = operation as Record<string, unknown>;
+  const op = operation as Record<string, any>;
 
   // 验证 type
   const validTypes = ['create', 'update', 'patch', 'delete', 'action'];
@@ -292,7 +292,7 @@ export function validateOperation(
 /**
  * 验证 Action 数据
  */
-export function validateAction(action: unknown, options: A2UIValidationOptions = {}): A2UIValidationResult<A2UIAction> {
+export function validateAction(action: any, options: A2UIValidationOptions = {}): A2UIValidationResult<A2UIAction> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const errors: A2UIValidationError[] = [];
 
@@ -311,7 +311,7 @@ export function validateAction(action: unknown, options: A2UIValidationOptions =
     };
   }
 
-  const act = action as Record<string, unknown>;
+  const act = action as Record<string, any>;
 
   // 验证 type
   if (!act.type || typeof act.type !== 'string') {
@@ -353,7 +353,7 @@ export function validateAction(action: unknown, options: A2UIValidationOptions =
 /**
  * 验证数据绑定路径
  */
-export function validateBindingPath(path: unknown): { valid: boolean; path?: string; error?: string } {
+export function validateBindingPath(path: any): { valid: boolean; path?: string; error?: string } {
   if (typeof path !== 'string') {
     return { valid: false, error: 'Binding path must be a string' };
   }
@@ -376,7 +376,7 @@ export function validateBindingPath(path: unknown): { valid: boolean; path?: str
 /**
  * 安全解析 JSON
  */
-export function safeParseJSON<T = unknown>(json: string, fallback: T): { success: boolean; data: T; error?: Error } {
+export function safeParseJSON<T = any>(json: string, fallback: T): { success: boolean; data: T; error?: Error } {
   try {
     const data = JSON.parse(json);
     return { success: true, data };
@@ -392,7 +392,7 @@ export function safeParseJSON<T = unknown>(json: string, fallback: T): { success
  * 批量验证操作列表
  */
 export function validateOperations(
-  operations: unknown[],
+  operations: any[],
   options: A2UIValidationOptions = {},
 ): { valid: A2UIOperation[]; invalid: Array<{ index: number; errors: A2UIValidationError[] }> } {
   const valid: A2UIOperation[] = [];

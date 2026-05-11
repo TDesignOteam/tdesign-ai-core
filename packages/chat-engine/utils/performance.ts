@@ -61,8 +61,8 @@ export class PerformanceMonitor {
    */
   private getMemoryUsage(): number {
     if (typeof performance !== 'undefined' && 'memory' in performance) {
-      // @ts-ignore - performance.memory 在某些环境中可用
-      return (performance.memory?.usedJSHeapSize || 0) / 1024 / 1024;
+      const perf = performance as Performance & { memory?: { usedJSHeapSize: number } };
+      return (perf.memory?.usedJSHeapSize || 0) / 1024 / 1024;
     }
     return 0;
   }

@@ -123,7 +123,7 @@ export class SSEClient extends EventEmitter {
       this.connectionManager.cleanup();
       this.resetParser();
       this.emit('complete', true);
-    } catch (error: unknown) {
+    } catch (error: any) {
       if ((error as Error).name !== 'AbortError') {
         this.logger.error('stream abort failed:', error);
         this.emit('error', error);
@@ -178,9 +178,10 @@ export class SSEClient extends EventEmitter {
       }
       this.reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
     } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        this.logger.error('sse request failed:', error);
-        this.emit('error', error);
+      if (!(error instanceof Error) || error.name !== 'AbortError') {
+        const err = error instanceof Error ? error : new Error(String(error));
+        this.logger.error('sse request failed:', err);
+        this.emit('error', err);
       }
     }
   }

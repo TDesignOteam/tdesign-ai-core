@@ -22,31 +22,4 @@ export default tseslint.config(
       },
     },
   },
-  {
-    files: ['packages/**/*.ts'],
-    rules: {
-      'no-undef': 'off',
-      'no-useless-assignment': 'off',
-      '@typescript-eslint/ban-ts-comment': 'off',
-      '@typescript-eslint/no-empty-object-type': 'off',
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': [
-        'warn',
-        {
-          argsIgnorePattern: '^_',
-          caughtErrorsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-        },
-      ],
-    },
-  },
-  {
-    files: ['packages/shared/json-patch/**/*.ts'],
-    rules: {
-      'no-prototype-builtins': 'off',
-      'no-var': 'off',
-      'prefer-const': 'off',
-      '@typescript-eslint/no-unused-vars': 'off',
-    },
-  },
 );

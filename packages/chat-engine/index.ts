@@ -342,7 +342,7 @@ export default class ChatEngine implements IChatEngine {
   public processMessageResult(messageId: string, result: AIMessageContent | AIMessageContent[] | null) {
     if (!result) return;
 
-    if (Array.isArray(result) && (result as any)._isSnapshot) {
+    if (Array.isArray(result) && (result as AIMessageContent[] & { _isSnapshot?: boolean })._isSnapshot) {
       // MESSAGES_SNAPSHOT：整体替换，避免与已有内容拼接冲突
       this.messageStore.replaceContent(messageId, result);
     } else {
@@ -582,7 +582,7 @@ export default class ChatEngine implements IChatEngine {
    * 先让用户 `onComplete` 回调有机会自定义内容；否则按各内容块状态结算，
    * 并广播 `REQUEST_COMPLETE` 或 `REQUEST_ABORT` 事件。
    */
-  private handleComplete(id: string, isAborted: boolean, params: ChatRequestParams, chunk?: unknown) {
+  private handleComplete(id: string, isAborted: boolean, params: ChatRequestParams, chunk?: any) {
     const customResult = this.config.onComplete?.(isAborted, params, chunk);
     if (Array.isArray(customResult) || (customResult && 'status' in customResult)) {
       this.processMessageResult(id, customResult);
@@ -611,7 +611,7 @@ export default class ChatEngine implements IChatEngine {
   }
 
   /** 运行时错误兜底：回调 + 广播 */
-  private handleError(id: string, error: unknown) {
+  private handleError(id: string, error: any) {
     this.config.onError?.(error as Error);
     this.emitRequestError(id, error);
   }
@@ -622,7 +622,7 @@ export default class ChatEngine implements IChatEngine {
    * 把消息状态置为 `'error'` 并广播 `REQUEST_ERROR` 事件。
    * 被 `sendRequest` catch / `handleBatchRequest` 空结果 / `handleError` 三处共用。
    */
-  private emitRequestError(messageId: string, error: unknown, params?: ChatRequestParams) {
+  private emitRequestError(messageId: string, error: any, params?: ChatRequestParams) {
     this.messageStore.setMessageStatus(messageId, 'error');
     this.eventBus.emit(ChatEngineEventType.REQUEST_ERROR, {
       messageId,

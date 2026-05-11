@@ -1,7 +1,7 @@
 /**
  * OpenClaw 工具函数
  */
-import type { OpenClawFrame, OpenClawRequestFrame, OpenClawResponseFrame, OpenClawEventFrame } from './types';
+import type { OpenClawFrame, OpenClawRequestFrame } from './types';
 
 /**
  * 生成 UUID
@@ -35,7 +35,7 @@ export function parseFrame(data: string | object): OpenClawFrame | null {
 /**
  * 创建请求帧
  */
-export function createRequestFrame<T extends Record<string, unknown>>(
+export function createRequestFrame<T extends Record<string, any>>(
   method: string,
   params: T,
   id?: string,
@@ -134,7 +134,7 @@ export function safeJsonParse<T>(data: string, fallback: T): T {
 /**
  * 深度合并对象
  */
-export function deepMerge<T extends Record<string, unknown>>(target: T, source: Partial<T>): T {
+export function deepMerge<T extends Record<string, any>>(target: T, source: Partial<T>): T {
   const result = { ...target };
 
   for (const key in source) {
@@ -151,8 +151,8 @@ export function deepMerge<T extends Record<string, unknown>>(target: T, source: 
         !Array.isArray(sourceValue)
       ) {
         result[key] = deepMerge(
-          targetValue as Record<string, unknown>,
-          sourceValue as Record<string, unknown>,
+          targetValue as Record<string, any>,
+          sourceValue as Record<string, any>,
         ) as T[typeof key];
       } else if (sourceValue !== undefined) {
         result[key] = sourceValue as T[typeof key];
