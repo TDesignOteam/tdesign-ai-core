@@ -5,7 +5,7 @@
  * 供 AG-UI 和 OpenClaw 等多个适配器共同使用。
  *
  * ActivityManager 处理 Activity 事件的 Snapshot/Delta 增量合并，
- * 是协议无关的纯状态管理器。
+ * 是协议无关的纯状态管理器
  */
 export { ActivityManagerImpl, activityManager } from '../agui/ActivityManager';
 export type { ActivityManager } from '../agui/ActivityManager';
