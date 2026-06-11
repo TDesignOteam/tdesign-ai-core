@@ -13,6 +13,7 @@
  * 1. 服务端是状态的单一数据源（updateDataModel 来自服务端）
  * 2. 本模块只负责存储和订阅，不负责 A2UI → JsonRender 的转换
  * 3. 转换逻辑由 a2ui-to-jsonrender.ts 中的函数完成
+ * 4. A2UI v0.9.1 只要求 surfaceId 在当前活跃 Surface 中唯一，deleteSurface 后可复用
  */
 
 import type { JsonRenderSchema } from './types/core';

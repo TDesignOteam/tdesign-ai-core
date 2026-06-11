@@ -1,6 +1,6 @@
 /**
  * A2UI 消息处理器 v2
- * 完全按照 A2UI v0.9 协议实现
+ * 按 A2UI v0.9.1（兼容 v0.9）协议实现
  *
  * 支持四种消息类型：
  * - createSurface: 创建 Surface
@@ -60,7 +60,7 @@ interface InternalSurface {
  * A2UI 消息处理器
  *
  * 核心功能：
- * 1. 处理 A2UI v0.9 协议消息
+ * 1. 处理 A2UI v0.9.1 协议消息
  * 2. 管理 Surface 生命周期
  * 3. 维护组件注册表和数据模型
  * 4. 构建组件树
@@ -135,10 +135,10 @@ export class A2uiMessageProcessor {
     this.snapshotVersion++;
   }
 
-  // ============= A2UI v0.9 消息处理 =============
+  // ============= A2UI v0.9.1 消息处理 =============
 
   /**
-   * 处理单条 A2UI v0.9 消息
+   * 处理单条 A2UI v0.9.1 消息
    */
   processMessage(message: A2UIServerMessage): void {
     this.processMessageInternal(message);
