@@ -7,9 +7,9 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   outDir: 'dist',
-  // 将内部包 @tdesign/ai-shared 打进产物；immer 与 json-render 保持外置
+  // 将内部包 @tdesign/ai-shared 打进产物；immer 保持外置
   deps: {
     alwaysBundle: ['@tdesign/ai-shared'],
-    neverBundle: ['immer', '@json-render/core'],
+    neverBundle: ['immer'],
   },
 });

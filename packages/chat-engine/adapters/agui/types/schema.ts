@@ -65,7 +65,7 @@ const ActivityMessageSchema = z.object({
   id: z.string(),
   role: z.literal('activity'),
   activityType: z.string(),
-  content: z.record(z.any()),
+  content: z.record(z.string(), z.any()),
   timestamp: z.number().optional(),
 });
 
