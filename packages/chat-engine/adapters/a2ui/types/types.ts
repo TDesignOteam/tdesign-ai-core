@@ -1,7 +1,7 @@
 /**
  * A2UI v0.9 协议类型定义
  * 参考 A2UI Specification 0.9 和 @a2ui/core 实现
- * 
+ *
  * 核心层：框架无关，可跨 React/Vue 复用
  */
 
@@ -49,17 +49,16 @@ export const stringArrayOrPathSchema = z.union([z.array(z.string()), PathBinding
  * 1. A2UI v0.9 规范格式：{ name: string, context?: Record<string, unknown> }
  * 2. 简化格式（向后兼容）：{ type: string, payload?: unknown }
  */
-export const A2UIActionSchema = z.object({
-  // A2UI v0.9 标准字段
-  name: z.string().optional(),
-  context: z.record(z.unknown()).optional(),
-  // 向后兼容字段
-  type: z.string().optional(),
-  payload: z.unknown().optional(),
-}).refine(
-  (data) => data.name || data.type,
-  { message: 'Action must have either name or type' }
-);
+export const A2UIActionSchema = z
+  .object({
+    // A2UI v0.9 标准字段
+    name: z.string().optional(),
+    context: z.record(z.unknown()).optional(),
+    // 向后兼容字段
+    type: z.string().optional(),
+    payload: z.unknown().optional(),
+  })
+  .refine((data) => data.name || data.type, { message: 'Action must have either name or type' });
 
 export interface A2UIAction {
   /** A2UI v0.9 标准字段 */
@@ -96,10 +95,7 @@ export interface ActionContext {
 /**
  * Action 处理回调
  */
-export type ActionHandler = (
-  action: A2UIAction,
-  context?: ActionContext
-) => void | Promise<void>;
+export type ActionHandler = (action: A2UIAction, context?: ActionContext) => void | Promise<void>;
 
 // ============= 组件类型定义 (A2UI v0.9) =============
 
@@ -533,10 +529,12 @@ export interface A2UIMessage {
 
 // ============= Zod Schema (运行时验证) =============
 
-export const A2UIComponentBaseSchema = z.object({
-  id: z.string(),
-  component: z.string(),
-}).passthrough();
+export const A2UIComponentBaseSchema = z
+  .object({
+    id: z.string(),
+    component: z.string(),
+  })
+  .passthrough();
 
 export const createSurfaceMessageSchema = z.object({
   createSurface: z.object({
@@ -580,10 +578,12 @@ export const A2UISurfaceSchema = z.object({
   state: z.enum(['active', 'closed', 'pending']),
   root: z.any().nullable(),
   data: z.record(z.unknown()).optional(),
-  skeletonHint: z.object({
-    layout: z.enum(['form', 'card', 'list', 'simple', 'wizard']).optional(),
-    rowCount: z.number().optional(),
-    animation: z.enum(['gradient', 'flashed', 'none']).optional(),
-  }).optional(),
+  skeletonHint: z
+    .object({
+      layout: z.enum(['form', 'card', 'list', 'simple', 'wizard']).optional(),
+      rowCount: z.number().optional(),
+      animation: z.enum(['gradient', 'flashed', 'none']).optional(),
+    })
+    .optional(),
   updatedAt: z.number().optional(),
 });

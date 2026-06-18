@@ -107,21 +107,16 @@ export function formatWebSocketUrl(url: string): string {
 /**
  * 计算指数退避延迟
  */
-export function calculateBackoffDelay(
-  attempt: number,
-  baseDelay: number,
-  maxDelay = 30000,
-  jitter = true,
-): number {
+export function calculateBackoffDelay(attempt: number, baseDelay: number, maxDelay = 30000, jitter = true): number {
   let delay = baseDelay * Math.pow(1.5, attempt - 1);
   delay = Math.min(delay, maxDelay);
-  
+
   if (jitter) {
     // 添加 ±10% 的抖动
     const jitterRange = delay * 0.1;
     delay += (Math.random() - 0.5) * 2 * jitterRange;
   }
-  
+
   return Math.floor(delay);
 }
 
@@ -141,12 +136,12 @@ export function safeJsonParse<T>(data: string, fallback: T): T {
  */
 export function deepMerge<T extends Record<string, unknown>>(target: T, source: Partial<T>): T {
   const result = { ...target };
-  
+
   for (const key in source) {
     if (Object.prototype.hasOwnProperty.call(source, key)) {
       const targetValue = result[key];
       const sourceValue = source[key];
-      
+
       if (
         typeof targetValue === 'object' &&
         targetValue !== null &&
@@ -164,6 +159,6 @@ export function deepMerge<T extends Record<string, unknown>>(target: T, source: 
       }
     }
   }
-  
+
   return result;
 }

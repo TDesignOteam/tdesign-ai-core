@@ -5,9 +5,10 @@
   "scripts": {
     "build": "pnpm -r run build",
     "type-check": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "eslint packages --ext .ts",
+    "lint": "eslint packages",
+    "lint:fix": "eslint packages --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "clean": "pnpm -r run clean"
   },
   "repository": {
@@ -16,17 +17,18 @@
   },
   "license": "MIT",
   "engines": {
-    "node": ">=18.0.0"
+    "node": "^22.18.0 || >=24.11.0"
   },
   "packageManager": "pnpm@9.15.9",
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.6.2",
     "typescript": "^5.5.0",
-    "immer": "^10.0.0",
-    "tsup": "^8.5.0"
+    "typescript-eslint": "^8.61.0"
   },
   "dependencies": {
-    "@tdesign/ai-chat-engine": "workspace:*",
-    "@tdesign/ai-shared": "workspace:*",
     "@json-render/core": "^0.17.0",
     "zod": "^4.3.6"
   }

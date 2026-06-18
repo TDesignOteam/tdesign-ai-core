@@ -13,16 +13,21 @@
     "!**/*.test.ts"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsdown",
     "clean": "rimraf dist"
   },
   "publishConfig": {
     "access": "public",
     "exports": {
       ".": {
-        "types": "./dist/index.d.ts",
-        "import": "./dist/index.mjs",
-        "require": "./dist/index.cjs"
+        "import": {
+          "types": "./dist/index.d.mts",
+          "default": "./dist/index.mjs"
+        },
+        "require": {
+          "types": "./dist/index.d.cts",
+          "default": "./dist/index.cjs"
+        }
       }
     }
   },
@@ -39,7 +44,8 @@
   },
   "devDependencies": {
     "immer": "^10.0.0",
-    "tsup": "^8.5.0",
+    "rimraf": "^6.0.1",
+    "tsdown": "^0.22.3",
     "typescript": "^5.5.0"
   },
   "peerDependencies": {

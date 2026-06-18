@@ -138,9 +138,10 @@ export default class MessageProcessor {
       }
     }
 
-    const existingContent = targetIndex !== -1
-      ? (messageStore.messages.find((m) => m.id === targetMessageId) as any)?.content?.[targetIndex]
-      : undefined;
+    const existingContent =
+      targetIndex !== -1
+        ? (messageStore.messages.find((m) => m.id === targetMessageId) as any)?.content?.[targetIndex]
+        : undefined;
 
     const processed = this.processContentUpdate(existingContent, rawChunk);
     messageStore.appendContent(targetMessageId, processed, targetIndex);

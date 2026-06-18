@@ -3,16 +3,15 @@ import { applyJsonPatch } from '../../utils';
 
 /**
  * Activity 状态管理器
- * 
+ *
  * 职责：
  * - 处理 AG-UI Activity 事件的 Snapshot/Delta 增量合并
  * - 提供当前 Activity 数据的快捷访问（用于 event-mapper 生成消息内容）
- * 
+ *
  * 注意：
  * - Activity 本身会渲染在消息流中，不需要独立订阅机制
  * - 如需监听 Activity 变化，应使用 eventBus 的 MESSAGE_UPDATE 事件
  */
-
 
 export interface ActivityManager {
   /**
@@ -81,8 +80,6 @@ export class ActivityManagerImpl implements ActivityManager {
     return Object.keys(this.activities);
   }
 
-
-
   /**
    * 处理 AG-UI Activity 事件
    * 返回更新后的 ActivityData，供 event-mapper 使用
@@ -134,8 +131,7 @@ export class ActivityManagerImpl implements ActivityManager {
 
       // 计算新增的 operations 范围
       const newOpsCount = this.getOperationsCount(newContent);
-      const deltaInfo =
-        newOpsCount > oldOpsCount ? { fromIndex: oldOpsCount, toIndex: newOpsCount } : undefined;
+      const deltaInfo = newOpsCount > oldOpsCount ? { fromIndex: oldOpsCount, toIndex: newOpsCount } : undefined;
 
       const activityData: ActivityData = {
         activityType,

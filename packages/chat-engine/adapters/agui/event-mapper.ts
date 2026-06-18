@@ -143,7 +143,7 @@ export class AGUIEventMapper {
 
   /**
    * 处理文本消息事件
-   * 
+   *
    * 支持两种模式：
    * 1. 标准模式：TEXT_MESSAGE_START → TEXT_MESSAGE_CONTENT → TEXT_MESSAGE_END
    * 2. 简化模式：仅发送 TEXT_MESSAGE_CHUNK，自动补全生命周期
@@ -172,14 +172,14 @@ export class AGUIEventMapper {
   /**
    * 处理简化模式的 TEXT_MESSAGE_CHUNK 事件
    * 自动补全 Start → Content → End 生命周期
-   * 
+   *
    * 关键：通过 messageId 区分不同的文本块，
    * 当 messageId 变化时创建新的内容块
    */
   private handleTextMessageChunk(event: any): AIMessageContent | null {
     const messageId = event.messageId || 'default';
     const role = event?.role || 'assistant';
-    
+
     // 如果是新的 messageId，需要创建新的内容块
     if (this.currentTextMessageId !== messageId) {
       this.currentTextMessageId = messageId;
@@ -236,13 +236,11 @@ export class AGUIEventMapper {
 
       case AGUIEventType.REASONING_ENCRYPTED_VALUE:
         // encryptedValue 仅用于跨轮状态连续性，透传到 ext 由业务层在下一轮回传
-        return createThinkingContent(
-          {},
-          'streaming',
-          'merge',
-          false,
-          { encryptedValue: event.encryptedValue, subtype: event.subtype, entityId: event.entityId },
-        );
+        return createThinkingContent({}, 'streaming', 'merge', false, {
+          encryptedValue: event.encryptedValue,
+          subtype: event.subtype,
+          entityId: event.entityId,
+        });
 
       case AGUIEventType.REASONING_END:
       case AGUIEventType.THINKING_END:
@@ -283,11 +281,7 @@ export class AGUIEventMapper {
   /**
    * 创建新的 reasoning 内容块，消费 pendingReasoningTitle
    */
-  private openReasoningBlock(
-    messageId: string | null,
-    title: string | undefined,
-    text: string,
-  ): AIMessageContent {
+  private openReasoningBlock(messageId: string | null, title: string | undefined, text: string): AIMessageContent {
     this.currentReasoningMessageId = messageId;
     const resolvedTitle = title || this.pendingReasoningTitle || '思考中...';
     this.pendingReasoningTitle = null;
@@ -296,7 +290,7 @@ export class AGUIEventMapper {
 
   /**
    * 处理工具调用事件
-   * 
+   *
    * 支持两种模式：
    * 1. 标准模式：TOOL_CALL_START → TOOL_CALL_ARGS → TOOL_CALL_END
    * 2. 简化模式：仅发送 TOOL_CALL_CHUNK，自动补全生命周期
@@ -321,11 +315,11 @@ export class AGUIEventMapper {
   /**
    * 处理活动事件
    * 委托给 activityManager 进行状态管理和订阅通知
-   * 
+   *
    * 支持两种模式：
    * 1. 标准模式：先收到 ACTIVITY_SNAPSHOT，后续 ACTIVITY_DELTA 基于 snapshot 增量更新
    * 2. 纯增量模式：没有 ACTIVITY_SNAPSHOT，直接收到 ACTIVITY_DELTA，自动初始化空内容
-   * 
+   *
    * 注意：不同 activityType 的活动是独立管理的，互不影响
    */
   private handleActivityEvent(event: any): AIMessageContent | null {
@@ -414,7 +408,7 @@ export class AGUIEventMapper {
   /**
    * 处理简化模式的 TOOL_CALL_CHUNK 事件
    * 自动补全 Start → Args → End 生命周期
-   * 
+   *
    * TOOL_CALL_CHUNK 事件结构：
    * - toolCallId: 工具调用ID（可选，首次时自动生成）
    * - toolCallName: 工具名称（首次必需）
@@ -491,7 +485,7 @@ export class AGUIEventMapper {
   private handleToolCallEnd(event: any) {
     // 标记工具调用结束
     this.toolCallEnded.add(event.toolCallId);
-    
+
     // 更新 toolCallMap 中的 eventType
     if (this.toolCallMap[event.toolCallId]) {
       this.toolCallMap[event.toolCallId] = {
@@ -499,7 +493,7 @@ export class AGUIEventMapper {
         eventType: AGUIEventType.TOOL_CALL_END,
       };
     }
-    
+
     return this.updateToolCallInContext(event.toolCallId, 'complete');
   }
 

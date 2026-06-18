@@ -7,12 +7,7 @@
  * 生命周期（可选钩子）：
  *   initialize → handleStream(* n) → afterMessageUpdate(* n) → abort? → destroy?
  */
-import type {
-  AIMessageContent,
-  ChatMessagesData,
-  ChatRequestParams,
-  ChatServiceConfig,
-} from '../type';
+import type { AIMessageContent, ChatMessagesData, ChatRequestParams, ChatServiceConfig } from '../type';
 import type { IChatEventBus } from '../event-bus';
 import type { MessageStore } from '../store/message';
 

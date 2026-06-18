@@ -1,7 +1,7 @@
 /**
  * A2UI v0.9 → json-render 适配器
  * 将 A2UI v0.9 协议转换为 json-render Schema
- * 
+ *
  * 核心设计：
  * 1. A2UI v0.9 的 createSurface 只是初始化信号，不包含组件数据
  * 2. 组件数据通过 updateComponents 消息逐步发送（数组形式）
@@ -30,12 +30,12 @@ const TYPE_MAPPING: Record<string, string> = {
   ChoicePicker: 'Select',
   Slider: 'Slider',
   DateTimeInput: 'DatePicker',
-  
+
   // 布局组件
   Card: 'Card',
   Row: 'Row',
   Column: 'Column', // A2UI Column → json-render Column（垂直布局），不是 Col（栅格列）
-  Col: 'Col',       // 保留 Col 映射给显式使用栅格的场景
+  Col: 'Col', // 保留 Col 映射给显式使用栅格的场景
   List: 'List',
   Tabs: 'Tabs',
   Divider: 'Divider',
@@ -49,7 +49,7 @@ const TYPE_MAPPING: Record<string, string> = {
 function mapProps(component: A2UIComponent): Record<string, any> {
   // 排除 A2UI 特有字段，保留其他属性
   const { id, component: componentType, weight, child, children, ...restProps } = component;
-  
+
   const mappedProps: Record<string, any> = { ...restProps };
 
   // 处理 weight（flex-grow）
@@ -223,7 +223,7 @@ function buildSurfaceState(messages: A2UIMessage[]): A2UISurfaceState | null {
     if (msg.updateDataModel && surfaceState) {
       const { path, op, value } = msg.updateDataModel;
       const operation = op || 'replace';
-      
+
       if (operation === 'replace' && (path === '/' || !path)) {
         // 替换整个数据模型
         surfaceState.dataModel = value as Record<string, unknown>;
@@ -255,7 +255,7 @@ function buildSurfaceState(messages: A2UIMessage[]): A2UISurfaceState | null {
 function setValueByPath(obj: Record<string, unknown>, path: string, value: unknown): void {
   const parts = path.split('/').filter(Boolean);
   let current: any = obj;
-  
+
   for (let i = 0; i < parts.length - 1; i++) {
     const key = parts[i];
     const nextKey = parts[i + 1];
@@ -265,7 +265,7 @@ function setValueByPath(obj: Record<string, unknown>, path: string, value: unkno
     }
     current = current[key];
   }
-  
+
   if (parts.length > 0) {
     current[parts[parts.length - 1]] = value;
   }
@@ -278,13 +278,13 @@ function setValueByPath(obj: Record<string, unknown>, path: string, value: unkno
 function deleteValueByPath(obj: Record<string, unknown>, path: string): void {
   const parts = path.split('/').filter(Boolean);
   let current: any = obj;
-  
+
   for (let i = 0; i < parts.length - 1; i++) {
     const key = parts[i];
     if (!(key in current)) return;
     current = current[key];
   }
-  
+
   if (parts.length > 0) {
     const lastKey = parts[parts.length - 1];
     if (Array.isArray(current) && /^\d+$/.test(lastKey)) {
@@ -316,26 +316,24 @@ function surfaceStateToSchema(state: A2UISurfaceState): JsonRenderSchema {
 
 /**
  * 转换 A2UI v0.9 消息数组为 json-render Schema
- * 
+ *
  * 处理流程：
  * 1. 查找 createSurface 消息初始化 Surface
  * 2. 累积所有 updateComponents 消息构建组件树
  * 3. 累积所有 updateDataModel 消息填充数据
  * 4. 转换为 json-render Schema
- * 
+ *
  * @param messages A2UI 消息数组
  * @returns json-render Schema 或 null
  */
-export function convertA2UIMessagesToJsonRender(
-  messages: A2UIMessage[],
-): JsonRenderSchema | null {
+export function convertA2UIMessagesToJsonRender(messages: A2UIMessage[]): JsonRenderSchema | null {
   if (!messages || messages.length === 0) {
     return null;
   }
 
   // 构建 Surface 状态
   const surfaceState = buildSurfaceState(messages);
-  
+
   if (!surfaceState) {
     return null;
   }
@@ -351,15 +349,12 @@ export function convertA2UIMessagesToJsonRender(
 
 /**
  * 应用增量更新到现有 Schema
- * 
+ *
  * @param schema 当前 json-render Schema
  * @param components A2UI updateComponents 的组件数组
  * @returns 更新后的 Schema
  */
-export function applyA2UIUpdates(
-  schema: JsonRenderSchema,
-  components: A2UIComponent[],
-): JsonRenderSchema {
+export function applyA2UIUpdates(schema: JsonRenderSchema, components: A2UIComponent[]): JsonRenderSchema {
   if (!Array.isArray(components)) {
     return schema;
   }
@@ -379,7 +374,7 @@ export function applyA2UIUpdates(
 
 /**
  * 应用数据模型更新到现有 Schema
- * 
+ *
  * @param schema 当前 json-render Schema
  * @param path JSON Pointer 路径
  * @param op 操作类型

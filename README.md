@@ -8,10 +8,10 @@ TDesign AIGC 领域框架无关的核心 SDK 集合。
 
 ## 包结构
 
-| 包 | npm 名 | 说明 |
-|---|--------|------|
+| 包                     | npm 名                    | 说明                                                                     |
+| ---------------------- | ------------------------- | ------------------------------------------------------------------------ |
 | `packages/chat-engine` | `@tdesign/ai-chat-engine` | 聊天引擎核心：消息管理、流式处理、协议适配（AG-UI / OpenClaw）、事件总线 |
-| `packages/shared` | `@tdesign/ai-shared` | 跨引擎公共工具：EventEmitter、Logger、JSON Patch |
+| `packages/shared`      | `@tdesign/ai-shared`      | 跨引擎公共工具：EventEmitter、Logger、JSON Patch                         |
 
 ## 架构
 
