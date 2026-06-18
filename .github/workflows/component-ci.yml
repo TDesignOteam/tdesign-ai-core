@@ -2,7 +2,7 @@ name: component-ci
 
 on:
   pull_request:
-    branches: [develop]
+    branches: [main]
     types: [opened, synchronize, reopened]
     paths:
       - 'packages/**'
