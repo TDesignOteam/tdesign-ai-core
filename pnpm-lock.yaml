@@ -48,13 +48,12 @@ importers:
       expr-eval:
         specifier: ^2.0.2
         version: 2.0.2
-      zod:
-        specifier: '3'
-        version: 3.25.76
-    devDependencies:
       immer:
         specifier: ^10.0.0
         version: 10.2.0
+      zod:
+        specifier: '3'
+        version: 3.25.76
 
   packages/shared: {}
 

@@ -38,9 +38,6 @@
     "expr-eval": "^2.0.2",
     "zod": "3"
   },
-  "devDependencies": {
-    "immer": "^10.0.0"
-  },
   "peerDependencies": {
     "immer": "^10.0.0"
   }
