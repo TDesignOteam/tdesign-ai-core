@@ -9,31 +9,7 @@
     "./*": "./*.ts"
   },
   "files": [
-    "dist",
     "**/*.ts",
     "!**/*.test.ts"
-  ],
-  "scripts": {
-    "build": "tsdown",
-    "clean": "rimraf dist"
-  },
-  "publishConfig": {
-    "exports": {
-      ".": {
-        "import": {
-          "types": "./dist/index.d.mts",
-          "default": "./dist/index.mjs"
-        },
-        "require": {
-          "types": "./dist/index.d.cts",
-          "default": "./dist/index.cjs"
-        }
-      }
-    }
-  },
-  "devDependencies": {
-    "rimraf": "^6.0.1",
-    "tsdown": "^0.22.3",
-    "typescript": "^5.5.0"
-  }
+  ]
 }
