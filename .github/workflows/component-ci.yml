@@ -1,0 +1,116 @@
+name: component-ci
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'packages/**'
+      - '.github/workflows/component-ci.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tdesign-react:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        script:
+          - lint
+          - test
+          - build
+          - preview
+        include:
+          - script: lint
+            run: pnpm run lint
+          - script: test
+            run: pnpm run test
+          - script: build
+            run: pnpm run build:aigc
+          - script: preview
+            run: pnpm -C packages/tdesign-react-aigc/site preview
+
+    steps:
+      - name: Checkout tdesign-react
+        uses: actions/checkout@v6
+        with:
+          repository: Tencent/tdesign-react
+          submodules: recursive
+
+      - run: rm -rf packages/ai-core
+
+      - name: Checkout tdesign-ai-core
+        uses: actions/checkout@v6
+        with:
+          path: packages/ai-core
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+
+      - run: pnpm install
+
+      - run: ${{ matrix.run }}
+
+      - if: matrix.script == 'preview'
+        uses: actions/upload-artifact@v7
+        with:
+          name: tdesign-react-site
+          path: packages/tdesign-react/site/dist
+          retention-days: 5
+
+  tdesign-web-components:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        script:
+          - lint
+          - test
+          - build
+          - preview
+        include:
+          - script: lint
+            run: pnpm run lint
+          - script: test
+            run: pnpm run test
+          - script: build
+            run: pnpm run build:chat
+          - script: preview
+            run: pnpm -C packages/tdesign-web-components-chat/site preview
+
+    steps:
+      - name: Checkout tdesign-web-components
+        uses: actions/checkout@v6
+        with:
+          repository: TDesignOteam/tdesign-web-components
+          submodules: recursive
+
+      - run: rm -rf common-utils/_ai-core
+
+      - name: Checkout tdesign-ai-core
+        uses: actions/checkout@v6
+        with:
+          path: common-utils/_ai-core
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+
+      - run: pnpm install
+
+      - run: ${{ matrix.run }}
+
+      - if: matrix.script == 'preview'
+        uses: actions/upload-artifact@v7
+        with:
+          name: tdesign-web-components-site
+          path: packages/tdesign-web-components-chat/site/dist
+          retention-days: 5
