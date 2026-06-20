@@ -51,15 +51,9 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version-file: packages/ai-core/.node-version
+          node-version-file: .node-version
 
-      # 校验 ai-core 自身 lockfile 与 package.json 一致（依赖变更须在本仓库提交 lockfile）
-      - name: Verify ai-core lockfile
-        working-directory: packages/ai-core
-        run: pnpm install --frozen-lockfile
-
-      # 宿主 monorepo lockfile 无法随 ai-core PR 预更新，需允许同步
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
 
       - run: ${{ matrix.run }}
 
@@ -108,15 +102,11 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version-file: common-utils/_ai-core/.node-version
+          node-version-file: .node-version
 
-      # 校验 ai-core 自身 lockfile 与 package.json 一致（依赖变更须在本仓库提交 lockfile）
-      - name: Verify ai-core lockfile
-        working-directory: common-utils/_ai-core
-        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
 
-      # 宿主 monorepo lockfile 无法随 ai-core PR 预更新，需允许同步
-      - run: pnpm install --no-frozen-lockfile
+      - run: git diff
 
       - run: ${{ matrix.run }}
 
