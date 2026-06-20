@@ -7,12 +7,12 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint packages --ext .ts",
+    "lint": "eslint .",
     "clean": "pnpm -r run clean",
     "prepare": "husky"
   },
   "lint-staged": {
-    "packages/**/*.{vue,js,jsx,ts,tsx}": [
+    "packages/**/*.ts": [
       "prettier --write --cache",
       "eslint --fix --cache"
     ]
@@ -27,9 +27,7 @@
   },
   "packageManager": "pnpm@9.15.9",
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
     "eslint": "^10.3.0",
-    "globals": "^17.6.0",
     "husky": "^9.1.7",
     "immer": "^10.0.0",
     "lint-staged": "^17.0.4",
