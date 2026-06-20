@@ -22,7 +22,7 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
 
       - run: pnpm run lint
 
@@ -37,6 +37,6 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
 
       - run: pnpm build
