@@ -25,7 +25,8 @@ export interface ChatBaseContent<T extends string, TData> {
   status?: ChatMessageStatus;
   id?: string;
   strategy?: 'merge' | 'append';
-  ext?: Record<string, any>;
+  // ext 为业务透传字段，结构开放
+  ext?: Record<string, unknown>;
 }
 
 // 内容类型
@@ -78,7 +79,7 @@ export type AttachmentItem = {
   width?: number;
   height?: number;
   extension?: string; // 自定义文件后缀，默认按照name文件名后缀识别
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 };
 export type AttachmentContent = ChatBaseContent<'attachment', AttachmentItem[]>;
 
@@ -104,7 +105,7 @@ export type ToolCall = {
 export type ToolCallContent = ChatBaseContent<'toolcall', ToolCall>;
 
 // Activity 内容
-export type ActivityData<TContent = Record<string, any>> = {
+export type ActivityData<TContent = Record<string, unknown>> = {
   activityType: string;
   messageId?: string;
   content: TContent;
@@ -115,7 +116,7 @@ export type ActivityData<TContent = Record<string, any>> = {
   };
 };
 
-export type ActivityContent<TContent = Record<string, any>> = ChatBaseContent<'activity', ActivityData<TContent>>;
+export type ActivityContent<TContent = Record<string, unknown>> = ChatBaseContent<'activity', ActivityData<TContent>>;
 
 // 消息主体
 // 基础消息结构
@@ -124,12 +125,13 @@ export interface ChatBaseMessage {
   id: string;
   status?: ChatMessageStatus;
   datetime?: string;
-  ext?: any;
+  // ext 为业务透传字段，结构开放
+  ext?: Record<string, unknown>;
 }
 
 // 类型扩展机制
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-empty-interface
+  // 供下游通过 declaration merging 扩展内容类型
   interface AIContentTypeOverrides {}
 }
 
@@ -146,6 +148,14 @@ type AIContentTypeMap = {
 
 export type AIContentType = keyof AIContentTypeMap;
 export type AIMessageContent = AIContentTypeMap[AIContentType];
+export type AIMessageContentSnapshot = AIMessageContent[] & { _isSnapshot?: true };
+
+export function isAIMessageContentSnapshot(
+  result: AIMessageContent | AIMessageContent[] | null | undefined,
+): result is AIMessageContentSnapshot {
+  return Array.isArray(result) && '_isSnapshot' in result && result._isSnapshot === true;
+}
+
 export type UserMessageContent = TextContent | AttachmentContent;
 
 export interface UserMessage extends ChatBaseMessage {
@@ -173,14 +183,18 @@ export type ChatMessagesData = UserMessage | AIMessage | SystemMessage;
 // 回答消息体配置
 export type SSEChunkData = {
   event?: string;
-  data: any;
+  data: unknown;
 };
 
 export interface ChatRequestParams {
   prompt?: string;
   messageID?: string;
   attachments?: AttachmentContent['data'];
-  [key: string]: any;
+  metadata?: Record<string, unknown>;
+  /** HTTP 请求头，通常由 onRequest 回调注入 */
+  headers?: HeadersInit;
+  /** HTTP 请求体，通常由 onRequest 回调注入 */
+  body?: BodyInit | null;
 }
 
 // 基础配置类型
@@ -264,7 +278,7 @@ export interface DefaultEngineCallbacks {
   onComplete?: (
     isAborted: boolean,
     params?: ChatRequestParams,
-    result?: any,
+    result?: unknown,
   ) => AIMessageContent | AIMessageContent[] | void;
   onAbort?: () => Promise<void>;
   /** 错误处理 */
@@ -304,7 +318,7 @@ export interface DefaultEngineCallbacks {
 export interface ChatServiceConfig extends ChatNetworkConfig, DefaultEngineCallbacks {}
 
 // 联合类型支持静态配置和动态生成
-export type ChatServiceConfigSetter = ChatServiceConfig | ((params?: any) => ChatServiceConfig);
+export type ChatServiceConfigSetter = ChatServiceConfig | ((params?: ChatRequestParams) => ChatServiceConfig);
 
 // 统一的引擎接口
 export interface IChatEngine {
@@ -314,7 +328,7 @@ export interface IChatEngine {
    * @param messages 初始消息列表，用于恢复历史对话
    * @description 必须在使用其他方法前调用此方法进行初始化
    */
-  init(config?: any, messages?: ChatMessagesData[]): void;
+  init(config?: ChatServiceConfigSetter, messages?: ChatMessagesData[]): void;
 
   /**
    * 发送用户消息并获取AI回复
@@ -378,7 +392,10 @@ export interface IChatEngine {
    * @param handler 合并处理函数，接收新块和现有块，返回合并后的内容块
    * @description 用于自定义不同类型内容的增量更新逻辑
    */
-  registerMergeStrategy<T extends AIMessageContent>(type: T['type'], handler: (chunk: T, existing?: T) => T): void;
+  registerMergeStrategy<T extends AIMessageContent & { type: string }>(
+    type: T['type'],
+    handler: (chunk: T, existing?: T) => T,
+  ): void;
 
   // 属性访问
   /**
@@ -397,7 +414,7 @@ export interface IChatEngine {
    * 获取消息存储实例
    * @returns 消息存储对象
    */
-  get messageStore(): any; // 抽象化，不同引擎可能有不同的store
+  get messageStore(): import('./store/message').MessageStore;
 
   /**
    * 更新 WS 端点地址
@@ -438,12 +455,12 @@ export interface ChatState {
 
 export type ChatMessageSetterMode = 'replace' | 'prepend' | 'append';
 
-export type AIContentHandler<T extends ChatBaseContent<any, any>> = (chunk: T, existing?: T) => T;
+export type AIContentHandler<T extends ChatBaseContent<string, unknown>> = (chunk: T, existing?: T) => T;
 
-export interface ContentTypeDefinition<T extends string = string, D = any> {
+export interface ContentTypeDefinition<T extends string = string, D = unknown> {
   type: T;
   handler?: AIContentHandler<ChatBaseContent<T, D>>;
   renderer?: ContentRenderer<ChatBaseContent<T, D>>;
 }
 
-export type ContentRenderer<T extends ChatBaseContent<any, any>> = (content: T) => unknown;
+export type ContentRenderer<T extends ChatBaseContent<string, unknown>> = (content: T) => unknown;

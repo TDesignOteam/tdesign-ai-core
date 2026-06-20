@@ -12,6 +12,7 @@
 import type { AIMessageContent, ChatMessagesData, ChatRequestParams, ChatServiceConfig, SSEChunkData } from '../type';
 import { ChatEngineEventType } from '../event-bus';
 import { LoggerManager } from '../utils/logger';
+import { toRequestErrorCallbackArg } from '../utils';
 import { OpenClawAdapter, type OpenClawAdapterConfig } from '../adapters/openclaw';
 import type { IStreamHandler, StreamContext, StreamLifecycleContext, StreamProtocol } from './types';
 import type { LLMService } from '../server';
@@ -58,7 +59,7 @@ export class OpenClawStreamHandler implements IStreamHandler {
         await this.openclawAdapter!.connect();
       }
     } catch (error) {
-      config.onError?.(error as Error);
+      config.onError?.(toRequestErrorCallbackArg(error));
       // 连接失败不抛出，允许后续 sendMessage 时重试
       this.logger.error('OpenClaw pre-connect failed:', error);
     }
@@ -68,7 +69,7 @@ export class OpenClawStreamHandler implements IStreamHandler {
     const { messageId, config } = context;
 
     this.ensureAdapter(config);
-    this.updateStreamCallbacks(config, context);
+    this.updateStreamCallbacks(config, context, params);
 
     try {
       // 连接 WebSocket（如果未连接，比如 init 阶段连接失败需要重试）
@@ -191,7 +192,11 @@ export class OpenClawStreamHandler implements IStreamHandler {
   /**
    * 更新流式请求阶段的回调（消息处理 + 事件发布）
    */
-  private updateStreamCallbacks(config: ChatServiceConfig, context: StreamContext): void {
+  private updateStreamCallbacks(
+    config: ChatServiceConfig,
+    context: StreamContext,
+    requestParams: ChatRequestParams,
+  ): void {
     if (!this.openclawAdapter) return;
 
     const { messageId } = context;
@@ -231,9 +236,9 @@ export class OpenClawStreamHandler implements IStreamHandler {
         // 处理消息结果
         context.processMessageResult(messageId, result);
       },
-      onComplete: (isAborted, requestParams) => {
+      onComplete: (isAborted, completedParams) => {
         if (messageId) {
-          context.handleComplete(messageId, isAborted, requestParams || context.config);
+          context.handleComplete(messageId, isAborted, completedParams ?? requestParams);
         }
       },
       onError: (error) => {

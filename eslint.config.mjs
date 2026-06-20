@@ -13,9 +13,14 @@ export default defineConfig(
   {
     files: ['packages/**/*.ts'],
     rules: {
-      '@typescript-eslint/ban-ts-comment': 'off',
-      '@typescript-eslint/no-empty-object-type': 'off',
-      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/ban-ts-comment': 'error',
+      '@typescript-eslint/no-empty-object-type': [
+        'error',
+        {
+          allowWithName: 'AIContentTypeOverrides',
+        },
+      ],
       '@typescript-eslint/no-unused-vars': [
         'warn',
         {
@@ -24,6 +29,13 @@ export default defineConfig(
           varsIgnorePattern: '^_',
         },
       ],
+    },
+  },
+  {
+    // 协议适配层数据结构高度动态，待 schema 完善后逐步收紧
+    files: ['packages/chat-engine/adapters/**/*.ts', 'packages/shared/immutable-patch.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 );

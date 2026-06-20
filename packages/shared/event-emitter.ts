@@ -1,17 +1,19 @@
+type EventListener = (...args: unknown[]) => void;
+
 /**
  * 简单的 EventEmitter 实现，用于浏览器环境
  */
 export default class SimpleEventEmitter {
-  private events: Map<string, Array<(...args: any[]) => void>> = new Map();
+  private events = new Map<string, EventListener[]>();
 
-  on(event: string, listener: (...args: any[]) => void): void {
+  on(event: string, listener: EventListener): void {
     if (!this.events.has(event)) {
       this.events.set(event, []);
     }
     this.events.get(event)!.push(listener);
   }
 
-  off(event: string, listener: (...args: any[]) => void): void {
+  off(event: string, listener: EventListener): void {
     const listeners = this.events.get(event);
     if (listeners) {
       const index = listeners.indexOf(listener);
@@ -21,15 +23,15 @@ export default class SimpleEventEmitter {
     }
   }
 
-  once(event: string, listener: (...args: any[]) => void): void {
-    const wrapper = (...args: any[]) => {
+  once(event: string, listener: EventListener): void {
+    const wrapper: EventListener = (...args) => {
       this.off(event, wrapper);
       listener(...args);
     };
     this.on(event, wrapper);
   }
 
-  emit(event: string, ...args: any[]): boolean {
+  emit(event: string, ...args: unknown[]): boolean {
     const listeners = this.events.get(event);
     if (listeners && listeners.length > 0) {
       listeners.forEach((listener) => {

@@ -8,6 +8,7 @@
  * 4. 提供与 AGUIAdapter 相似的接口，便于 ChatEngine 统一调度
  */
 import EventEmitter from '../../utils/eventEmitter';
+import { toError } from '../../utils';
 import { LoggerManager } from '../../utils/logger';
 import { WebSocketClient, type WebSocketClientConfig, WebSocketConnectionState } from '../../server/websocket-client';
 import type { AIMessageContent, ChatRequestParams, SSEChunkData } from '../../type';
@@ -216,9 +217,9 @@ export class OpenClawAdapter extends EventEmitter {
         resolve();
       };
 
-      const onError = (error: Error) => {
+      const onError = (error: unknown) => {
         cleanup();
-        reject(error);
+        reject(toError(error));
       };
 
       this.once('connected', onConnected);
@@ -268,7 +269,7 @@ export class OpenClawAdapter extends EventEmitter {
    */
   handleEvent(chunk: SSEChunkData): AIMessageContent | AIMessageContent[] | null {
     // 将 SSE 格式转换为 OpenClaw 帧格式
-    const frame = parseFrame(chunk.data);
+    const frame = parseFrame(chunk.data as string | object);
     if (!frame || frame.type !== 'event') {
       return null;
     }
@@ -417,16 +418,20 @@ export class OpenClawAdapter extends EventEmitter {
   private setupEventHandlers(): void {
     if (!this.wsClient) return;
 
-    this.wsClient.on('message', (event: { event: string; data: unknown }) => {
-      this.handleWebSocketMessage(event.data);
+    this.wsClient.on('message', (event: unknown) => {
+      if (typeof event === 'object' && event !== null && 'data' in event) {
+        this.handleWebSocketMessage((event as { data: unknown }).data);
+      }
     });
 
-    this.wsClient.on('error', (error: Error) => {
-      this.logger.error('[OpenClaw] WebSocket error:', error?.message || error);
-      this.callbacks.onError?.(error);
+    this.wsClient.on('error', (error: unknown) => {
+      const err = toError(error);
+      this.logger.error('[OpenClaw] WebSocket error:', err.message);
+      this.callbacks.onError?.(err);
     });
 
-    this.wsClient.on('complete', (isAborted: boolean) => {
+    this.wsClient.on('complete', (...args: unknown[]) => {
+      const isAborted = args[0] === true;
       console.warn(`[OpenClaw] WebSocket complete event! isAborted=${isAborted}, isStreaming=${this.isStreaming}`);
       if (this.isStreaming) {
         console.warn(
@@ -438,9 +443,13 @@ export class OpenClawAdapter extends EventEmitter {
       this.callbacks.onDisconnected?.(isAborted ? 'Aborted' : 'Connection closed');
     });
 
-    this.wsClient.on('stateChange', (event: { from: WebSocketConnectionState; to: WebSocketConnectionState }) => {
-      this.logger.debug(`WebSocket state: ${event.from} -> ${event.to}`);
-      if (event.to === WebSocketConnectionState.CONNECTED) {
+    this.wsClient.on('stateChange', (event: unknown) => {
+      if (typeof event !== 'object' || event === null || !('from' in event) || !('to' in event)) {
+        return;
+      }
+      const { from, to } = event as { from: WebSocketConnectionState; to: WebSocketConnectionState };
+      this.logger.debug(`WebSocket state: ${from} -> ${to}`);
+      if (to === WebSocketConnectionState.CONNECTED) {
         this.connectionState = OpenClawConnectionState.HANDSHAKING;
       }
     });

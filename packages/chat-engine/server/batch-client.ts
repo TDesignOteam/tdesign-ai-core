@@ -1,5 +1,6 @@
 import EventEmitter from '../utils/eventEmitter';
 import { LoggerManager } from '../utils/logger';
+import { isAbortError } from '../utils';
 import { ConnectionError, TimeoutError } from './errors';
 
 /**
@@ -17,7 +18,7 @@ export class BatchClient extends EventEmitter {
    * @param timeout 超时时间（毫秒）
    * @returns 响应数据
    */
-  async request<T>(endpoint: string, request: RequestInit, timeout = 1000000): Promise<T> {
+  async request<T>(endpoint: string, request: RequestInit, timeout = 1000000): Promise<T | null> {
     // 中止上一个请求
     this.abort();
 
@@ -37,15 +38,15 @@ export class BatchClient extends EventEmitter {
 
       if (!response.ok) {
         this.emit('error', new ConnectionError(`HTTP error! status: ${response.status}`));
-        return null as T;
+        return null;
       }
       return (await response.json()) as T;
     } catch (error: unknown) {
-      if ((error as Error).name !== 'AbortError') {
+      if (!isAbortError(error)) {
         this.logger.error('Batch request failed:', error);
         this.emit('error', error);
       }
-      return undefined as unknown as T;
+      return null;
     } finally {
       clearTimeout(timeoutId);
       this.controller = null;

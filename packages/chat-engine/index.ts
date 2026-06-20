@@ -23,6 +23,8 @@ import type {
   IChatEngine,
   SystemMessage,
 } from './type';
+import { isAIMessageContentSnapshot } from './type';
+import { toRequestErrorCallbackArg } from './utils';
 
 /**
  * 聊天引擎主类。
@@ -342,7 +344,7 @@ export default class ChatEngine implements IChatEngine {
   public processMessageResult(messageId: string, result: AIMessageContent | AIMessageContent[] | null) {
     if (!result) return;
 
-    if (Array.isArray(result) && (result as any)._isSnapshot) {
+    if (isAIMessageContentSnapshot(result)) {
       // MESSAGES_SNAPSHOT：整体替换，避免与已有内容拼接冲突
       this.messageStore.replaceContent(messageId, result);
     } else {
@@ -434,7 +436,7 @@ export default class ChatEngine implements IChatEngine {
     try {
       if (transport === 'ws') {
         if (lastAI && (lastAI.status === 'streaming' || lastAI.status === 'pending')) {
-          this.handleComplete(lastAI.id, true, this.lastRequestParams || ({} as ChatRequestParams));
+          this.handleComplete(lastAI.id, true, this.lastRequestParams ?? {});
         }
 
         if (this.config.abortRequest) {
@@ -489,8 +491,14 @@ export default class ChatEngine implements IChatEngine {
    * @param type    内容类型（如 `'text'` / `'markdown'`）
    * @param handler 接收新块与现有块，返回合并后的内容块
    */
-  public registerMergeStrategy<T extends AIMessageContent>(type: T['type'], handler: (chunk: T, existing?: T) => T) {
-    this.messageProcessor.registerHandler(type, handler);
+  public registerMergeStrategy<T extends AIMessageContent & { type: string }>(
+    type: T['type'],
+    handler: (chunk: T, existing?: T) => T,
+  ) {
+    this.messageProcessor.registerHandler(
+      type as string,
+      handler as unknown as (chunk: AIMessageContent, existing?: AIMessageContent) => AIMessageContent,
+    );
   }
 
   /**
@@ -612,7 +620,7 @@ export default class ChatEngine implements IChatEngine {
 
   /** 运行时错误兜底：回调 + 广播 */
   private handleError(id: string, error: unknown) {
-    this.config.onError?.(error as Error);
+    this.config.onError?.(toRequestErrorCallbackArg(error));
     this.emitRequestError(id, error);
   }
 

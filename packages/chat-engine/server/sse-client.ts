@@ -1,5 +1,6 @@
 /* eslint-disable no-await-in-loop, max-classes-per-file */
 import EventEmitter from '../utils/eventEmitter';
+import { isAbortError, toError } from '../utils';
 import { LoggerManager } from '../utils/logger';
 import { ConnectionManager } from './connection-manager';
 import { ConnectionError, TimeoutError } from './errors';
@@ -95,8 +96,8 @@ export class SSEClient extends EventEmitter {
       this.setState(SSEConnectionState.CONNECTED);
       this.connectionManager.onConnectionSuccess();
       await this.readStream();
-    } catch (error) {
-      this.handleConnectionError(error as Error);
+    } catch (error: unknown) {
+      this.handleConnectionError(error);
     }
   }
 
@@ -124,7 +125,7 @@ export class SSEClient extends EventEmitter {
       this.resetParser();
       this.emit('complete', true);
     } catch (error: unknown) {
-      if ((error as Error).name !== 'AbortError') {
+      if (!isAbortError(error)) {
         this.logger.error('stream abort failed:', error);
         this.emit('error', error);
       }
@@ -177,8 +178,8 @@ export class SSEClient extends EventEmitter {
         return;
       }
       this.reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
+    } catch (error: unknown) {
+      if (!isAbortError(error)) {
         this.logger.error('sse request failed:', error);
         this.emit('error', error);
       }
@@ -208,10 +209,10 @@ export class SSEClient extends EventEmitter {
         // 直接解析SSE数据
         this.parseSSEData(value);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       if (!this.controller?.signal.aborted) {
         this.logger.error(`Stream reading error for ${this.connectionId}:`, error);
-        this.handleConnectionError(error as Error);
+        this.handleConnectionError(error);
       } else {
         this.logger.debug(`Stream reading stopped for ${this.connectionId} (aborted)`);
       }
@@ -261,11 +262,12 @@ export class SSEClient extends EventEmitter {
   /**
    * 简化的错误处理
    */
-  private handleConnectionError(error: Error) {
-    this.connectionInfo.error = error;
-    this.connectionManager.handleConnectionError(error);
+  private handleConnectionError(error: unknown) {
+    const err = toError(error);
+    this.connectionInfo.error = err;
+    this.connectionManager.handleConnectionError(err);
     this.setState(SSEConnectionState.ERROR);
-    this.emit('error', error);
+    this.emit('error', err);
   }
 
   /**

@@ -1,4 +1,5 @@
 import type { AIMessageContent, ChatRequestParams, ChatServiceConfig, ChatTransport, SSEChunkData } from '../type';
+import { toRequestErrorCallbackArg } from '../utils';
 import { LoggerManager } from '../utils/logger';
 import { BatchClient } from './batch-client';
 import { SSEClient } from './sse-client';
@@ -54,6 +55,14 @@ export class LLMService implements ILLMService {
     return 'sse';
   }
 
+  /** 将 EventEmitter 消息 payload 窄化为 SSEChunkData */
+  private static toSSEChunkData(msg: unknown): SSEChunkData | null {
+    if (typeof msg !== 'object' || msg === null || !('data' in msg)) {
+      return null;
+    }
+    return msg as SSEChunkData;
+  }
+
   /**
    * 处理批量请求（非流式）
    */
@@ -63,8 +72,8 @@ export class LLMService implements ILLMService {
   ): Promise<AIMessageContent | AIMessageContent[]> {
     // 确保只有一个客户端实例
     this.batchClient = this.batchClient || new BatchClient();
-    this.batchClient.on('error', (error) => {
-      config.onError?.(error);
+    this.batchClient.on('error', (error: unknown) => {
+      config.onError?.(toRequestErrorCallbackArg(error));
     });
 
     const req = (await config.onRequest?.(params)) || params;
@@ -89,8 +98,8 @@ export class LLMService implements ILLMService {
       }
       // 如果没有data，返回空数组
       return [];
-    } catch (error) {
-      config.onError?.(error as Error | Response);
+    } catch (error: unknown) {
+      config.onError?.(toRequestErrorCallbackArg(error));
       throw error;
     }
   }
@@ -117,13 +126,16 @@ export class LLMService implements ILLMService {
     this.wsPersistent = true;
 
     // 设置基础事件处理器
-    this.wsClient.on('start', (chunk) => {
-      config.onStart?.(chunk);
+    this.wsClient.on('start', (chunk: unknown) => {
+      if (typeof chunk === 'string') {
+        config.onStart?.(chunk);
+      }
     });
 
     // 绑定 onChunk 处理后端主动推送的事件（如 HISTORY_MESSAGES）
-    this.wsClient.on('message', (msg) => {
-      const chunk = msg as SSEChunkData;
+    this.wsClient.on('message', (msg: unknown) => {
+      const chunk = LLMService.toSSEChunkData(msg);
+      if (!chunk) return;
       if (config.isValidChunk && !config.isValidChunk(chunk)) return;
       config.onChunk?.(chunk);
     });
@@ -164,23 +176,26 @@ export class LLMService implements ILLMService {
     const req = (await config.onRequest?.(params)) || {};
 
     // 设置事件处理器
-    this.sseClient.on('start', (chunk) => {
-      config.onStart?.(chunk);
+    this.sseClient.on('start', (chunk: unknown) => {
+      if (typeof chunk === 'string') {
+        config.onStart?.(chunk);
+      }
     });
 
-    this.sseClient.on('message', (msg) => {
-      const chunk = msg as SSEChunkData;
+    this.sseClient.on('message', (msg: unknown) => {
+      const chunk = LLMService.toSSEChunkData(msg);
+      if (!chunk) return;
       // 如果配置了 isValidChunk 且返回 false，则跳过该 chunk
       if (config.isValidChunk && !config.isValidChunk(chunk)) return;
       config.onMessage?.(chunk);
     });
 
-    this.sseClient.on('error', (error) => {
-      config.onError?.(error);
+    this.sseClient.on('error', (error: unknown) => {
+      config.onError?.(toRequestErrorCallbackArg(error));
     });
 
-    this.sseClient.on('complete', (isAborted) => {
-      config.onComplete?.(isAborted, req);
+    this.sseClient.on('complete', (...args: unknown[]) => {
+      config.onComplete?.(args[0] === true, req);
     });
 
     await this.sseClient.connect(req);
@@ -205,22 +220,25 @@ export class LLMService implements ILLMService {
     this.wsClient!.removeAllListeners();
 
     // 设置事件处理器（与 SSE 事件模型一致）
-    this.wsClient!.on('start', (chunk) => {
-      config.onStart?.(chunk);
+    this.wsClient!.on('start', (chunk: unknown) => {
+      if (typeof chunk === 'string') {
+        config.onStart?.(chunk);
+      }
     });
 
-    this.wsClient!.on('message', (msg) => {
-      const chunk = msg as SSEChunkData;
+    this.wsClient!.on('message', (msg: unknown) => {
+      const chunk = LLMService.toSSEChunkData(msg);
+      if (!chunk) return;
       if (config.isValidChunk && !config.isValidChunk(chunk)) return;
       config.onMessage?.(chunk);
     });
 
-    this.wsClient!.on('error', (error) => {
-      config.onError?.(error);
+    this.wsClient!.on('error', (error: unknown) => {
+      config.onError?.(toRequestErrorCallbackArg(error));
     });
 
-    this.wsClient!.on('complete', (isAborted) => {
-      config.onComplete?.(isAborted, params);
+    this.wsClient!.on('complete', (...args: unknown[]) => {
+      config.onComplete?.(args[0] === true, params);
     });
 
     // 发送请求
@@ -257,7 +275,7 @@ export class LLMService implements ILLMService {
   /**
    * 获取 SSE 连接统计
    */
-  getSSEStats(): { id: string; status: string; info: any } | null {
+  getSSEStats(): { id: string; status: string; info: unknown } | null {
     if (!this.sseClient) return null;
 
     return {
@@ -270,7 +288,7 @@ export class LLMService implements ILLMService {
   /**
    * 获取 WebSocket 连接统计
    */
-  getWSStats(): { id: string; status: string; info: any } | null {
+  getWSStats(): { id: string; status: string; info: unknown } | null {
     if (!this.wsClient) return null;
 
     return {

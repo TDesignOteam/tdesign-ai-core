@@ -6,9 +6,7 @@ import type {
   AttachmentItem,
   ChatMessagesData,
   ImageContent,
-  MarkdownContent,
   SearchContent,
-  TextContent,
   ThinkingContent,
   UserMessage,
 } from '../type';
@@ -16,7 +14,10 @@ import type { MessageStore } from '../store/message';
 import { isAIMessage } from '../utils';
 
 export default class MessageProcessor {
-  private contentHandlers: Map<string, (chunk: any, existing?: any) => any> = new Map();
+  private contentHandlers = new Map<
+    string,
+    (chunk: AIMessageContent, existing?: AIMessageContent) => AIMessageContent
+  >();
 
   constructor() {
     this.registerDefaultHandlers();
@@ -64,19 +65,17 @@ export default class MessageProcessor {
     if (!lastContent) {
       return {
         ...newChunk,
-        status: newChunk?.status || 'streaming',
-      };
+        status: newChunk.status || 'streaming',
+      } as AIMessageContent;
     }
-    // 如果有注册的处理器且类型匹配
-    if (handler && lastContent?.type === newChunk.type) {
+    if (handler && lastContent.type === newChunk.type) {
       return handler(newChunk, lastContent);
     }
-    // 没有处理器时的默认合并逻辑
     return {
-      ...(lastContent || {}),
+      ...lastContent,
       ...newChunk,
-      status: newChunk?.status || 'streaming',
-    };
+      status: newChunk.status || 'streaming',
+    } as AIMessageContent;
   }
 
   /**
@@ -118,7 +117,7 @@ export default class MessageProcessor {
     let targetMessageId = messageId;
 
     // 作为新的内容块追加
-    if ((rawChunk as any)?.strategy === 'append') {
+    if (rawChunk.strategy === 'append') {
       targetIndex = -1;
     } else {
       // merge 策略：按 type 查找最后一个匹配的类型
@@ -138,9 +137,10 @@ export default class MessageProcessor {
       }
     }
 
+    const targetMessage = messageStore.messages.find((m) => m.id === targetMessageId);
     const existingContent =
-      targetIndex !== -1
-        ? (messageStore.messages.find((m) => m.id === targetMessageId) as any)?.content?.[targetIndex]
+      targetIndex !== -1 && targetMessage && isAIMessage(targetMessage)
+        ? targetMessage.content?.[targetIndex]
         : undefined;
 
     const processed = this.processContentUpdate(existingContent, rawChunk);
@@ -152,7 +152,8 @@ export default class MessageProcessor {
    */
   private findLastContentIndex(contents: AIMessageContent[], type: string): number {
     for (let i = contents.length - 1; i >= 0; i--) {
-      if (contents[i].type === type) {
+      const item = contents[i];
+      if (item?.type === type) {
         return i;
       }
     }
@@ -191,9 +192,9 @@ export default class MessageProcessor {
   }
 
   // 通用处理器注册方法
-  public registerHandler<T extends AIMessageContent>(
-    type: T['type'], // 使用类型中定义的type字段作为参数类型
-    handler: (chunk: T, existing?: T) => T,
+  public registerHandler(
+    type: string,
+    handler: (chunk: AIMessageContent, existing?: AIMessageContent) => AIMessageContent,
   ) {
     this.contentHandlers.set(type, handler);
   }
@@ -211,10 +212,10 @@ export default class MessageProcessor {
   }
 
   // 通用处理器工厂
-  private createContentHandler<T extends AIMessageContent>(
-    mergeData: (existing: T['data'], incoming: T['data']) => T['data'],
-  ): (chunk: T, existing?: T) => T {
-    return (chunk: T, existing?: T): T => {
+  private createContentHandler(
+    mergeData: (existing: unknown, incoming: unknown) => unknown,
+  ): (chunk: AIMessageContent, existing?: AIMessageContent) => AIMessageContent {
+    return (chunk, existing): AIMessageContent => {
       if (existing?.type === chunk.type) {
         return {
           ...existing,
@@ -225,53 +226,62 @@ export default class MessageProcessor {
             ...existing.ext,
             ...chunk.ext,
           },
-        };
+        } as AIMessageContent;
       }
       return {
         ...chunk,
-        data: chunk.data,
         status: chunk.status || 'streaming',
-      };
+      } as AIMessageContent;
     };
   }
 
   // 文本类处理器（text/markdown）
   private registerTextHandlers() {
-    // 创建类型安全的处理器
-    const createTextHandler = <T extends TextContent | MarkdownContent>() =>
-      this.createContentHandler<T>((existing: string, incoming: string) => existing + incoming);
+    this.registerHandler('text', this.createContentHandler(this.mergeStringData));
+    this.registerHandler('markdown', this.createContentHandler(this.mergeStringData));
+  }
 
-    this.registerHandler<TextContent>('text', createTextHandler<TextContent>());
-    this.registerHandler<MarkdownContent>('markdown', createTextHandler<MarkdownContent>());
+  /** 合并字符串类型 content.data，忽略非 string 的异常值 */
+  private mergeStringData(existing: unknown, incoming: unknown): string {
+    const prev = typeof existing === 'string' ? existing : '';
+    const next = typeof incoming === 'string' ? incoming : '';
+    return prev + next;
   }
 
   // 思考过程处理器
   private registerThinkingHandler() {
-    this.registerHandler<ThinkingContent>(
+    this.registerHandler(
       'thinking',
-      this.createContentHandler((existing, incoming) => ({
-        ...existing,
-        ...incoming,
-        text: (existing?.text || '') + (incoming?.text || ''),
-      })),
+      this.createContentHandler((existing, incoming) => {
+        const prev = (existing ?? {}) as ThinkingContent['data'];
+        const next = (incoming ?? {}) as ThinkingContent['data'];
+        return {
+          ...prev,
+          ...next,
+          text: (prev.text || '') + (next.text || ''),
+        };
+      }),
     );
   }
 
   // 图片处理器
   private registerImageHandler() {
-    this.registerHandler<ImageContent>(
+    this.registerHandler(
       'image',
-      this.createContentHandler((existing, incoming) => ({ ...existing, ...incoming })),
+      this.createContentHandler((existing, incoming) => ({
+        ...((existing ?? {}) as ImageContent['data']),
+        ...((incoming ?? {}) as ImageContent['data']),
+      })),
     );
   }
 
   // 搜索处理器
   private registerSearchHandler() {
-    this.registerHandler<SearchContent>(
+    this.registerHandler(
       'search',
       this.createContentHandler((existing, incoming) => ({
-        ...existing,
-        ...incoming,
+        ...((existing ?? {}) as SearchContent['data']),
+        ...((incoming ?? {}) as SearchContent['data']),
       })),
     );
   }
