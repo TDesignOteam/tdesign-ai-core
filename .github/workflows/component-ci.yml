@@ -104,8 +104,9 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - run: pnpm install
+      - run: pnpm install --no-frozen-lockfile
 
+      - run: git diff
       - run: ${{ matrix.run }}
 
       - if: matrix.script == 'preview'
