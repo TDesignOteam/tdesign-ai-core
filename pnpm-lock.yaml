@@ -7,13 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      '@json-render/core':
-        specifier: ^0.17.0
-        version: 0.17.0(zod@4.3.6)
-      zod:
-        specifier: ^4.3.6
-        version: 4.3.6
     devDependencies:
       eslint:
         specifier: ^10.3.0
@@ -47,7 +40,7 @@ importers:
     dependencies:
       '@json-render/core':
         specifier: ^0.17.0
-        version: 0.17.0(zod@3.25.76)
+        version: 0.17.0(zod@4.4.3)
       '@tdesign/ai-shared':
         specifier: workspace:*
         version: link:../shared
@@ -58,8 +51,8 @@ importers:
         specifier: ^10.0.0
         version: 10.2.0
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.3.6
+        version: 4.4.3
 
   packages/shared: {}
 
@@ -889,11 +882,8 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
-
-  zod@4.3.6:
-    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
 snapshots:
 
@@ -995,13 +985,9 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@json-render/core@0.17.0(zod@3.25.76)':
+  '@json-render/core@0.17.0(zod@4.4.3)':
     dependencies:
-      zod: 3.25.76
-
-  '@json-render/core@0.17.0(zod@4.3.6)':
-    dependencies:
-      zod: 4.3.6
+      zod: 4.4.3
 
   '@napi-rs/wasm-runtime@1.1.5(@emnapi/core@1.11.0)(@emnapi/runtime@1.11.0)':
     dependencies:
@@ -1671,6 +1657,4 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod@3.25.76: {}
-
-  zod@4.3.6: {}
+  zod@4.4.3: {}
