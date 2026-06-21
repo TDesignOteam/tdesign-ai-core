@@ -61,14 +61,13 @@ import type { ChatServiceConfig } from '@tdesign/ai-chat-engine';
 
 ```bash
 pnpm install        # 安装依赖
-pnpm build          # 根目录 tsdown 构建 chat-engine
+pnpm build          # 递归构建各 workspace 包（chat-engine）
 pnpm type-check     # TypeScript 类型检查
 pnpm lint           # ESLint 检查
 pnpm lint:fix       # ESLint 自动修复
 pnpm format         # Prettier 格式化
 pnpm format:check   # Prettier 格式检查
 pnpm verify         # 构建 + 类型 + lint + format 一键校验
-pnpm clean          # 清理 chat-engine/dist
 ```
 
 ## License

@@ -12,6 +12,9 @@
     "**/*.ts",
     "!**/*.test.ts"
   ],
+  "scripts": {
+    "build": "tsdown"
+  },
   "publishConfig": {
     "access": "public",
     "exports": {
@@ -41,5 +44,8 @@
   },
   "peerDependencies": {
     "immer": "^10.0.0"
+  },
+  "devDependencies": {
+    "tsdown": "^0.22.3"
   }
 }
