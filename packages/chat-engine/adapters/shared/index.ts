@@ -18,12 +18,7 @@ export {
 } from './content-factory';
 
 // 合并/更新工具函数
-export {
-  mergeStringContent,
-  updateToolCall,
-  handleSuggestionToolCall,
-  parseSSEData,
-} from './merge-utils';
+export { mergeStringContent, updateToolCall, handleSuggestionToolCall, parseSSEData } from './merge-utils';
 
 // Activity 管理器
 export { ActivityManagerImpl, activityManager } from './activity-manager';

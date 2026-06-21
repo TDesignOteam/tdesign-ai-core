@@ -8,7 +8,10 @@
     ".": "./index.ts",
     "./*": "./*.ts"
   },
-  "files": ["**/*.ts", "!**/*.test.ts"],
+  "files": [
+    "**/*.ts",
+    "!**/*.test.ts"
+  ],
   "devDependencies": {
     "typescript": "^5.5.0"
   }

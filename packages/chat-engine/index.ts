@@ -1,5 +1,3 @@
-/* eslint-disable no-param-reassign */
-/* eslint-disable class-methods-use-this */
 import { MessageStore } from './store/message';
 import type { ChatEventBusOptions, IChatEventBus } from './event-bus';
 import { ChatEngineEventType, ChatEventBus } from './event-bus';
@@ -95,9 +93,7 @@ export default class ChatEngine implements IChatEngine {
    * engine.agui?.getToolcallByName('search');
    */
   public get agui(): AGUIStreamHandler | null {
-    return this.streamHandler?.protocol === 'agui'
-      ? (this.streamHandler as AGUIStreamHandler)
-      : null;
+    return this.streamHandler?.protocol === 'agui' ? (this.streamHandler as AGUIStreamHandler) : null;
   }
 
   /**
@@ -107,9 +103,7 @@ export default class ChatEngine implements IChatEngine {
    * engine.openclaw?.getAdapter()?.invokeAction(...);
    */
   public get openclaw(): OpenClawStreamHandler | null {
-    return this.streamHandler?.protocol === 'openclaw'
-      ? (this.streamHandler as OpenClawStreamHandler)
-      : null;
+    return this.streamHandler?.protocol === 'openclaw' ? (this.streamHandler as OpenClawStreamHandler) : null;
   }
 
   // ──────────────────────────────────────────────
@@ -207,11 +201,9 @@ export default class ChatEngine implements IChatEngine {
     }
 
     if (!this._connectingPromise) {
-      this._connectingPromise = this.llmService
-        .initWSConnection(config)
-        .finally(() => {
-          this._connectingPromise = null;
-        });
+      this._connectingPromise = this.llmService.initWSConnection(config).finally(() => {
+        this._connectingPromise = null;
+      });
     }
     return this._connectingPromise;
   }
@@ -495,10 +487,7 @@ export default class ChatEngine implements IChatEngine {
    * @param type    内容类型（如 `'text'` / `'markdown'`）
    * @param handler 接收新块与现有块，返回合并后的内容块
    */
-  public registerMergeStrategy<T extends AIMessageContent>(
-    type: T['type'],
-    handler: (chunk: T, existing?: T) => T,
-  ) {
+  public registerMergeStrategy<T extends AIMessageContent>(type: T['type'], handler: (chunk: T, existing?: T) => T) {
     this.messageProcessor.registerHandler(type, handler);
   }
 
@@ -598,7 +587,7 @@ export default class ChatEngine implements IChatEngine {
     } else {
       // 任何内容块失败，即视为整体失败
       const allContentFailed = this.messageStore.messages.find((content) => content.status === 'error');
-      // eslint-disable-next-line no-nested-ternary
+
       this.messageStore.setMessageStatus(id, isAborted ? 'stop' : allContentFailed ? 'error' : 'complete');
     }
 

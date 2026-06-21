@@ -108,7 +108,7 @@ export type ActivityData<TContent = Record<string, any>> = {
   activityType: string;
   messageId?: string;
   content: TContent;
-   /** 增量更新信息 */
+  /** 增量更新信息 */
   deltaInfo?: {
     fromIndex: number;
     toIndex: number;
@@ -129,7 +129,6 @@ export interface ChatBaseMessage {
 
 // 类型扩展机制
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-empty-interface
   interface AIContentTypeOverrides {}
 }
 

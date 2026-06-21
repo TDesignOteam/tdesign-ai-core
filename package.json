@@ -7,8 +7,15 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint packages --ext .ts",
-    "clean": "pnpm -r run clean"
+    "lint": "eslint .",
+    "clean": "pnpm -r run clean",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "{packages/**/*.ts,eslint.config.mjs,.prettierrc.mjs}": [
+      "prettier --write --cache",
+      "eslint --fix --cache"
+    ]
   },
   "repository": {
     "type": "git",
@@ -20,14 +27,12 @@
   },
   "packageManager": "pnpm@9.15.9",
   "devDependencies": {
+    "eslint": "^10.3.0",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.4",
+    "prettier": "^3.8.3",
     "typescript": "^5.5.0",
-    "immer": "^10.0.0",
-    "tsup": "^8.5.0"
-  },
-  "dependencies": {
-    "@tdesign/ai-chat-engine": "workspace:*",
-    "@tdesign/ai-shared": "workspace:*",
-    "@json-render/core": "^0.17.0",
-    "zod": "^4.3.6"
+    "typescript-eslint": "^8.59.2"
   }
 }
