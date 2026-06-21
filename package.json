@@ -12,7 +12,7 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "packages/**/*.ts": [
+    "{packages/**/*.ts,eslint.config.mjs,.prettierrc.mjs}": [
       "prettier --write --cache",
       "eslint --fix --cache"
     ]
@@ -28,16 +28,11 @@
   "packageManager": "pnpm@9.15.9",
   "devDependencies": {
     "eslint": "^10.3.0",
+    "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
-    "immer": "^10.0.0",
     "lint-staged": "^17.0.4",
     "prettier": "^3.8.3",
-    "tsup": "^8.5.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.59.2"
-  },
-  "dependencies": {
-    "@tdesign/ai-chat-engine": "workspace:*",
-    "@tdesign/ai-shared": "workspace:*"
   }
 }

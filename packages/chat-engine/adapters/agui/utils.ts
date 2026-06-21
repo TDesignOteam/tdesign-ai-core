@@ -1,4 +1,3 @@
-/* eslint-disable default-param-last */
 /**
  * AGUI适配器工具函数
  * 包含与类无关的纯函数，用于处理AGUI协议相关逻辑

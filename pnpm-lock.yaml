@@ -7,32 +7,22 @@ settings:
 importers:
 
   .:
-    dependencies:
-      '@tdesign/ai-chat-engine':
-        specifier: workspace:*
-        version: link:packages/chat-engine
-      '@tdesign/ai-shared':
-        specifier: workspace:*
-        version: link:packages/shared
     devDependencies:
       eslint:
         specifier: ^10.3.0
         version: 10.3.0
+      eslint-config-prettier:
+        specifier: ^10.1.8
+        version: 10.1.8(eslint@10.3.0)
       husky:
         specifier: ^9.1.7
         version: 9.1.7
-      immer:
-        specifier: ^10.0.0
-        version: 10.2.0
       lint-staged:
         specifier: ^17.0.4
         version: 17.0.4
       prettier:
         specifier: ^3.8.3
         version: 3.8.3
-      tsup:
-        specifier: ^8.5.0
-        version: 8.5.1(typescript@5.9.3)(yaml@2.9.0)
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
@@ -590,6 +580,12 @@ packages:
   escape-string-regexp@4.0.0:
     resolution: {integrity: sha512-TtpcNJ3XAzx3Gq8sWRzJaVajRs0uVxA2YAkdb1jm2YkPz4G6egUFAyA3n5vtEIZefPk5Wa4UXbKuS5fKkJWdgA==}
     engines: {node: '>=10'}
+
+  eslint-config-prettier@10.1.8:
+    resolution: {integrity: sha512-82GZUjRS0p/jganf6q1rEO25VSoHH0hKPCTrgillPjdI/3bgBhAE1QzHrHTizjpRvy6pGAvKjDJtk2pF9NDq8w==}
+    hasBin: true
+    peerDependencies:
+      eslint: '>=7.0.0'
 
   eslint-scope@9.1.2:
     resolution: {integrity: sha512-xS90H51cKw0jltxmvmHy2Iai1LIqrfbw57b79w/J7MfvDfkIkFZ+kj6zC3BjtUwh150HsSSdxXZcsuv72miDFQ==}
@@ -1458,6 +1454,10 @@ snapshots:
       '@esbuild/win32-x64': 0.27.7
 
   escape-string-regexp@4.0.0: {}
+
+  eslint-config-prettier@10.1.8(eslint@10.3.0):
+    dependencies:
+      eslint: 10.3.0
 
   eslint-scope@9.1.2:
     dependencies:

@@ -1,4 +1,3 @@
-/* eslint-disable max-classes-per-file */
 import EventEmitter from '../utils/eventEmitter';
 import { LoggerManager } from '../utils/logger';
 import { ConnectionError, TimeoutError } from './errors';
