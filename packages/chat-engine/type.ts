@@ -129,7 +129,6 @@ export interface ChatBaseMessage {
 
 // 类型扩展机制
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-empty-interface
   interface AIContentTypeOverrides {}
 }
 

@@ -1,5 +1,3 @@
-/* eslint-disable no-param-reassign */
-/* eslint-disable class-methods-use-this */
 import { MessageStore } from './store/message';
 import type { ChatEventBusOptions, IChatEventBus } from './event-bus';
 import { ChatEngineEventType, ChatEventBus } from './event-bus';
@@ -589,7 +587,7 @@ export default class ChatEngine implements IChatEngine {
     } else {
       // 任何内容块失败，即视为整体失败
       const allContentFailed = this.messageStore.messages.find((content) => content.status === 'error');
-      // eslint-disable-next-line no-nested-ternary
+
       this.messageStore.setMessageStatus(id, isAborted ? 'stop' : allContentFailed ? 'error' : 'complete');
     }
 
