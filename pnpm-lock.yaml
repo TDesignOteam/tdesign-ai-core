@@ -36,8 +36,8 @@ importers:
   packages/chat-engine:
     dependencies:
       '@json-render/core':
-        specifier: ^0.17.0
-        version: 0.17.0(zod@4.4.3)
+        specifier: ^0.19.0
+        version: 0.19.0(zod@4.4.3)
       '@tdesign/ai-shared':
         specifier: workspace:*
         version: link:../shared
@@ -148,8 +148,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@json-render/core@0.17.0':
-    resolution: {integrity: sha512-8woFjU0RZqxDvJ9E1vxv21uv1lcXEGut/tcVWiVsduds3pcX3tCv5xKSjREjew/yS061CGjFAPr5vozYS39whg==}
+  '@json-render/core@0.19.0':
+    resolution: {integrity: sha512-vvcyZ+10EDZKbEyB1J2kXOGfDaiZR2LurZGSqi2r5STHyKr+Te85DWaBxTwRGgM7U1LtIvNx85BzzjElRKoAIg==}
     peerDependencies:
       zod: ^4.0.0
 
@@ -958,7 +958,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@json-render/core@0.17.0(zod@4.4.3)':
+  '@json-render/core@0.19.0(zod@4.4.3)':
     dependencies:
       zod: 4.4.3
 
