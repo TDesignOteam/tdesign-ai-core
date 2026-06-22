@@ -52,9 +52,22 @@ import type { ChatServiceConfig } from '@tdesign/ai-chat-engine';
 
 ## 开发
 
+### 环境要求
+
+- Node.js `^22.22.1 || >=24.11.0`（见 `.node-version`）
+- pnpm `9.15.9`
+
+### 常用命令
+
 ```bash
-pnpm install
-pnpm type-check
+pnpm install        # 安装依赖
+pnpm build          # 递归构建各 workspace 包（chat-engine）
+pnpm type-check     # TypeScript 类型检查
+pnpm lint           # ESLint 检查
+pnpm lint:fix       # ESLint 自动修复
+pnpm format         # Prettier 格式化
+pnpm format:check   # Prettier 格式检查
+pnpm verify         # 构建 + 类型 + lint + format 一键校验
 ```
 
 ## License

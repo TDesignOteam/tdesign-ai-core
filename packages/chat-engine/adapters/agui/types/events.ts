@@ -128,7 +128,7 @@ export function isStateEvent(eventType: string): boolean {
 }
 
 const BaseEventSchema = z.object({
-  type: z.nativeEnum(AGUIEventType),
+  type: z.enum(AGUIEventType),
   timestamp: z.number().optional(),
   rawEvent: z.any().optional(),
 });
@@ -142,7 +142,7 @@ export const TextMessageStartEventSchema = BaseEventSchema.extend({
 export const TextMessageContentEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.TEXT_MESSAGE_CONTENT),
   messageId: z.string(),
-  delta: z.string().refine((s) => s.length > 0, 'Delta must not be an empty string'),
+  delta: z.string().refine((s) => s.length > 0, { error: 'Delta must not be an empty string' }),
 });
 
 export const TextMessageEndEventSchema = BaseEventSchema.extend({
@@ -263,7 +263,7 @@ export const ActivitySnapshotEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.ACTIVITY_SNAPSHOT),
   messageId: z.string().optional(),
   activityType: z.string(),
-  content: z.record(z.any()),
+  content: z.record(z.string(), z.any()),
   replace: z.boolean().optional(),
 });
 

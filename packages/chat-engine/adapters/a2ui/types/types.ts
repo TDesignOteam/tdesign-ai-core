@@ -24,7 +24,7 @@ export type PathBinding = z.infer<typeof PathBindingSchema>;
  */
 export const ExprBindingSchema = z.object({
   expr: z.string(),
-  vars: z.record(z.union([PathBindingSchema, z.any()])).optional(),
+  vars: z.record(z.string(), z.union([PathBindingSchema, z.any()])).optional(),
   format: z.string().optional(),
 });
 export type ExprBinding = z.infer<typeof ExprBindingSchema>;
@@ -53,12 +53,12 @@ export const A2UIActionSchema = z
   .object({
     // A2UI v0.9 标准字段
     name: z.string().optional(),
-    context: z.record(z.unknown()).optional(),
+    context: z.record(z.string(), z.unknown()).optional(),
     // 向后兼容字段
     type: z.string().optional(),
     payload: z.unknown().optional(),
   })
-  .refine((data) => data.name || data.type, { message: 'Action must have either name or type' });
+  .refine((data) => data.name || data.type, { error: 'Action must have either name or type' });
 
 export interface A2UIAction {
   /** A2UI v0.9 标准字段 */
@@ -577,7 +577,7 @@ export const A2UISurfaceSchema = z.object({
   catalogId: z.string().optional(),
   state: z.enum(['active', 'closed', 'pending']),
   root: z.any().nullable(),
-  data: z.record(z.unknown()).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
   skeletonHint: z
     .object({
       layout: z.enum(['form', 'card', 'list', 'simple', 'wizard']).optional(),
