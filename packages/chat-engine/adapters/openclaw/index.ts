@@ -470,7 +470,7 @@ export class OpenClawAdapter extends EventEmitter {
     }
 
     console.log(
-      `[OpenClaw Frame] type="${frame.type}", event=${(frame as any).event}, isStreaming=${this.isStreaming}`,
+      `[OpenClaw Frame] type="${frame.type}", event=${frame.type === 'event' ? frame.event : undefined}, isStreaming=${this.isStreaming}`,
     );
 
     // 处理响应帧
@@ -498,7 +498,7 @@ export class OpenClawAdapter extends EventEmitter {
     }
 
     // 忽略心跳、健康检查等非业务事件
-    if (event === OpenClawEventType.HEALTH || event === OpenClawEventType.HEARTBEAT || event === ('tick' as any)) {
+    if (event === OpenClawEventType.HEALTH || event === OpenClawEventType.HEARTBEAT || event === 'tick') {
       console.log(`[OpenClaw] Skipping non-business event: "${event}"`);
       return;
     }

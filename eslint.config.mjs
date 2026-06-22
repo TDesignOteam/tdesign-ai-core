@@ -30,11 +30,4 @@ export default defineConfig(
       ],
     },
   },
-  {
-    // 协议适配层数据结构高度动态，待 schema 完善后逐步收紧
-    files: ['packages/chat-engine/adapters/**/*.ts', 'packages/shared/immutable-patch.ts'],
-    rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-    },
-  },
 );

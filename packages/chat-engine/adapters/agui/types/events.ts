@@ -130,7 +130,7 @@ export function isStateEvent(eventType: string): boolean {
 const BaseEventSchema = z.object({
   type: z.enum(AGUIEventType),
   timestamp: z.number().optional(),
-  rawEvent: z.any().optional(),
+  rawEvent: z.unknown().optional(),
 });
 
 export const TextMessageStartEventSchema = BaseEventSchema.extend({
@@ -263,7 +263,7 @@ export const ActivitySnapshotEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.ACTIVITY_SNAPSHOT),
   messageId: z.string().optional(),
   activityType: z.string(),
-  content: z.record(z.string(), z.any()),
+  content: z.record(z.string(), z.unknown()),
   replace: z.boolean().optional(),
 });
 
@@ -271,7 +271,7 @@ export const ActivityDeltaEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.ACTIVITY_DELTA),
   messageId: z.string().optional(),
   activityType: z.string().optional(),
-  patch: z.array(z.any()).optional(), // JSON Patch (RFC 6902)
+  patch: z.array(z.unknown()).optional(), // JSON Patch (RFC 6902)
 });
 
 export const ThinkingStartEventSchema = BaseEventSchema.extend({
@@ -291,7 +291,7 @@ export const StateSnapshotEventSchema = BaseEventSchema.extend({
 
 export const StateDeltaEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.STATE_DELTA),
-  delta: z.array(z.any()), // JSON Patch (RFC 6902)
+  delta: z.array(z.unknown()), // JSON Patch (RFC 6902)
 });
 
 export const MessagesSnapshotEventSchema = BaseEventSchema.extend({
@@ -301,14 +301,14 @@ export const MessagesSnapshotEventSchema = BaseEventSchema.extend({
 
 export const RawEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.RAW),
-  event: z.any(),
+  event: z.unknown(),
   source: z.string().optional(),
 });
 
 export const CustomEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.CUSTOM),
   name: z.string(),
-  value: z.any(),
+  value: z.unknown(),
 });
 
 export const RunStartedEventSchema = BaseEventSchema.extend({
@@ -321,7 +321,7 @@ export const RunFinishedEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.RUN_FINISHED),
   threadId: z.string(),
   runId: z.string(),
-  result: z.any().optional(),
+  result: z.unknown().optional(),
 });
 
 export const RunErrorEventSchema = BaseEventSchema.extend({
@@ -410,3 +410,6 @@ export type RunFinishedEvent = z.infer<typeof RunFinishedEventSchema>;
 export type RunErrorEvent = z.infer<typeof RunErrorEventSchema>;
 export type StepStartedEvent = z.infer<typeof StepStartedEventSchema>;
 export type StepFinishedEvent = z.infer<typeof StepFinishedEventSchema>;
+
+/** AG-UI 协议事件（SSE 解析后的运行时对象） */
+export type AGUIProtocolEvent = { type: string } & Record<string, unknown>;

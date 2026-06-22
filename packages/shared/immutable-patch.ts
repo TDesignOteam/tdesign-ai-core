@@ -13,9 +13,9 @@
  */
 
 export type Operation =
-  | { op: 'add'; path: string; value: any }
+  | { op: 'add'; path: string; value: unknown }
   | { op: 'remove'; path: string }
-  | { op: 'replace'; path: string; value: any }
+  | { op: 'replace'; path: string; value: unknown }
   | { op: 'move'; path: string; from: string }
   | { op: 'copy'; path: string; from: string }
   | { op: 'append'; path: string; value: string };
@@ -35,11 +35,11 @@ function parsePath(path: string): string[] {
 /**
  * 获取嵌套值
  */
-function getByPath(obj: any, path: string[]): any {
-  let current = obj;
+function getByPath(obj: unknown, path: string[]): unknown {
+  let current: unknown = obj;
   for (const key of path) {
-    if (current == null) return undefined;
-    current = current[key];
+    if (current == null || typeof current !== 'object') return undefined;
+    current = (current as Record<string, unknown>)[key];
   }
   return current;
 }
@@ -48,13 +48,13 @@ function getByPath(obj: any, path: string[]): any {
  * 不可变地设置嵌套值（结构共享）
  * 只重建路径上的节点，其他节点保持原引用
  */
-function setByPath<T>(obj: T, path: string[], value: any): T {
+function setByPath<T>(obj: T, path: string[], value: unknown): T {
   if (path.length === 0) {
-    return value;
+    return value as T;
   }
 
   const [head, ...tail] = path;
-  const current = obj as any;
+  const current = obj as Record<string, unknown> | unknown[];
 
   // 判断当前层是数组还是对象
   const isArray = Array.isArray(current);
@@ -66,22 +66,20 @@ function setByPath<T>(obj: T, path: string[], value: any): T {
       const newArr = [...current];
       newArr[index as number] = value;
       return newArr as unknown as T;
-    } else {
-      return { ...current, [head]: value };
     }
+    return { ...(current as Record<string, unknown>), [head]: value } as T;
   }
 
   // 递归处理子路径
-  const child = current[head];
+  const child = isArray ? (current as unknown[])[index as number] : (current as Record<string, unknown>)[head];
   const newChild = setByPath(child, tail, value);
 
   if (isArray) {
     const newArr = [...current];
     newArr[index as number] = newChild;
     return newArr as unknown as T;
-  } else {
-    return { ...current, [head]: newChild };
   }
+  return { ...(current as Record<string, unknown>), [head]: newChild } as T;
 }
 
 /**
@@ -93,7 +91,7 @@ function removeByPath<T>(obj: T, path: string[]): T {
   }
 
   const [head, ...tail] = path;
-  const current = obj as any;
+  const current = obj as Record<string, unknown> | unknown[];
   const isArray = Array.isArray(current);
 
   if (tail.length === 0) {
@@ -103,14 +101,13 @@ function removeByPath<T>(obj: T, path: string[]): T {
       const newArr = [...current];
       newArr.splice(index, 1);
       return newArr as unknown as T;
-    } else {
-      const { [head]: _, ...rest } = current;
-      return rest as T;
     }
+    const { [head]: _, ...rest } = current as Record<string, unknown>;
+    return rest as T;
   }
 
   // 递归处理子路径
-  const child = current[head];
+  const child = isArray ? (current as unknown[])[parseInt(head, 10)] : (current as Record<string, unknown>)[head];
   const newChild = removeByPath(child, tail);
 
   if (isArray) {
@@ -118,9 +115,8 @@ function removeByPath<T>(obj: T, path: string[]): T {
     const newArr = [...current];
     newArr[index] = newChild;
     return newArr as unknown as T;
-  } else {
-    return { ...current, [head]: newChild };
   }
+  return { ...(current as Record<string, unknown>), [head]: newChild } as T;
 }
 
 /**

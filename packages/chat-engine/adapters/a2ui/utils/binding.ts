@@ -186,7 +186,6 @@ function evaluateStringExpression(expr: string, vars: Values): unknown {
     }
   }
 
-  // eslint-disable-next-line no-new-func
   return new Function(`return (${processedExpr})`)();
 }
 

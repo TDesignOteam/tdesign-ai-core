@@ -46,18 +46,32 @@ const TYPE_MAPPING: Record<string, string> = {
  * 属性映射函数
  * 将 A2UI v0.9 组件属性转换为 json-render 组件属性
  */
-function mapProps(component: A2UIComponent): Record<string, any> {
+function isPathBinding(value: unknown): value is { path: string } {
+  return typeof value === 'object' && value !== null && 'path' in value && typeof value.path === 'string';
+}
+
+function mergeMappedStyle(mappedProps: Record<string, unknown>, style: Record<string, unknown>): void {
+  const existing = mappedProps.style;
+  mappedProps.style = {
+    ...(typeof existing === 'object' && existing !== null ? (existing as Record<string, unknown>) : {}),
+    ...style,
+  };
+}
+
+function mapProps(component: A2UIComponent): Record<string, unknown> {
   // 排除 A2UI 特有字段，保留其他属性
   const { id, component: componentType, weight, child, children, ...restProps } = component;
 
-  const mappedProps: Record<string, any> = { ...restProps };
+  const mappedProps: Record<string, unknown> = { ...restProps };
 
   // 处理 weight（flex-grow）
-  if (weight !== undefined) {
+  if (mappedProps.style && typeof mappedProps.style === 'object' && mappedProps.style !== null) {
     mappedProps.style = {
-      ...mappedProps.style,
+      ...(mappedProps.style as Record<string, unknown>),
       flexGrow: weight,
     };
+  } else {
+    mappedProps.style = { flexGrow: weight };
   }
 
   // 特定类型的属性转换
@@ -84,7 +98,7 @@ function mapProps(component: A2UIComponent): Record<string, any> {
 
     case 'TextField':
       // A2UI TextField 的 text 属性（数据绑定）→ json-render 的 value
-      if (mappedProps.text && typeof mappedProps.text === 'object' && mappedProps.text.path) {
+      if (isPathBinding(mappedProps.text)) {
         mappedProps.valuePath = mappedProps.text.path;
         delete mappedProps.text;
       }
@@ -92,7 +106,7 @@ function mapProps(component: A2UIComponent): Record<string, any> {
 
     case 'CheckBox':
       // A2UI CheckBox 的 checked 属性（数据绑定）
-      if (mappedProps.checked && typeof mappedProps.checked === 'object' && mappedProps.checked.path) {
+      if (isPathBinding(mappedProps.checked)) {
         mappedProps.valuePath = mappedProps.checked.path;
         delete mappedProps.checked;
       }
@@ -102,13 +116,11 @@ function mapProps(component: A2UIComponent): Record<string, any> {
       // A2UI Column 的 gap 属性 → json-render Column 的 size 属性 + CSS gap 后备
       if (mappedProps.gap !== undefined) {
         mappedProps.size = mappedProps.gap;
-        // 同时设置 CSS gap 作为后备方案
-        mappedProps.style = {
-          ...mappedProps.style,
+        mergeMappedStyle(mappedProps, {
           display: 'flex',
           flexDirection: 'column',
           gap: `${mappedProps.gap}px`,
-        };
+        });
         delete mappedProps.gap;
       }
       break;
@@ -117,17 +129,14 @@ function mapProps(component: A2UIComponent): Record<string, any> {
       // A2UI Row 的 gap 属性 → json-render Row 的 gutter 属性 + CSS gap 后备
       if (mappedProps.gap !== undefined) {
         mappedProps.gutter = mappedProps.gap;
-        // 同时设置 CSS gap 作为后备方案
-        mappedProps.style = {
-          ...mappedProps.style,
+        mergeMappedStyle(mappedProps, {
           display: 'flex',
           flexDirection: 'row',
           gap: `${mappedProps.gap}px`,
-        };
+        });
         delete mappedProps.gap;
       }
-      // A2UI Row 的 distribution 属性 → json-render Row 的 justify 属性
-      if (mappedProps.distribution) {
+      if (typeof mappedProps.distribution === 'string') {
         const distributionMap: Record<string, string> = {
           start: 'start',
           end: 'end',
@@ -136,11 +145,9 @@ function mapProps(component: A2UIComponent): Record<string, any> {
           'space-around': 'space-around',
         };
         mappedProps.justify = distributionMap[mappedProps.distribution] || mappedProps.distribution;
-        // 同时设置 CSS justifyContent
-        mappedProps.style = {
-          ...mappedProps.style,
+        mergeMappedStyle(mappedProps, {
           justifyContent: mappedProps.distribution === 'end' ? 'flex-end' : mappedProps.distribution,
-        };
+        });
         delete mappedProps.distribution;
       }
       break;
@@ -150,7 +157,7 @@ function mapProps(component: A2UIComponent): Record<string, any> {
   }
 
   // 处理通用的 disabled 数据绑定
-  if (mappedProps.disabled && typeof mappedProps.disabled === 'object' && mappedProps.disabled.path) {
+  if (isPathBinding(mappedProps.disabled)) {
     mappedProps.disabledPath = mappedProps.disabled.path;
     delete mappedProps.disabled;
   }
@@ -254,43 +261,56 @@ function buildSurfaceState(messages: A2UIMessage[]): A2UISurfaceState | null {
  */
 function setValueByPath(obj: Record<string, unknown>, path: string, value: unknown): void {
   const parts = path.split('/').filter(Boolean);
-  let current: any = obj;
+  let current: Record<string, unknown> | unknown[] = obj;
 
   for (let i = 0; i < parts.length - 1; i++) {
     const key = parts[i];
     const nextKey = parts[i + 1];
+    if (Array.isArray(current)) {
+      const index = Number(key);
+      if (current[index] === undefined) {
+        current[index] = /^\d+$/.test(nextKey) ? [] : {};
+      }
+      current = current[index] as Record<string, unknown> | unknown[];
+      continue;
+    }
     if (!(key in current)) {
-      // 如果下一个 key 是数字，创建数组；否则创建对象
       current[key] = /^\d+$/.test(nextKey) ? [] : {};
     }
-    current = current[key];
+    current = current[key] as Record<string, unknown> | unknown[];
   }
 
   if (parts.length > 0) {
-    current[parts[parts.length - 1]] = value;
+    const lastKey = parts[parts.length - 1];
+    if (Array.isArray(current)) {
+      current[Number(lastKey)] = value;
+    } else {
+      current[lastKey] = value;
+    }
   }
 }
 
-/**
- * 根据 JSON Pointer 路径删除值
- * 支持数组索引路径
- */
 function deleteValueByPath(obj: Record<string, unknown>, path: string): void {
   const parts = path.split('/').filter(Boolean);
-  let current: any = obj;
+  let current: Record<string, unknown> | unknown[] = obj;
 
   for (let i = 0; i < parts.length - 1; i++) {
     const key = parts[i];
+    if (Array.isArray(current)) {
+      const index = Number(key);
+      if (current[index] === undefined) return;
+      current = current[index] as Record<string, unknown> | unknown[];
+      continue;
+    }
     if (!(key in current)) return;
-    current = current[key];
+    current = current[key] as Record<string, unknown> | unknown[];
   }
 
   if (parts.length > 0) {
     const lastKey = parts[parts.length - 1];
     if (Array.isArray(current) && /^\d+$/.test(lastKey)) {
-      // 数组元素删除
       current.splice(parseInt(lastKey, 10), 1);
-    } else {
+    } else if (!Array.isArray(current)) {
       delete current[lastKey];
     }
   }

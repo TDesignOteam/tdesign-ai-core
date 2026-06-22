@@ -1,14 +1,18 @@
 import type { AIMessageContent, SSEChunkData, ToolCall } from '../../type';
+import type { JsonPatchOperation } from '../../utils/json-patch-operation';
 import {
   AGUIEventType,
+  type AGUIProtocolEvent,
+  type CustomEvent,
   isActivityEvent,
   isReasoningEvent,
   isStateEvent,
   isTextMessageEvent,
   isToolCallEvent,
 } from './types/events';
+import type { AGUIMessage } from './types/schema';
 import { stateManager } from './StateManager';
-import { activityManager } from './ActivityManager';
+import { activityManager, type AGUIActivityEvent } from './ActivityManager';
 import {
   createActivityContent,
   createMarkdownContent,
@@ -22,6 +26,42 @@ import {
   parseSSEData,
   updateToolCall,
 } from './utils';
+
+function eventString(event: AGUIProtocolEvent, key: string, fallback = ''): string {
+  const value = event[key];
+  return typeof value === 'string' ? value : fallback;
+}
+
+function eventOptionalString(event: AGUIProtocolEvent, key: string): string | undefined {
+  const value = event[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function eventRecord(event: AGUIProtocolEvent, key: string): Record<string, unknown> | undefined {
+  const value = event[key];
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return undefined;
+}
+
+function toActivityEvent(event: AGUIProtocolEvent): AGUIActivityEvent {
+  return {
+    type: event.type,
+    activityType: eventString(event, 'activityType', 'unknown'),
+    content: eventRecord(event, 'content'),
+    patch: Array.isArray(event.patch) ? (event.patch as JsonPatchOperation[]) : undefined,
+    messageId: eventOptionalString(event, 'messageId'),
+  };
+}
+
+function toCustomEvent(event: AGUIProtocolEvent): CustomEvent {
+  return {
+    type: AGUIEventType.CUSTOM,
+    name: eventString(event, 'name'),
+    value: event.value,
+  };
+}
 
 /**
  * AGUIEventMapper
@@ -147,21 +187,29 @@ export class AGUIEventMapper {
    * 1. 标准模式：TEXT_MESSAGE_START → TEXT_MESSAGE_CONTENT → TEXT_MESSAGE_END
    * 2. 简化模式：仅发送 TEXT_MESSAGE_CHUNK，自动补全生命周期
    */
-  private handleTextMessageEvent(event: any): AIMessageContent | null {
+  private handleTextMessageEvent(event: AGUIProtocolEvent): AIMessageContent | null {
     switch (event.type) {
       case AGUIEventType.TEXT_MESSAGE_START:
-        this.currentTextMessageId = event.messageId || null; // 标记当前消息 ID
-        return createMarkdownContent('', 'streaming', 'append');
+        this.currentTextMessageId = typeof event.messageId === 'string' ? event.messageId : null;
+        return createMarkdownContent('', 'streaming', 'append') as AIMessageContent;
 
       case AGUIEventType.TEXT_MESSAGE_CHUNK:
         return this.handleTextMessageChunk(event);
 
       case AGUIEventType.TEXT_MESSAGE_CONTENT:
-        return createMarkdownContent(event.delta || '', 'streaming', 'merge');
+        return createMarkdownContent(
+          typeof event.delta === 'string' ? event.delta : '',
+          'streaming',
+          'merge',
+        ) as AIMessageContent;
 
       case AGUIEventType.TEXT_MESSAGE_END:
-        this.currentTextMessageId = null; // 重置状态
-        return createMarkdownContent(event.delta || '', 'complete', 'merge');
+        this.currentTextMessageId = null;
+        return createMarkdownContent(
+          typeof event.delta === 'string' ? event.delta : '',
+          'complete',
+          'merge',
+        ) as AIMessageContent;
 
       default:
         return null;
@@ -175,20 +223,30 @@ export class AGUIEventMapper {
    * 关键：通过 messageId 区分不同的文本块，
    * 当 messageId 变化时创建新的内容块
    */
-  private handleTextMessageChunk(event: any): AIMessageContent | null {
-    const messageId = event.messageId || 'default';
-    const role = event?.role || 'assistant';
+  private handleTextMessageChunk(event: AGUIProtocolEvent): AIMessageContent | null {
+    const messageId = typeof event.messageId === 'string' ? event.messageId : 'default';
+    const role = event.role === 'assistant' || event.role === 'system' ? event.role : 'assistant';
 
     // 如果是新的 messageId，需要创建新的内容块
     if (this.currentTextMessageId !== messageId) {
       this.currentTextMessageId = messageId;
       this.currentTextMessageRole = role;
       // 创建新内容块，使用 append 策略，通过 ext.role 传递角色信息
-      return createMarkdownContent(event.delta || '', 'streaming', 'append', role);
+      return createMarkdownContent(
+        typeof event.delta === 'string' ? event.delta : '',
+        'streaming',
+        'append',
+        role,
+      ) as AIMessageContent;
     }
 
     // 同一个 messageId，使用 merge 策略追加内容
-    return createMarkdownContent(event.delta || '', 'streaming', 'merge', this.currentTextMessageRole || role);
+    return createMarkdownContent(
+      typeof event.delta === 'string' ? event.delta : '',
+      'streaming',
+      'merge',
+      this.currentTextMessageRole || role,
+    ) as AIMessageContent;
   }
 
   /**
@@ -209,21 +267,30 @@ export class AGUIEventMapper {
    * - `REASONING_ENCRYPTED_VALUE`   → encryptedValue 存入 thinking.ext，供业务下轮透传
    * - `REASONING_END`               → 当前块 complete，title 置为 '思考结束'
    */
-  private handleReasoningEvent(event: any): AIMessageContent | null {
+  private handleReasoningEvent(event: AGUIProtocolEvent): AIMessageContent | null {
     switch (event.type) {
       case AGUIEventType.REASONING_START:
       case AGUIEventType.THINKING_START:
-        this.pendingReasoningTitle = event.title || '思考中...';
+        this.pendingReasoningTitle = eventString(event, 'title', '思考中...');
         this.currentReasoningMessageId = null;
         return null;
 
       case AGUIEventType.REASONING_MESSAGE_START:
       case AGUIEventType.THINKING_TEXT_MESSAGE_START:
-        return this.openReasoningBlock(event.messageId || null, event.title, '');
+        return this.openReasoningBlock(
+          eventOptionalString(event, 'messageId') ?? null,
+          eventOptionalString(event, 'title'),
+          '',
+        );
 
       case AGUIEventType.REASONING_MESSAGE_CONTENT:
       case AGUIEventType.THINKING_TEXT_MESSAGE_CONTENT:
-        return createThinkingContent({ text: event.delta || '' }, 'streaming', 'merge', false);
+        return createThinkingContent(
+          { text: eventString(event, 'delta') },
+          'streaming',
+          'merge',
+          false,
+        ) as AIMessageContent;
 
       case AGUIEventType.REASONING_MESSAGE_END:
       case AGUIEventType.THINKING_TEXT_MESSAGE_END:
@@ -234,18 +301,22 @@ export class AGUIEventMapper {
         return this.handleReasoningMessageChunk(event);
 
       case AGUIEventType.REASONING_ENCRYPTED_VALUE:
-        // encryptedValue 仅用于跨轮状态连续性，透传到 ext 由业务层在下一轮回传
-        return createThinkingContent({}, 'streaming', 'merge', false, {
-          encryptedValue: event.encryptedValue,
-          subtype: event.subtype,
-          entityId: event.entityId,
-        });
+        return createThinkingContent({ text: '' }, 'streaming', 'merge', false, {
+          encryptedValue: eventString(event, 'encryptedValue'),
+          subtype: eventString(event, 'subtype'),
+          entityId: eventString(event, 'entityId'),
+        }) as AIMessageContent;
 
       case AGUIEventType.REASONING_END:
       case AGUIEventType.THINKING_END:
         this.currentReasoningMessageId = null;
         this.pendingReasoningTitle = null;
-        return createThinkingContent({ title: event.title || '思考结束' }, 'complete', 'merge', true);
+        return createThinkingContent(
+          { text: '', title: eventString(event, 'title', '思考结束') },
+          'complete',
+          'merge',
+          true,
+        ) as AIMessageContent;
 
       default:
         return null;
@@ -261,30 +332,26 @@ export class AGUIEventMapper {
    * - 空 delta 显式关闭当前 reasoning 消息（AG-UI 规范定义的 chunk 关闭信号，仅作用于自身 messageId）
    *   参考: https://docs.ag-ui.com/concepts/events#reasoningmessagechunk
    */
-  private handleReasoningMessageChunk(event: any): AIMessageContent | null {
-    const messageId = event.messageId || null;
-    const delta = event.delta ?? '';
+  private handleReasoningMessageChunk(event: AGUIProtocolEvent): AIMessageContent | null {
+    const messageId = eventOptionalString(event, 'messageId') ?? null;
+    const delta = eventString(event, 'delta');
 
-    // 规范: empty delta implicitly closes the message
     if (delta === '' && messageId && this.currentReasoningMessageId === messageId) {
       this.currentReasoningMessageId = null;
-      return createThinkingContent({ title: '思考结束' }, 'complete', 'merge', true);
+      return createThinkingContent({ text: '', title: '思考结束' }, 'complete', 'merge', true) as AIMessageContent;
     }
 
     if (this.currentReasoningMessageId !== messageId) {
-      return this.openReasoningBlock(messageId, event.title, delta);
+      return this.openReasoningBlock(messageId, eventOptionalString(event, 'title'), delta);
     }
-    return createThinkingContent({ text: delta }, 'streaming', 'merge', false);
+    return createThinkingContent({ text: delta }, 'streaming', 'merge', false) as AIMessageContent;
   }
 
-  /**
-   * 创建新的 reasoning 内容块，消费 pendingReasoningTitle
-   */
   private openReasoningBlock(messageId: string | null, title: string | undefined, text: string): AIMessageContent {
     this.currentReasoningMessageId = messageId;
     const resolvedTitle = title || this.pendingReasoningTitle || '思考中...';
     this.pendingReasoningTitle = null;
-    return createThinkingContent({ text, title: resolvedTitle }, 'streaming', 'append', false);
+    return createThinkingContent({ text, title: resolvedTitle }, 'streaming', 'append', false) as AIMessageContent;
   }
 
   /**
@@ -294,7 +361,7 @@ export class AGUIEventMapper {
    * 1. 标准模式：TOOL_CALL_START → TOOL_CALL_ARGS → TOOL_CALL_END
    * 2. 简化模式：仅发送 TOOL_CALL_CHUNK，自动补全生命周期
    */
-  private handleToolCallEvent(event: any): AIMessageContent | null {
+  private handleToolCallEvent(event: AGUIProtocolEvent): AIMessageContent | null {
     switch (event.type) {
       case AGUIEventType.TOOL_CALL_START:
         return this.handleToolCallStart(event);
@@ -321,15 +388,13 @@ export class AGUIEventMapper {
    *
    * 注意：不同 activityType 的活动是独立管理的，互不影响
    */
-  private handleActivityEvent(event: any): AIMessageContent | null {
-    const activityType = event.activityType || 'unknown';
-    // 委托给 activityManager 处理
-    const activityData = activityManager.handleActivityEvent(event);
+  private handleActivityEvent(event: AGUIProtocolEvent): AIMessageContent | null {
+    const activityType = eventString(event, 'activityType', 'unknown');
+    const activityData = activityManager.handleActivityEvent(toActivityEvent(event));
     if (!activityData) {
       return null;
     }
 
-    // 根据事件类型决定 strategy
     const isSnapshot = event.type === AGUIEventType.ACTIVITY_SNAPSHOT;
     const isFirstDelta = event.type === AGUIEventType.ACTIVITY_DELTA && !activityManager.getActivity(activityType);
 
@@ -337,31 +402,36 @@ export class AGUIEventMapper {
       activityType,
       activityData.content,
       'streaming',
-      // SNAPSHOT 或首次 DELTA 使用 append 创建新内容块，后续使用 merge
       isSnapshot || isFirstDelta ? 'append' : 'merge',
       activityData.deltaInfo,
-    );
+    ) as AIMessageContent;
   }
 
-  /**
-   * 处理状态事件
-   */
-  private handleStateEvent(event: any): null {
-    stateManager.handleStateEvent(event);
+  private handleStateEvent(event: AGUIProtocolEvent): null {
+    stateManager.handleStateEvent({
+      type: event.type,
+      snapshot: eventRecord(event, 'snapshot'),
+      delta: Array.isArray(event.delta) ? (event.delta as JsonPatchOperation[]) : undefined,
+    });
     return null;
   }
 
-  /**
-   * 处理其他事件
-   */
-  private handleOtherEvent(event: any): AIMessageContent | AIMessageContent[] | null {
+  private handleOtherEvent(event: AGUIProtocolEvent): AIMessageContent | AIMessageContent[] | null {
     switch (event.type) {
-      case AGUIEventType.MESSAGES_SNAPSHOT:
-        return handleMessagesSnapshot(event.messages);
+      case AGUIEventType.MESSAGES_SNAPSHOT: {
+        const messages = event.messages;
+        if (!Array.isArray(messages)) return null;
+        return handleMessagesSnapshot(messages as AGUIMessage[]);
+      }
       case AGUIEventType.CUSTOM:
-        return handleCustomEvent(event);
+        return handleCustomEvent(toCustomEvent(event)) as AIMessageContent;
       case AGUIEventType.RUN_ERROR:
-        return [createTextContent(event.message || event.error || '系统未知错误', 'error')];
+        return [
+          createTextContent(
+            eventString(event, 'message', eventString(event, 'error', '系统未知错误')),
+            'error',
+          ) as AIMessageContent,
+        ];
       default:
         return null;
     }
@@ -370,81 +440,60 @@ export class AGUIEventMapper {
   /**
    * 处理工具调用开始事件
    */
-  private handleToolCallStart(event: any): AIMessageContent | null {
-    // 标记已显式开始（防止后续 chunk 重复触发 start）
-    this.toolCallChunkStarted.add(event.toolCallId);
+  private handleToolCallStart(event: AGUIProtocolEvent): AIMessageContent | null {
+    const toolCallId = eventString(event, 'toolCallId');
+    this.toolCallChunkStarted.add(toolCallId);
 
-    // 初始化工具调用
-    this.toolCallMap[event.toolCallId] = {
+    this.toolCallMap[toolCallId] = {
       eventType: 'TOOL_CALL_START',
-      toolCallId: event.toolCallId,
-      toolCallName: event.toolCallName,
-      parentMessageId: event.parentMessageId || '',
+      toolCallId,
+      toolCallName: eventString(event, 'toolCallName'),
+      parentMessageId: eventString(event, 'parentMessageId'),
     };
 
-    // 每个 TOOL_CALL_START 都会开启一个新的独立内容块（append）
-    return createToolCallContent(this.toolCallMap[event.toolCallId], 'pending', 'append');
+    return createToolCallContent(this.toolCallMap[toolCallId], 'pending', 'append') as AIMessageContent;
   }
 
-  /**
-   * 处理工具调用参数事件
-   */
-  private handleToolCallArgs(event: any): AIMessageContent | null {
-    if (!this.toolCallMap[event.toolCallId]) return null;
+  private handleToolCallArgs(event: AGUIProtocolEvent): AIMessageContent | null {
+    const toolCallId = eventString(event, 'toolCallId');
+    if (!this.toolCallMap[toolCallId]) return null;
 
-    const currentArgs = this.toolCallMap[event.toolCallId].args || '';
-    const newArgs = mergeStringContent(currentArgs, event.delta || '');
+    const currentArgs = this.toolCallMap[toolCallId].args || '';
+    const newArgs = mergeStringContent(currentArgs, eventString(event, 'delta'));
 
-    // 更新内部ToolCall对象
-    this.toolCallMap[event.toolCallId] = updateToolCall(this.toolCallMap[event.toolCallId], {
+    this.toolCallMap[toolCallId] = updateToolCall(this.toolCallMap[toolCallId], {
       eventType: 'TOOL_CALL_ARGS',
       args: newArgs,
     });
 
-    return this.updateToolCallInContext(event.toolCallId, 'streaming');
+    return this.updateToolCallInContext(toolCallId, 'streaming');
   }
 
-  /**
-   * 处理简化模式的 TOOL_CALL_CHUNK 事件
-   * 自动补全 Start → Args → End 生命周期
-   *
-   * TOOL_CALL_CHUNK 事件结构：
-   * - toolCallId: 工具调用ID（可选，首次时自动生成）
-   * - toolCallName: 工具名称（首次必需）
-   * - delta: 参数增量内容
-   * - parentMessageId: 父消息ID（可选）
-   */
-  private handleToolCallChunk(event: any): AIMessageContent | null {
-    // 生成或使用 toolCallId
-    const toolCallId = event.toolCallId || `auto_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+  private handleToolCallChunk(event: AGUIProtocolEvent): AIMessageContent | null {
+    const toolCallId =
+      eventOptionalString(event, 'toolCallId') || `auto_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
-    // 检查是否是该 toolCallId 的第一个 chunk
     const isFirstChunk = !this.toolCallChunkStarted.has(toolCallId) && !this.toolCallMap[toolCallId];
 
     if (isFirstChunk) {
-      // 自动触发 TOOL_CALL_START 逻辑
       this.toolCallChunkStarted.add(toolCallId);
-
-      // 重置当前文本消息 ID，确保后续文本消息创建新内容块
       this.currentTextMessageId = null;
 
-      // 初始化工具调用
       this.toolCallMap[toolCallId] = {
         eventType: 'TOOL_CALL_START',
         toolCallId,
-        toolCallName: event.toolCallName || 'unknown',
-        parentMessageId: event.parentMessageId || '',
-        args: event.delta || '', // 第一个 chunk 的 delta 作为初始 args
+        toolCallName: eventString(event, 'toolCallName', 'unknown'),
+        parentMessageId: eventString(event, 'parentMessageId'),
+        args: eventString(event, 'delta'),
       };
 
-      return createToolCallContent(this.toolCallMap[toolCallId], 'streaming', 'append');
+      return createToolCallContent(this.toolCallMap[toolCallId], 'streaming', 'append') as AIMessageContent;
     }
 
-    // 后续 chunk：更新 args
     if (!this.toolCallMap[toolCallId]) return null;
 
     const currentArgs = this.toolCallMap[toolCallId].args || '';
-    const newArgs = mergeStringContent(currentArgs, event.delta || '');
+    const newArgs = mergeStringContent(currentArgs, eventString(event, 'delta'));
 
     this.toolCallMap[toolCallId] = updateToolCall(this.toolCallMap[toolCallId], {
       eventType: 'TOOL_CALL_CHUNK',
@@ -454,55 +503,42 @@ export class AGUIEventMapper {
     return this.updateToolCallInContext(toolCallId, 'streaming');
   }
 
-  /**
-   * 处理工具调用结果事件
-   */
-  private handleToolCallResult(event: any): AIMessageContent | null {
-    if (!this.toolCallMap[event.toolCallId]) return null;
+  private handleToolCallResult(event: AGUIProtocolEvent): AIMessageContent | null {
+    const toolCallId = eventString(event, 'toolCallId');
+    if (!this.toolCallMap[toolCallId]) return null;
 
-    const currentResult = this.toolCallMap[event.toolCallId].result || '';
-    const newResult = mergeStringContent(currentResult, event.content || '');
+    const currentResult = this.toolCallMap[toolCallId].result || '';
+    const newResult = mergeStringContent(currentResult, eventString(event, 'content'));
 
-    // 更新内部ToolCall对象
-    this.toolCallMap[event.toolCallId] = updateToolCall(this.toolCallMap[event.toolCallId], {
+    this.toolCallMap[toolCallId] = updateToolCall(this.toolCallMap[toolCallId], {
       eventType: AGUIEventType.TOOL_CALL_RESULT,
       result: newResult,
     });
 
-    // 处理 suggestion 特殊情况
-    const suggestionContent = handleSuggestionToolCall(this.toolCallMap[event.toolCallId]);
+    const suggestionContent = handleSuggestionToolCall(this.toolCallMap[toolCallId]);
     if (suggestionContent) {
-      return suggestionContent;
+      return suggestionContent as AIMessageContent;
     }
 
-    return this.updateToolCallInContext(event.toolCallId, 'complete');
+    return this.updateToolCallInContext(toolCallId, 'complete');
   }
 
-  /**
-   * 处理工具调用结束事件
-   */
-  private handleToolCallEnd(event: any) {
-    // 标记工具调用结束
-    this.toolCallEnded.add(event.toolCallId);
+  private handleToolCallEnd(event: AGUIProtocolEvent) {
+    const toolCallId = eventString(event, 'toolCallId');
+    this.toolCallEnded.add(toolCallId);
 
-    // 更新 toolCallMap 中的 eventType
-    if (this.toolCallMap[event.toolCallId]) {
-      this.toolCallMap[event.toolCallId] = {
-        ...this.toolCallMap[event.toolCallId],
+    if (this.toolCallMap[toolCallId]) {
+      this.toolCallMap[toolCallId] = {
+        ...this.toolCallMap[toolCallId],
         eventType: AGUIEventType.TOOL_CALL_END,
       };
     }
 
-    return this.updateToolCallInContext(event.toolCallId, 'complete');
+    return this.updateToolCallInContext(toolCallId, 'complete');
   }
 
-  /**
-   * 更新独立的 toolcall 内容块
-   *
-   * 通过相同的 type (toolcall-${toolCallName}-${toolCallId}) 触发 merge 策略。
-   */
   private updateToolCallInContext(toolCallId: string, status: 'streaming' | 'complete'): AIMessageContent | null {
-    return createToolCallContent(this.toolCallMap[toolCallId], status, 'merge');
+    return createToolCallContent(this.toolCallMap[toolCallId], status, 'merge') as AIMessageContent;
   }
 }
 

@@ -47,7 +47,7 @@ const AssistantMessageSchema = BaseMessageSchema.extend({
  */
 const UserMessageSchema = BaseMessageSchema.extend({
   role: z.literal('user'),
-  content: z.union([z.string(), z.array(z.any())]),
+  content: z.union([z.string(), z.array(z.unknown())]),
 });
 
 // 扩展类型定义，支持两种 content 格式
@@ -65,7 +65,7 @@ const ActivityMessageSchema = z.object({
   id: z.string(),
   role: z.literal('activity'),
   activityType: z.string(),
-  content: z.record(z.string(), z.any()),
+  content: z.record(z.string(), z.unknown()),
   timestamp: z.number().optional(),
 });
 
@@ -127,20 +127,20 @@ export const ContextSchema = z.object({
 export const ToolSchema = z.object({
   name: z.string(),
   description: z.string(),
-  parameters: z.any(), // JSON Schema for the tool parameters
+  parameters: z.unknown(), // JSON Schema for the tool parameters
 });
 
 export const RunAgentInputSchema = z.object({
   threadId: z.string(),
   runId: z.string(),
-  state: z.any(),
+  state: z.unknown(),
   messages: z.array(AGUIMessageSchema),
   tools: z.array(ToolSchema),
   context: z.array(ContextSchema),
-  forwardedProps: z.any(),
+  forwardedProps: z.unknown(),
 });
 
-export const StateSchema = z.any();
+export const StateSchema = z.record(z.string(), z.unknown());
 
 export type AGUIToolCall = z.infer<typeof ToolCallSchema>;
 export type AGUIFunctionCall = z.infer<typeof FunctionCallSchema>;

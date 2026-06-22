@@ -1,4 +1,13 @@
-import { applyJsonPatch } from '../../utils';
+import { applyJsonPatch, type JsonPatchOperation } from '../../utils';
+
+/** AG-UI 状态值（协议层为开放 JSON 结构） */
+export type AGUIStateValue = unknown;
+
+export interface AGUIStateEvent {
+  type: string;
+  snapshot?: Record<string, AGUIStateValue>;
+  delta?: JsonPatchOperation[];
+}
 
 /**
  * 状态管理器
@@ -15,11 +24,11 @@ export interface StateManager {
   /**
    * 获取当前状态（基于当前状态key）
    */
-  getCurrentState: () => any;
+  getCurrentState: () => AGUIStateValue;
   /**
    * 获取指定状态key的状态
    */
-  getState: (stateKey: string) => any;
+  getState: (stateKey: string) => AGUIStateValue;
   /**
    * 获取所有状态keys
    */
@@ -29,11 +38,11 @@ export interface StateManager {
    * @param callback 状态变化回调函数
    * @param targetStateKey 可选：指定订阅特定的stateKey，不传则订阅当前活跃状态
    */
-  subscribe: (callback: (state: any, stateKey: string) => void, targetStateKey?: string) => () => void;
+  subscribe: (callback: (state: AGUIStateValue, stateKey: string) => void, targetStateKey?: string) => () => void;
   /**
    * 处理AG-UI状态事件，自动从事件中提取stateKey
    */
-  handleStateEvent: (event: { type: string; snapshot?: any; delta?: any[] }) => void;
+  handleStateEvent: (event: AGUIStateEvent) => void;
   /**
    * 清理所有状态和订阅
    */
@@ -41,15 +50,15 @@ export interface StateManager {
 }
 
 export class StateManagerImpl implements StateManager {
-  private states: Record<string, any> = {};
+  private states: Record<string, AGUIStateValue> = {};
 
   private currentStateKey: string | null = null;
 
   // 最新状态订阅者（覆盖模式）
-  private latestSubscribers: Set<(state: any, stateKey: string) => void> = new Set();
+  private latestSubscribers: Set<(state: AGUIStateValue, stateKey: string) => void> = new Set();
 
   // 绑定状态订阅者（隔离模式）
-  private boundSubscribers: Map<string, Set<(state: any) => void>> = new Map();
+  private boundSubscribers: Map<string, Set<(state: AGUIStateValue) => void>> = new Map();
 
   /**
    * 获取当前活跃的状态key
@@ -61,7 +70,7 @@ export class StateManagerImpl implements StateManager {
   /**
    * 获取当前状态（基于当前状态key）
    */
-  getCurrentState(): any {
+  getCurrentState(): AGUIStateValue {
     if (!this.currentStateKey) return null;
     return this.states[this.currentStateKey];
   }
@@ -69,7 +78,7 @@ export class StateManagerImpl implements StateManager {
   /**
    * 获取指定状态key的状态
    */
-  getState(stateKey: string): any {
+  getState(stateKey: string): AGUIStateValue {
     return this.states[stateKey];
   }
 
@@ -84,7 +93,7 @@ export class StateManagerImpl implements StateManager {
    * 订阅最新状态（覆盖模式）
    * 适用于只有一个组件，每轮都用新状态更新的场景
    */
-  subscribeToLatest(callback: (state: any, stateKey: string) => void): () => void {
+  subscribeToLatest(callback: (state: AGUIStateValue, stateKey: string) => void): () => void {
     this.latestSubscribers.add(callback);
     // 立即调用一次当前状态
     if (this.currentStateKey && this.states[this.currentStateKey]) {
@@ -103,7 +112,7 @@ export class StateManagerImpl implements StateManager {
    * @param callback 状态变化回调函数
    * @param targetStateKey 可选：指定订阅特定的stateKey，不传则订阅当前活跃状态
    */
-  subscribe(callback: (state: any, stateKey: string) => void, targetStateKey?: string): () => void {
+  subscribe(callback: (state: AGUIStateValue, stateKey: string) => void, targetStateKey?: string): () => void {
     if (targetStateKey) {
       // 绑定模式：订阅特定 stateKey
       return this.subscribeToState(targetStateKey, (state) => callback(state, targetStateKey));
@@ -116,7 +125,7 @@ export class StateManagerImpl implements StateManager {
    * 订阅特定状态（隔离模式）
    * 适用于每轮对话创建新组件，各自保持独立状态的场景
    */
-  subscribeToState(stateKey: string, callback: (state: any) => void): () => void {
+  subscribeToState(stateKey: string, callback: (state: AGUIStateValue) => void): () => void {
     if (!this.boundSubscribers.has(stateKey)) {
       this.boundSubscribers.set(stateKey, new Set());
     }
@@ -140,7 +149,7 @@ export class StateManagerImpl implements StateManager {
    * 处理AG-UI状态事件
    * 自动从事件中提取stateKey，无需外部传递
    */
-  handleStateEvent(event: { type: string; snapshot?: any; delta?: any[] }): void {
+  handleStateEvent(event: AGUIStateEvent): void {
     if (event.type === 'STATE_SNAPSHOT') {
       // 处理STATE_SNAPSHOT：立即更新
       if (event.snapshot && typeof event.snapshot === 'object') {
@@ -190,7 +199,7 @@ export class StateManagerImpl implements StateManager {
   /**
    * 设置状态并立即通知订阅者
    */
-  private setState(stateKey: string, state: any): void {
+  private setState(stateKey: string, state: AGUIStateValue): void {
     // 更新状态
     this.states[stateKey] = state;
     this.currentStateKey = stateKey;
@@ -200,7 +209,7 @@ export class StateManagerImpl implements StateManager {
   /**
    * 通知订阅者
    */
-  private notifySubscribers(stateKey: string, state: any): void {
+  private notifySubscribers(stateKey: string, state: AGUIStateValue): void {
     // 通知绑定订阅者（只通知对应stateKey的订阅者）
     const boundSubs = this.boundSubscribers.get(stateKey);
     if (boundSubs) {

@@ -37,7 +37,7 @@
  *   timestamp: number,
  * }
  */
-import type { ChatMessagesData, AIMessageContent, TextContent, UserMessage, AIMessage } from '../../type';
+import type { ChatMessagesData, AIMessageContent, TextContent, UserMessage, AIMessage, ToolCall } from '../../type';
 import { createToolCallContent } from '../shared';
 import { generateUUID } from './utils';
 
@@ -314,7 +314,7 @@ function convertAssistantContent(
         const toolResult = toolResultMap.get(toolCallId);
         const resultStr = toolResult?.content || '';
 
-        const toolCall = {
+        const toolCall: ToolCall = {
           toolCallId,
           toolCallName,
           eventType: toolResult ? 'TOOL_CALL_RESULT' : 'TOOL_CALL_START',

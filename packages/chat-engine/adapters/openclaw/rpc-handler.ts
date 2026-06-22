@@ -67,7 +67,7 @@ export class OpenClawRPCHandler {
 
   private config: Required<RPCHandlerConfig>;
 
-  private sendFn: ((frame: OpenClawRequestFrame<any>) => void) | null = null;
+  private sendFn: ((frame: OpenClawRequestFrame) => void) | null = null;
 
   private seq = 0;
 
@@ -130,7 +130,7 @@ export class OpenClawRPCHandler {
 
       // 发送请求
       try {
-        this.sendFn!(frame);
+        this.sendFn!(frame as OpenClawRequestFrame);
       } catch (error) {
         this.pendingRequests.delete(id);
         clearTimeout(timeoutId);

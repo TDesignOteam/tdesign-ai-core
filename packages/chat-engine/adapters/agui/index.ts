@@ -113,35 +113,32 @@ export class AGUIAdapter {
      * 2. 后端返回格式：content 是数组 [{ type, text }]（text 字段存储文本）
      * 3. 已转换格式：content 已经是数组 [{ type, data }]
      */
-    const processUserContent = (content: any): UserMessageContent[] => {
-      // 如果 content 已经是数组格式，需要做字段适配
+    const processUserContent = (content: unknown): UserMessageContent[] => {
       if (Array.isArray(content)) {
-        return content.map((item: any) => {
-          // 如果已经有 data 字段，说明已经是 ChatEngine 格式
-          if (item.data !== undefined) {
+        return content.map((item: unknown) => {
+          if (typeof item !== 'object' || item === null) {
+            return { type: 'text', data: '' };
+          }
+          const record = item as Record<string, unknown>;
+          if (record.data !== undefined) {
             return item as UserMessageContent;
           }
-          // 后端返回的格式用 text 字段存储文本，需要映射为 data 字段
-          if (item.type === 'text' && item.text !== undefined) {
+          if (record.type === 'text' && record.text !== undefined) {
             return {
               type: 'text' as const,
-              data: item.text,
+              data: String(record.text),
             };
           }
-          // 其他类型的数组元素，尝试用 text 字段兜底
           return {
-            type: item.type || 'text',
-            data: item.text || item.data || '',
+            type: typeof record.type === 'string' ? record.type : 'text',
+            data: String(record.text ?? record.data ?? ''),
           } as UserMessageContent;
         });
       }
-      // 如果是字符串，包装为标准格式
-      return [
-        {
-          type: 'text',
-          data: content,
-        },
-      ];
+      if (typeof content === 'string') {
+        return [{ type: 'text', data: content }];
+      }
+      return [{ type: 'text', data: '' }];
     };
 
     /**

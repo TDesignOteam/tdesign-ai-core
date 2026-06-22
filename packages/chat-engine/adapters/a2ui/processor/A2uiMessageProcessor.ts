@@ -287,10 +287,9 @@ export class A2uiMessageProcessor {
 
     // 检查是否有组件的 children 使用了这个路径作为 template
     for (const component of surface.components.values()) {
-      const children = (component as any).children;
+      const children = component.children;
       if (children && typeof children === 'object' && !Array.isArray(children)) {
-        // A2UI v0.9 格式: { componentId, path }
-        const templatePath = (children as any).path;
+        const templatePath = 'path' in children && typeof children.path === 'string' ? children.path : undefined;
         if (templatePath && (path.startsWith(templatePath) || templatePath.startsWith(path))) {
           return true;
         }

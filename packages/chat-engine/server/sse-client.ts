@@ -191,7 +191,6 @@ export class SSEClient extends EventEmitter {
   private async readStream(): Promise<void> {
     try {
       while (this.state === SSEConnectionState.CONNECTED && this.reader) {
-        // eslint-disable no-await-in-loop
         const { done, value } = await this.reader.read();
 
         if (done) {

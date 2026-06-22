@@ -1,5 +1,13 @@
 import { ActivityData } from '../../type';
-import { applyJsonPatch } from '../../utils';
+import { applyJsonPatch, type JsonPatchOperation } from '../../utils';
+
+export interface AGUIActivityEvent {
+  type: string;
+  activityType: string;
+  content?: Record<string, unknown>;
+  patch?: JsonPatchOperation[];
+  messageId?: string;
+}
 
 /**
  * Activity 状态管理器
@@ -33,13 +41,7 @@ export interface ActivityManager {
   /**
    * 处理 AG-UI Activity 事件
    */
-  handleActivityEvent: (event: {
-    type: string;
-    activityType: string;
-    content?: any;
-    patch?: any[];
-    messageId?: string;
-  }) => ActivityData | null;
+  handleActivityEvent: (event: AGUIActivityEvent) => ActivityData | null;
   /**
    * 清理活动数据
    */
@@ -84,13 +86,7 @@ export class ActivityManagerImpl implements ActivityManager {
    * 处理 AG-UI Activity 事件
    * 返回更新后的 ActivityData，供 event-mapper 使用
    */
-  handleActivityEvent(event: {
-    type: string;
-    activityType: string;
-    content?: any;
-    patch?: any[];
-    messageId?: string;
-  }): ActivityData | null {
+  handleActivityEvent(event: AGUIActivityEvent): ActivityData | null {
     const { activityType, messageId } = event;
 
     if (event.type === 'ACTIVITY_SNAPSHOT') {
@@ -159,12 +155,12 @@ export class ActivityManagerImpl implements ActivityManager {
   /**
    * 根据 JSON Patch 路径推断初始内容结构
    */
-  private inferInitialContent(patch: any[] | undefined): Record<string, any> {
+  private inferInitialContent(patch: JsonPatchOperation[] | undefined): Record<string, unknown> {
     if (!patch || !Array.isArray(patch) || patch.length === 0) {
       return {};
     }
 
-    const initialContent: Record<string, any> = {};
+    const initialContent: Record<string, unknown> = {};
 
     for (const op of patch) {
       if (op.path) {
@@ -187,7 +183,7 @@ export class ActivityManagerImpl implements ActivityManager {
   /**
    * 获取 content 中的 operations/messages 数量
    */
-  private getOperationsCount(content: Record<string, any> | null | undefined): number {
+  private getOperationsCount(content: Record<string, unknown> | null | undefined): number {
     if (!content) return 0;
     const ops = content.operations || content.messages;
     return Array.isArray(ops) ? ops.length : 0;

@@ -50,7 +50,7 @@ export interface A2UIComponent {
         componentId: string;
       };
   /** 其他组件特定属性 */
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
