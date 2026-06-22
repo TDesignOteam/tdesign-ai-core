@@ -5,8 +5,6 @@
   "scripts": {
     "build": "pnpm -r run build",
     "type-check": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
