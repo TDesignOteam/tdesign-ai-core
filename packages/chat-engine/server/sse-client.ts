@@ -1,4 +1,3 @@
-/* eslint-disable no-await-in-loop, max-classes-per-file */
 import EventEmitter from '../utils/eventEmitter';
 import { isAbortError, toError } from '../utils';
 import { LoggerManager } from '../utils/logger';

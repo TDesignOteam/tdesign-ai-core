@@ -5,14 +5,15 @@
   "scripts": {
     "build": "pnpm -r run build",
     "type-check": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
     "lint": "eslint .",
-    "clean": "pnpm -r run clean",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "verify": "pnpm build && pnpm type-check && pnpm lint && pnpm format:check",
     "prepare": "husky"
   },
   "lint-staged": {
-    "packages/**/*.ts": [
+    "{packages/**/*.ts,eslint.config.mjs,.prettierrc.mjs}": [
       "prettier --write --cache",
       "eslint --fix --cache"
     ]
@@ -23,21 +24,17 @@
   },
   "license": "MIT",
   "engines": {
-    "node": ">=18.0.0"
+    "node": "^22.22.1 || >=24.11.0"
   },
   "packageManager": "pnpm@9.15.9",
   "devDependencies": {
-    "eslint": "^10.3.0",
+    "eslint": "^10.5.0",
+    "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
-    "immer": "^10.0.0",
     "lint-staged": "^17.0.4",
-    "prettier": "^3.8.3",
-    "tsup": "^8.5.0",
-    "typescript": "^5.5.0",
-    "typescript-eslint": "^8.59.2"
-  },
-  "dependencies": {
-    "@tdesign/ai-chat-engine": "workspace:*",
-    "@tdesign/ai-shared": "workspace:*"
+    "prettier": "^3.8.4",
+    "tsdown": "^0.22.3",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.1"
   }
 }
