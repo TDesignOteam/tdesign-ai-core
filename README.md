@@ -54,7 +54,7 @@ import type { ChatServiceConfig } from '@tdesign/ai-chat-engine';
 
 ### 环境要求
 
-- Node.js `^22.18.0 || >=24.11.0`
+- Node.js `^22.22.1 || >=24.11.0`（见 `.node-version`）
 - pnpm `9.15.9`
 
 ### 常用命令

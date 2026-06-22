@@ -24,17 +24,17 @@
   },
   "license": "MIT",
   "engines": {
-    "node": "^22.18.0 || >=24.11.0"
+    "node": "^22.22.1 || >=24.11.0"
   },
   "packageManager": "pnpm@9.15.9",
   "devDependencies": {
-    "eslint": "^10.3.0",
+    "eslint": "^10.5.0",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.4",
-    "prettier": "^3.8.3",
+    "prettier": "^3.8.4",
     "tsdown": "^0.22.3",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.59.2"
+    "typescript-eslint": "^8.61.1"
   }
 }
