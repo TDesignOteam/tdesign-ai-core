@@ -4,6 +4,7 @@
   "description": "TDesign AIGC framework-agnostic core SDKs",
   "scripts": {
     "build": "pnpm -r run build",
+    "dev": "pnpm --filter @tdesign/ai-chat-engine dev",
     "type-check": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

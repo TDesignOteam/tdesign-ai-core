@@ -3,6 +3,8 @@ import { defineConfig } from 'tsdown';
 export default defineConfig({
   entry: ['index.ts'],
   format: ['esm', 'cjs'],
+  // CJS 使用 named 导出模式，消除 default + named 混用警告；ESM 仍输出 `ChatEngine as default`
+  outputOptions: { exports: 'named' },
   dts: true,
   sourcemap: true,
   clean: true,
