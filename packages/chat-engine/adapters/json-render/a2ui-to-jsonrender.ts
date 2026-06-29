@@ -68,14 +68,13 @@ function mapProps(component: A2UIComponent): Record<string, any> {
         mappedProps.label = mappedProps.text;
         delete mappedProps.text;
       }
-      // A2UI action 格式转换：{ name, context } → { name, params }
-      // context 中的 { path: "/xxx" } 会在运行时被 Button 组件解析
+      // A2UI action 协议转换：A2UI 的 { name, context } → json-render ActionBinding 的 { action, params }
+      // context 中的 { path: "/xxx" } 会在运行时被组件解析为实际数据
       if (mappedProps.action && typeof mappedProps.action === 'object') {
         const a2uiAction = mappedProps.action as { name: string; context?: Record<string, unknown> };
         mappedProps.action = {
-          name: a2uiAction.name,
-          // 将 context 转为 params，保留动态绑定引用供运行时解析
-          params: a2uiAction.context || {},
+          action: a2uiAction.name,
+          params: a2uiAction.context ?? {},
         };
       }
       // 处理 theme 映射（A2UI 的 theme: 'primary' → TDesign 的 theme: 'primary'）
