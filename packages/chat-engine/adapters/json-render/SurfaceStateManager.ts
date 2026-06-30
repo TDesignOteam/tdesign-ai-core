@@ -123,6 +123,40 @@ class SurfaceStateManager {
   }
 
   /**
+   * 直接替换 Surface 的 Schema（用于组件树变更后批量更新）
+   *
+   * 与 registerSurface 的差异：
+   * - registerSurface 用于首次创建（不通知订阅者，因为还没有订阅者）
+   * - updateSchema 用于已存在 Surface 的 schema 替换，会通知现有订阅者
+   *
+   * @param surfaceId Surface ID
+   * @param schema 新的 json-render Schema
+   * @returns 是否成功（Surface 存在）
+   */
+  updateSchema(surfaceId: string, schema: JsonRenderSchema): boolean {
+    const cache = this.surfaces.get(surfaceId);
+    if (!cache) {
+      if (this.debug) {
+        console.warn('[SurfaceStateManager] updateSchema: Surface 不存在', surfaceId);
+      }
+      return false;
+    }
+
+    cache.schema = schema;
+    cache.updatedAt = Date.now();
+
+    if (this.debug) {
+      console.log('[SurfaceStateManager] 替换 Schema:', {
+        surfaceId,
+        elementsCount: Object.keys(schema.elements).length,
+      });
+    }
+
+    this.notifySubscribersAsync(surfaceId, cache.schema);
+    return true;
+  }
+
+  /**
    * 订阅 Surface 状态变化
    *
    * @param surfaceId Surface ID
