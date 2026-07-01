@@ -61,7 +61,7 @@ export class PerformanceMonitor {
    */
   private getMemoryUsage(): number {
     if (typeof performance !== 'undefined' && 'memory' in performance) {
-      // @ts-ignore - performance.memory 在某些环境中可用
+      // @ts-expect-error performance.memory 仅在部分运行时（如 Chrome）可用
       return (performance.memory?.usedJSHeapSize || 0) / 1024 / 1024;
     }
     return 0;

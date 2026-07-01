@@ -11,17 +11,16 @@ import EventEmitter from '../../utils/eventEmitter';
 import { LoggerManager } from '../../utils/logger';
 import { WebSocketClient, type WebSocketClientConfig, WebSocketConnectionState } from '../../server/websocket-client';
 import type { AIMessageContent, ChatRequestParams, SSEChunkData } from '../../type';
-import { OpenClawEventMapper, type EventMapResult } from './event-mapper';
-import { OpenClawRPCHandler, RPCError } from './rpc-handler';
+import { OpenClawEventMapper } from './event-mapper';
+import { OpenClawRPCHandler } from './rpc-handler';
 import type {
   OpenClawConfig,
-  OpenClawFrame,
   OpenClawEventFrame,
   OpenClawResponseFrame,
   ConnectParams,
   ConnectChallengePayload,
 } from './types';
-import { mergeOpenClawConfig, DEFAULT_OPENCLAW_CONFIG } from './types/config';
+import { mergeOpenClawConfig } from './types/config';
 import { OpenClawEventType, OpenClawConnectionState } from './types/events';
 import { generateUUID, parseFrame, getPlatform, getUserAgent, getLocale, formatWebSocketUrl } from './utils';
 

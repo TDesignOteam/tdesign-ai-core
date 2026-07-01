@@ -48,7 +48,7 @@ const TYPE_MAPPING: Record<string, string> = {
  */
 function mapProps(component: A2UIComponent): Record<string, any> {
   // 排除 A2UI 特有字段，保留其他属性
-  const { id, component: componentType, weight, child, children, ...restProps } = component;
+  const { id: _id, component: componentType, weight, child: _child, children: _children, ...restProps } = component;
 
   const mappedProps: Record<string, any> = { ...restProps };
 

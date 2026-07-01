@@ -1,7 +1,7 @@
 /**
  * OpenClaw 工具函数
  */
-import type { OpenClawFrame, OpenClawRequestFrame, OpenClawResponseFrame, OpenClawEventFrame } from './types';
+import type { OpenClawFrame, OpenClawRequestFrame } from './types';
 
 /**
  * 生成 UUID

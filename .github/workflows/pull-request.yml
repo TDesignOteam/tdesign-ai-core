@@ -24,7 +24,7 @@ jobs:
 
       - run: pnpm install
 
-      - run: pnpm run lint
+      - run: pnpm run verify
 
   build:
     runs-on: ubuntu-latest

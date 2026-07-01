@@ -66,12 +66,12 @@ export class AGUIStreamHandler implements IStreamHandler {
 
     await this.llmService.handleStreamRequest(params, {
       ...config,
-      // @ts-ignore
+      // @ts-expect-error onMessage 与 LLMService 回调签名存在差异
       onMessage: (_chunk: SSEChunkData) => {
         if (context.getStopReceive() || !messageId) return null;
         let chunk = _chunk;
         if (config.onChunk) {
-          // @ts-ignore
+          // @ts-expect-error onChunk 可能改写 chunk 结构
           chunk = config.onChunk(chunk);
           if (!chunk) {
             return;

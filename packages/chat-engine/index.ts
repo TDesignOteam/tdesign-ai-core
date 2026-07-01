@@ -140,7 +140,7 @@ export default class ChatEngine implements IChatEngine {
 
     // 协议级生命周期初始化（如 OpenClaw 预建 WS + 历史回填）
     // fire-and-forget：init 不阻塞协议握手
-    void this.streamHandler.initialize?.(this.config, {
+    this.streamHandler.initialize?.(this.config, {
       messageStore: this.messageStore,
       eventBus: this.eventBus,
     });
@@ -215,7 +215,7 @@ export default class ChatEngine implements IChatEngine {
    * 下次发送消息时会自动重置 `stopReceive` 并按需建立新连接。
    * 对 `sse` / `fetch` transport 为 no-op。
    */
-  public disconnect(): void {
+  public disconnect() {
     this.stopReceive = true;
     this.llmService.disconnectWS();
   }
