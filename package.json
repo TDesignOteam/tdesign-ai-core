@@ -5,15 +5,15 @@
   "scripts": {
     "build": "pnpm -r run build",
     "type-check": "tsc --noEmit",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "lint": "eslint packages --max-warnings 0",
+    "lint:fix": "eslint packages --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "verify": "pnpm build && pnpm type-check && pnpm lint && pnpm format:check",
     "prepare": "husky"
   },
   "lint-staged": {
-    "{packages/**/*.ts,eslint.config.mjs,.prettierrc.mjs}": [
+    "{packages/**/*.ts}": [
       "prettier --write --cache",
       "eslint --fix --cache"
     ]
@@ -29,7 +29,6 @@
   "packageManager": "pnpm@9.15.9",
   "devDependencies": {
     "eslint": "^10.5.0",
-    "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.4",
     "prettier": "^3.8.4",

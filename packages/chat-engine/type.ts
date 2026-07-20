@@ -313,7 +313,7 @@ export interface IChatEngine {
    * @param messages 初始消息列表，用于恢复历史对话
    * @description 必须在使用其他方法前调用此方法进行初始化
    */
-  init(config?: any, messages?: ChatMessagesData[]): void;
+  init(config?: any, messages?: ChatMessagesData[]): void | Promise<void>;
 
   /**
    * 发送用户消息并获取AI回复

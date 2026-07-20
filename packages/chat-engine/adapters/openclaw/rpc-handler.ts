@@ -6,9 +6,7 @@
 import type {
   OpenClawRequestFrame,
   OpenClawResponseFrame,
-  OpenClawEventFrame,
   OpenClawFrame,
-  OpenClawError,
   ConnectParams,
   ConnectResponse,
   ChatSendParams,
@@ -237,7 +235,7 @@ export class OpenClawRPCHandler {
    * 取消所有待处理的请求
    */
   cancelAll(reason = 'Cancelled'): void {
-    this.pendingRequests.forEach((pending, id) => {
+    this.pendingRequests.forEach((pending, _id) => {
       clearTimeout(pending.timeoutId);
       pending.reject(new RPCError(reason, 'CANCELLED'));
     });

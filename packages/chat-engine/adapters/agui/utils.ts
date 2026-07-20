@@ -29,7 +29,7 @@ export function mergeStringContent(existing: string | undefined, delta: string):
 
     // 其他情况，直接替换
     return delta;
-  } catch (error) {
+  } catch (_error) {
     // 不是有效的JSON，按普通字符串处理
     return existing + delta;
   }
