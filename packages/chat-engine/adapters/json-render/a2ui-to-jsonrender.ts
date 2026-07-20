@@ -1,9 +1,9 @@
 /**
- * A2UI v0.9 → json-render 适配器
- * 将 A2UI v0.9 协议转换为 json-render Schema
+ * A2UI v0.9.1 → json-render 适配器
+ * 将 A2UI v0.9.1协议转换为 json-render Schema
  *
  * 核心设计：
- * 1. A2UI v0.9 的 createSurface 只是初始化信号，不包含组件数据
+ * 1. A2UI 的 createSurface 只是初始化信号，不包含组件数据
  * 2. 组件数据通过 updateComponents 消息逐步发送（数组形式）
  * 3. 数据模型通过 updateDataModel 消息填充
  * 4. 组件字段名是 'component'，不是 'type'
@@ -44,7 +44,7 @@ const TYPE_MAPPING: Record<string, string> = {
 
 /**
  * 属性映射函数
- * 将 A2UI v0.9 组件属性转换为 json-render 组件属性
+ * 将 A2UI v0.9.1 组件属性转换为 json-render 组件属性
  */
 function mapProps(component: A2UIComponent): Record<string, any> {
   // 排除 A2UI 特有字段，保留其他属性
@@ -162,7 +162,7 @@ function mapProps(component: A2UIComponent): Record<string, any> {
  * 转换单个 A2UI 组件为 json-render UIElement
  */
 function convertComponent(component: A2UIComponent): UIElement {
-  // A2UI v0.9 使用 'component' 字段，不是 'type'
+  // A2UI 使用 'component' 字段，不是 json-render 的 'type'
   const a2uiType = component.component;
   const mappedType = TYPE_MAPPING[a2uiType] || a2uiType;
   const props = mapProps(component);
@@ -211,7 +211,7 @@ function buildSurfaceState(messages: A2UIMessage[]): A2UISurfaceState | null {
     // 2. updateComponents - 累积组件
     if (msg.updateComponents && surfaceState) {
       const { components } = msg.updateComponents;
-      // A2UI v0.9 的 components 是数组
+      // A2UI v0.9.1 的 components 是数组
       if (Array.isArray(components)) {
         for (const comp of components) {
           surfaceState.components.set(comp.id, comp);
@@ -308,14 +308,14 @@ function surfaceStateToSchema(state: A2UISurfaceState): JsonRenderSchema {
   });
 
   return {
-    root: 'root', // A2UI v0.9 规定必须有 id 为 'root' 的组件
+    root: 'root', // A2UI v0.9.1 规定必须有 id 为 'root' 的组件
     elements,
     data: state.dataModel,
   };
 }
 
 /**
- * 转换 A2UI v0.9 消息数组为 json-render Schema
+ * 转换 A2UI v0.9.1 消息数组为 json-render Schema
  *
  * 处理流程：
  * 1. 查找 createSurface 消息初始化 Surface

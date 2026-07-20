@@ -3,7 +3,7 @@
  * 将平铺的组件列表转换为嵌套的组件树
  * 参考 @a2ui/core ComponentTree 实现
  *
- * 支持两种 children 模式 (A2UI v0.9 规范)：
+ * 支持两种 children 模式 (A2UI v0.9.1 规范)：
  * 1. 直接引用: children: ["comp1", "comp2"]
  * 2. Template 模式: children: { componentId: "comp1", path: "/items" }
  */
@@ -81,7 +81,7 @@ export class ComponentTree {
         .filter((c): c is ResolvedComponent => c !== null);
     }
 
-    // 模式2: Template 模式 (A2UI v0.9: componentId + path)
+    // 模式2: Template 模式 (A2UI v0.9.1: componentId + path)
     if (children && typeof children === 'object' && 'componentId' in children) {
       return this.resolveTemplate(children.componentId, children.path, dataContextPath);
     }
