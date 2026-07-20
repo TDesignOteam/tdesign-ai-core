@@ -39,6 +39,8 @@ export enum OpenClawEventType {
   HEALTH = 'health',
   /** 心跳 */
   HEARTBEAT = 'heartbeat',
+  /** Gateway 定时事件 */
+  TICK = 'tick',
 
   // ============= Canvas/A2UI =============
   /** Canvas 更新 */

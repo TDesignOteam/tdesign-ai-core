@@ -8,10 +8,10 @@ import type { UIElement } from '@json-render/core';
  * json-render Activity 内容格式
  * 用于 ACTIVITY_SNAPSHOT 和 ACTIVITY_DELTA 事件
  */
-export interface JsonRenderSchema {
+export interface JsonRenderSchema<TData extends Record<string, unknown> = Record<string, unknown>> {
   root: string;
   elements: Record<string, UIElement>;
-  data?: Record<string, unknown>;
+  data?: TData;
 }
 
 /**

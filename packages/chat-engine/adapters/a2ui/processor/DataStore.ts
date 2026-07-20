@@ -15,6 +15,10 @@ function parsePath(path: string): string[] {
   return normalized.split('/').filter(Boolean);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /**
  * A2UI 数据存储
  * 支持 JSON Pointer 风格的路径访问
@@ -38,10 +42,10 @@ export class DataStore {
       if (current === null || current === undefined) {
         return undefined;
       }
-      if (typeof current !== 'object') {
+      if (!isRecord(current)) {
         return undefined;
       }
-      current = (current as Record<string, unknown>)[segment];
+      current = current[segment];
     }
 
     return current;
@@ -57,8 +61,8 @@ export class DataStore {
 
     if (segments.length === 0) {
       // 设置整个数据对象
-      if (typeof value === 'object' && value !== null) {
-        this.data = { ...(value as Record<string, unknown>) };
+      if (isRecord(value)) {
+        this.data = { ...value };
       }
       return;
     }
@@ -84,8 +88,7 @@ export class DataStore {
     } else {
       // 递归设置
       const existing = obj[head];
-      const nested =
-        typeof existing === 'object' && existing !== null ? { ...(existing as Record<string, unknown>) } : {};
+      const nested = isRecord(existing) ? { ...existing } : {};
       newObj[head] = this.setDeep(nested, tail, value);
     }
 
@@ -124,8 +127,8 @@ export class DataStore {
     } else {
       // 递归删除
       const existing = obj[head];
-      if (typeof existing === 'object' && existing !== null) {
-        newObj[head] = this.removeDeep(existing as Record<string, unknown>, tail);
+      if (isRecord(existing)) {
+        newObj[head] = this.removeDeep(existing, tail);
       }
     }
 
@@ -140,16 +143,9 @@ export class DataStore {
   merge(path: string, value: unknown): void {
     const existing = this.get(path);
 
-    if (
-      typeof existing === 'object' &&
-      existing !== null &&
-      typeof value === 'object' &&
-      value !== null &&
-      !Array.isArray(existing) &&
-      !Array.isArray(value)
-    ) {
+    if (isRecord(existing) && isRecord(value)) {
       // 两者都是对象，进行深度合并
-      const merged = this.deepMerge(existing as Record<string, unknown>, value as Record<string, unknown>);
+      const merged = this.deepMerge(existing, value);
       this.set(path, merged);
     } else if (existing === undefined) {
       // 不存在则直接设置
@@ -170,16 +166,9 @@ export class DataStore {
       if (existing === undefined) {
         // 新字段，直接设置
         result[key] = value;
-      } else if (
-        typeof existing === 'object' &&
-        existing !== null &&
-        typeof value === 'object' &&
-        value !== null &&
-        !Array.isArray(existing) &&
-        !Array.isArray(value)
-      ) {
+      } else if (isRecord(existing) && isRecord(value)) {
         // 递归合并对象
-        result[key] = this.deepMerge(existing as Record<string, unknown>, value as Record<string, unknown>);
+        result[key] = this.deepMerge(existing, value);
       }
       // 已存在且不是对象，保留原值
     }

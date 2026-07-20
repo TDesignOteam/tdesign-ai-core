@@ -119,7 +119,7 @@ async function signWithEd25519(privateKeyHex: string, nonce: string): Promise<st
   const privateKey = await crypto.subtle.importKey(
     'pkcs8',
     privateKeyBytes.buffer as ArrayBuffer,
-    'Ed25519' as unknown as AlgorithmIdentifier,
+    { name: 'Ed25519' },
     false,
     ['sign'],
   );
