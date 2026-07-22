@@ -6,9 +6,7 @@
 import type {
   OpenClawRequestFrame,
   OpenClawResponseFrame,
-  OpenClawEventFrame,
   OpenClawFrame,
-  OpenClawError,
   ConnectParams,
   ConnectResponse,
   ChatSendParams,
@@ -19,8 +17,8 @@ import { OpenClawMethod } from './types/events';
 /**
  * 待处理请求信息
  */
-interface PendingRequest<T = unknown> {
-  resolve: (payload: T) => void;
+interface PendingRequest {
+  resolve: (payload: unknown) => void;
   reject: (error: Error) => void;
   timeoutId: ReturnType<typeof setTimeout>;
   method: string;
@@ -37,6 +35,14 @@ export interface RPCHandlerConfig {
   autoRetry?: boolean;
   /** 最大重试次数，默认 3 */
   maxRetries?: number;
+}
+
+interface NodeInvokeParams {
+  [key: string]: unknown;
+  nodeId: string;
+  action: string;
+  payload: unknown;
+  runId?: string;
 }
 
 /**
@@ -67,7 +73,7 @@ export class OpenClawRPCHandler {
 
   private config: Required<RPCHandlerConfig>;
 
-  private sendFn: ((frame: OpenClawRequestFrame<any>) => void) | null = null;
+  private sendFn: ((frame: OpenClawRequestFrame) => void) | null = null;
 
   private seq = 0;
 
@@ -97,7 +103,7 @@ export class OpenClawRPCHandler {
   /**
    * 发送 RPC 请求
    */
-  async request<TParams extends object, TResult>(method: string, params: TParams): Promise<TResult> {
+  async request<TParams extends Record<string, unknown>, TResult>(method: string, params: TParams): Promise<TResult> {
     if (!this.sendFn) {
       throw new RPCError('Send function not set', 'SEND_NOT_CONFIGURED');
     }
@@ -169,7 +175,7 @@ export class OpenClawRPCHandler {
    */
   handleFrame(frame: OpenClawFrame): { type: 'response' | 'event'; handled: boolean; data?: unknown } {
     if (frame.type === 'res') {
-      const handled = this.handleResponse(frame as OpenClawResponseFrame);
+      const handled = this.handleResponse(frame);
       return { type: 'response', handled };
     }
 
@@ -216,8 +222,8 @@ export class OpenClawRPCHandler {
    * @param params.payload - 用户操作数据
    * @param params.runId - 关联的运行 ID（可选）
    */
-  async nodeInvoke(params: { nodeId: string; action: string; payload: unknown; runId?: string }): Promise<unknown> {
-    return this.request(OpenClawMethod.NODE_INVOKE, params as unknown as Record<string, unknown>);
+  async nodeInvoke(params: NodeInvokeParams): Promise<unknown> {
+    return this.request(OpenClawMethod.NODE_INVOKE, params);
   }
 
   /**
@@ -230,14 +236,14 @@ export class OpenClawRPCHandler {
    * @returns 包含 sessionKey, sessionId, messages 的响应对象
    */
   async sessionsHistory(params: { sessionKey: string; [key: string]: unknown }): Promise<unknown> {
-    return this.request(OpenClawMethod.SESSIONS_HISTORY, params as unknown as Record<string, unknown>);
+    return this.request(OpenClawMethod.SESSIONS_HISTORY, params);
   }
 
   /**
    * 取消所有待处理的请求
    */
   cancelAll(reason = 'Cancelled'): void {
-    this.pendingRequests.forEach((pending, id) => {
+    this.pendingRequests.forEach((pending, _id) => {
       clearTimeout(pending.timeoutId);
       pending.reject(new RPCError(reason, 'CANCELLED'));
     });

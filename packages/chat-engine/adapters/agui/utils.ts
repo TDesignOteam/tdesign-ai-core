@@ -3,6 +3,14 @@
  * 包含与类无关的纯函数，用于处理AGUI协议相关逻辑
  */
 
+import type { AIMessageContent } from '../../type';
+
+export type SnapshotMessageContent = AIMessageContent[] & { readonly _isSnapshot: true };
+
+export function isSnapshotMessageContent(content: AIMessageContent[]): content is SnapshotMessageContent {
+  return '_isSnapshot' in content && content._isSnapshot === true;
+}
+
 /**
  * 合并字符串内容，处理JSON和普通字符串
  * @param existing 现有内容
@@ -29,7 +37,7 @@ export function mergeStringContent(existing: string | undefined, delta: string):
 
     // 其他情况，直接替换
     return delta;
-  } catch (error) {
+  } catch (_error) {
     // 不是有效的JSON，按普通字符串处理
     return existing + delta;
   }
@@ -150,7 +158,7 @@ export function handleMessagesSnapshot(messages: any[]): any[] {
 
   // 标记为快照结果，让上层使用 replaceContent 语义
   if (result.length > 0) {
-    (result as any)._isSnapshot = true;
+    return Object.assign(result, { _isSnapshot: true as const });
   }
 
   return result;

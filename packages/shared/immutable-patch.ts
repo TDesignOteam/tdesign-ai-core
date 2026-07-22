@@ -13,12 +13,27 @@
  */
 
 export type Operation =
-  | { op: 'add'; path: string; value: any }
+  | { op: 'add'; path: string; value: JsonValue }
   | { op: 'remove'; path: string }
-  | { op: 'replace'; path: string; value: any }
+  | { op: 'replace'; path: string; value: JsonValue }
   | { op: 'move'; path: string; from: string }
   | { op: 'copy'; path: string; from: string }
   | { op: 'append'; path: string; value: string };
+
+export type JsonValue = string | number | boolean | null | JsonObject | JsonArray;
+export interface JsonObject {
+  [key: string]: JsonValue;
+}
+export type JsonArray = JsonValue[];
+type PatchValue = string | number | boolean | null | PatchObject | PatchArray | undefined;
+interface PatchObject {
+  [key: string]: PatchValue;
+}
+type PatchArray = PatchValue[];
+
+function isPatchObject(value: PatchValue): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 /**
  * 解析 JSON Pointer 路径
@@ -35,11 +50,17 @@ function parsePath(path: string): string[] {
 /**
  * 获取嵌套值
  */
-function getByPath(obj: any, path: string[]): any {
+function getByPath(obj: PatchValue, path: string[]): PatchValue {
   let current = obj;
   for (const key of path) {
     if (current == null) return undefined;
-    current = current[key];
+    if (Array.isArray(current)) {
+      current = current[Number(key)];
+    } else if (isPatchObject(current)) {
+      current = current[key];
+    } else {
+      return undefined;
+    }
   }
   return current;
 }
@@ -48,85 +69,63 @@ function getByPath(obj: any, path: string[]): any {
  * 不可变地设置嵌套值（结构共享）
  * 只重建路径上的节点，其他节点保持原引用
  */
-function setByPath<T>(obj: T, path: string[], value: any): T {
+function setByPath(obj: PatchValue, path: string[], value: PatchValue): PatchValue {
   if (path.length === 0) {
     return value;
   }
 
   const [head, ...tail] = path;
-  const current = obj as any;
 
-  // 判断当前层是数组还是对象
-  const isArray = Array.isArray(current);
-  const index = isArray ? (head === '-' ? current.length : parseInt(head, 10)) : head;
-
-  if (tail.length === 0) {
-    // 到达目标位置，设置值
-    if (isArray) {
-      const newArr = [...current];
-      newArr[index as number] = value;
-      return newArr as unknown as T;
-    } else {
-      return { ...current, [head]: value };
-    }
+  if (Array.isArray(obj)) {
+    const index = head === '-' ? obj.length : parseInt(head, 10);
+    const newArr = [...obj];
+    newArr[index] = tail.length === 0 ? value : setByPath(obj[index], tail, value);
+    return newArr;
   }
 
-  // 递归处理子路径
-  const child = current[head];
-  const newChild = setByPath(child, tail, value);
-
-  if (isArray) {
-    const newArr = [...current];
-    newArr[index as number] = newChild;
-    return newArr as unknown as T;
-  } else {
-    return { ...current, [head]: newChild };
-  }
+  const current = isPatchObject(obj) ? obj : {};
+  const newValue = tail.length === 0 ? value : setByPath(current[head], tail, value);
+  return { ...current, [head]: newValue };
 }
 
 /**
  * 不可变地删除嵌套值（结构共享）
  */
-function removeByPath<T>(obj: T, path: string[]): T {
+function removeByPath(obj: PatchValue, path: string[]): PatchValue {
   if (path.length === 0) {
-    return undefined as unknown as T;
+    return undefined;
   }
 
   const [head, ...tail] = path;
-  const current = obj as any;
-  const isArray = Array.isArray(current);
 
-  if (tail.length === 0) {
-    // 到达目标位置，删除值
-    if (isArray) {
-      const index = parseInt(head, 10);
-      const newArr = [...current];
-      newArr.splice(index, 1);
-      return newArr as unknown as T;
-    } else {
-      const { [head]: _, ...rest } = current;
-      return rest as T;
-    }
-  }
-
-  // 递归处理子路径
-  const child = current[head];
-  const newChild = removeByPath(child, tail);
-
-  if (isArray) {
+  if (Array.isArray(obj)) {
     const index = parseInt(head, 10);
-    const newArr = [...current];
-    newArr[index] = newChild;
-    return newArr as unknown as T;
-  } else {
-    return { ...current, [head]: newChild };
+    const newArr = [...obj];
+    if (tail.length === 0) {
+      newArr.splice(index, 1);
+    } else {
+      newArr[index] = removeByPath(obj[index], tail);
+    }
+    return newArr;
   }
+
+  const current = isPatchObject(obj) ? obj : {};
+  if (tail.length === 0) {
+    const { [head]: _, ...rest } = current;
+    return rest;
+  }
+  return { ...current, [head]: removeByPath(current[head], tail) };
 }
 
 /**
  * 应用单个操作（结构共享）
  */
-function applyOperationImmutable<T>(document: T, operation: Operation): T {
+function cloneJsonValue(value: PatchValue): JsonValue {
+  if (value === undefined) return null;
+  return JSON.parse(JSON.stringify(value)) as JsonValue;
+}
+
+function applyOperationImmutable(document: PatchValue, operation: Operation): PatchValue {
   const path = parsePath(operation.path);
 
   switch (operation.op) {
@@ -154,7 +153,7 @@ function applyOperationImmutable<T>(document: T, operation: Operation): T {
       const fromPath = parsePath(operation.from);
       const value = getByPath(document, fromPath);
       // 深拷贝 copy 的值，避免共享引用
-      return setByPath(document, path, JSON.parse(JSON.stringify(value)));
+      return setByPath(document, path, cloneJsonValue(value));
     }
 
     default:
@@ -179,8 +178,13 @@ function applyOperationImmutable<T>(document: T, operation: Operation): T {
  * tree.elements.b === newTree.elements.b  // true - b 节点未变，保持原引用
  * tree.elements.a === newTree.elements.a  // false - a 节点被修改，是新引用
  */
-export function applyPatchImmutable<T>(document: T, patch: Operation[]): T {
-  return patch.reduce((doc, op) => applyOperationImmutable(doc, op), document);
+/**
+ * 兼容历史契约：旧 API 承诺补丁结果保持输入泛型 `T`，现有调用方依赖该签名。
+ * 内部使用 `PatchValue` 表达 JSON Patch 可替换或删除根节点的真实语义，避免核心算法伪造类型。
+ */
+export function applyPatchImmutable<T>(document: T, patch: Operation[]): T;
+export function applyPatchImmutable(document: unknown, patch: Operation[]): unknown {
+  return patch.reduce((doc, op) => applyOperationImmutable(doc as PatchValue, op), document as PatchValue);
 }
 
 /**

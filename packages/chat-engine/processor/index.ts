@@ -117,7 +117,7 @@ export default class MessageProcessor {
     let targetMessageId = messageId;
 
     // 作为新的内容块追加
-    if ((rawChunk as any)?.strategy === 'append') {
+    if (rawChunk.strategy === 'append') {
       targetIndex = -1;
     } else {
       // merge 策略：按 type 查找最后一个匹配的类型
@@ -137,9 +137,10 @@ export default class MessageProcessor {
       }
     }
 
+    const targetMessage = messageStore.messages.find((item) => item.id === targetMessageId);
     const existingContent =
-      targetIndex !== -1
-        ? (messageStore.messages.find((m) => m.id === targetMessageId) as any)?.content?.[targetIndex]
+      targetIndex !== -1 && targetMessage && isAIMessage(targetMessage)
+        ? targetMessage.content?.[targetIndex]
         : undefined;
 
     const processed = this.processContentUpdate(existingContent, rawChunk);

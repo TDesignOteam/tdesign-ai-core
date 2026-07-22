@@ -9,6 +9,7 @@ import type { AGUIAdapterCallbacks } from '../adapters/agui';
 import type { AIMessageContent, ChatRequestParams, SSEChunkData, ToolCall } from '../type';
 import { ChatEngineEventType } from '../event-bus';
 import { LLMService } from '../server';
+import { isActivityContent, isToolCallContent } from '../utils';
 import type { IStreamHandler, StreamContext, StreamLifecycleContext, StreamProtocol } from './types';
 
 export class AGUIStreamHandler implements IStreamHandler {
@@ -66,16 +67,15 @@ export class AGUIStreamHandler implements IStreamHandler {
 
     await this.llmService.handleStreamRequest(params, {
       ...config,
-      // @ts-ignore
       onMessage: (_chunk: SSEChunkData) => {
         if (context.getStopReceive() || !messageId) return null;
         let chunk = _chunk;
         if (config.onChunk) {
-          // @ts-ignore
-          chunk = config.onChunk(chunk);
-          if (!chunk) {
-            return;
+          const filtered = config.onChunk(chunk);
+          if (!filtered) {
+            return null;
           }
+          chunk = filtered;
         }
 
         let result: AIMessageContent | AIMessageContent[] | null = null;
@@ -161,19 +161,19 @@ export class AGUIStreamHandler implements IStreamHandler {
     const contents = Array.isArray(result) ? result : [result];
     for (const content of contents) {
       // Activity 事件
-      if ((content as any).data?.activityType) {
+      if (isActivityContent(content)) {
         eventBus.emit(ChatEngineEventType.AGUI_ACTIVITY, {
-          activityType: (content as any).data.activityType,
+          activityType: content.data.activityType,
           messageId,
-          content: (content as any)?.data?.content,
+          content: content.data.content,
         });
       }
 
       // ToolCall 事件
-      if ((content as any)?.data?.eventType?.startsWith('TOOL_CALL')) {
+      if (isToolCallContent(content) && content.data.eventType?.startsWith('TOOL_CALL')) {
         eventBus.emit(ChatEngineEventType.AGUI_TOOLCALL, {
-          toolCall: (content as any).data,
-          eventType: (content as any).data.eventType,
+          toolCall: content.data,
+          eventType: content.data.eventType,
         });
       }
     }

@@ -3,6 +3,7 @@ import type { ChatEventBusOptions, IChatEventBus } from './event-bus';
 import { ChatEngineEventType, ChatEventBus } from './event-bus';
 import MessageProcessor from './processor';
 import { LLMService } from './server';
+import { isSnapshotMessageContent } from './adapters/agui/utils';
 import {
   createStreamHandler,
   type AGUIStreamHandler,
@@ -140,7 +141,7 @@ export default class ChatEngine implements IChatEngine {
 
     // 协议级生命周期初始化（如 OpenClaw 预建 WS + 历史回填）
     // fire-and-forget：init 不阻塞协议握手
-    void this.streamHandler.initialize?.(this.config, {
+    this.streamHandler.initialize?.(this.config, {
       messageStore: this.messageStore,
       eventBus: this.eventBus,
     });
@@ -215,7 +216,7 @@ export default class ChatEngine implements IChatEngine {
    * 下次发送消息时会自动重置 `stopReceive` 并按需建立新连接。
    * 对 `sse` / `fetch` transport 为 no-op。
    */
-  public disconnect(): void {
+  public disconnect() {
     this.stopReceive = true;
     this.llmService.disconnectWS();
   }
@@ -340,7 +341,7 @@ export default class ChatEngine implements IChatEngine {
   public processMessageResult(messageId: string, result: AIMessageContent | AIMessageContent[] | null) {
     if (!result) return;
 
-    if (Array.isArray(result) && (result as any)._isSnapshot) {
+    if (Array.isArray(result) && isSnapshotMessageContent(result)) {
       // MESSAGES_SNAPSHOT：整体替换，避免与已有内容拼接冲突
       this.messageStore.replaceContent(messageId, result);
     } else {

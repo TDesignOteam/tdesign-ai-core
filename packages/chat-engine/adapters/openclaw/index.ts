@@ -11,24 +11,17 @@ import EventEmitter from '../../utils/eventEmitter';
 import { LoggerManager } from '../../utils/logger';
 import { WebSocketClient, type WebSocketClientConfig, WebSocketConnectionState } from '../../server/websocket-client';
 import type { AIMessageContent, ChatRequestParams, SSEChunkData } from '../../type';
-import { OpenClawEventMapper, type EventMapResult } from './event-mapper';
-import { OpenClawRPCHandler, RPCError } from './rpc-handler';
-import type {
-  OpenClawConfig,
-  OpenClawFrame,
-  OpenClawEventFrame,
-  OpenClawResponseFrame,
-  ConnectParams,
-  ConnectChallengePayload,
-} from './types';
-import { mergeOpenClawConfig, DEFAULT_OPENCLAW_CONFIG } from './types/config';
+import { OpenClawEventMapper } from './event-mapper';
+import { OpenClawRPCHandler } from './rpc-handler';
+import type { OpenClawConfig, OpenClawEventFrame, ConnectParams, ConnectChallengePayload } from './types';
+import { mergeOpenClawConfig } from './types/config';
 import { OpenClawEventType, OpenClawConnectionState } from './types/events';
 import { generateUUID, parseFrame, getPlatform, getUserAgent, getLocale, formatWebSocketUrl } from './utils';
 
 import {
   convertOpenClawHistory,
   convertOpenClawHistoryResponse,
-  type OpenClawHistoryMessage,
+  isOpenClawHistoryMessage,
   type OpenClawHistoryResponse,
   type ConvertHistoryOptions,
 } from './history-converter';
@@ -460,19 +453,18 @@ export class OpenClawAdapter extends EventEmitter {
       return;
     }
 
-    console.log(
-      `[OpenClaw Frame] type="${frame.type}", event=${(frame as any).event}, isStreaming=${this.isStreaming}`,
-    );
+    const eventName = frame.type === 'event' ? frame.event : '';
+    console.log(`[OpenClaw Frame] type="${frame.type}", event=${eventName}, isStreaming=${this.isStreaming}`);
 
     // 处理响应帧
     if (frame.type === 'res') {
-      this.rpcHandler.handleResponse(frame as OpenClawResponseFrame);
+      this.rpcHandler.handleResponse(frame);
       return;
     }
 
     // 处理事件帧
     if (frame.type === 'event') {
-      this.handleEventFrame(frame as OpenClawEventFrame);
+      this.handleEventFrame(frame);
     }
   }
 
@@ -489,7 +481,11 @@ export class OpenClawAdapter extends EventEmitter {
     }
 
     // 忽略心跳、健康检查等非业务事件
-    if (event === OpenClawEventType.HEALTH || event === OpenClawEventType.HEARTBEAT || event === ('tick' as any)) {
+    if (
+      event === OpenClawEventType.HEALTH ||
+      event === OpenClawEventType.HEARTBEAT ||
+      event === OpenClawEventType.TICK
+    ) {
       console.log(`[OpenClaw] Skipping non-business event: "${event}"`);
       return;
     }
@@ -585,16 +581,16 @@ export class OpenClawAdapter extends EventEmitter {
       // 检查 connect 响应中是否包含历史消息
       // OpenClaw Gateway 会在 connect 响应的 payload 中附带 messages 数组，
       // 用于页面刷新后自动回填历史对话记录（无需额外 RPC 请求）
-      const connectPayload = response as unknown as Record<string, unknown>;
-      if (Array.isArray(connectPayload?.messages) && connectPayload.messages.length > 0) {
+      const historyMessages = response.messages?.filter(isOpenClawHistoryMessage) ?? [];
+      if (historyMessages.length > 0) {
         this.logger.info(
-          `OpenClaw connect response contains ${connectPayload.messages.length} history messages, converting...`,
+          `OpenClaw connect response contains ${historyMessages.length} history messages, converting...`,
         );
         try {
           const historyResponse = {
-            sessionKey: (connectPayload.sessionKey as string) || '',
-            sessionId: (connectPayload.sessionId as string) || '',
-            messages: connectPayload.messages as OpenClawHistoryMessage[],
+            sessionKey: response.sessionKey || '',
+            sessionId: response.sessionId,
+            messages: historyMessages,
           };
           const convertedMessages = convertOpenClawHistory(historyResponse.messages);
           this.logger.info(`Converted ${convertedMessages.length} history messages`);

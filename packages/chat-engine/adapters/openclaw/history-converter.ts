@@ -81,6 +81,15 @@ export interface OpenClawHistoryMessage {
   isError?: boolean;
 }
 
+export function isOpenClawHistoryMessage(
+  value: Record<string, unknown>,
+): value is Record<string, unknown> & OpenClawHistoryMessage {
+  if (typeof value !== 'object' || value === null || !('role' in value)) {
+    return false;
+  }
+  return ['user', 'assistant', 'toolResult', 'system'].includes(String(value.role));
+}
+
 /**
  * OpenClaw sessions.history 响应
  */
