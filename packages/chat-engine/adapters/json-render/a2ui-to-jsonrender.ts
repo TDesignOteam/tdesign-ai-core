@@ -141,7 +141,7 @@ function mapProps<TProps extends Record<string, unknown>>(component: A2UICompone
       if (isRecord(mappedProps.action) && typeof mappedProps.action.name === 'string') {
         const a2uiAction = mappedProps.action;
         mappedProps.action = {
-          name: a2uiAction.name,
+          action: a2uiAction.name,
           // 将 context 转为 params，保留动态绑定引用供运行时解析
           params: recordOrEmpty(a2uiAction.context),
         };
