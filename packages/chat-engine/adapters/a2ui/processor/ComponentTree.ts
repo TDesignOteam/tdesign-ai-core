@@ -12,6 +12,25 @@ import type { A2UIComponentBase, ChildrenProperty, ResolvedComponent } from '../
 import type { DataStore } from './DataStore';
 import type { PathResolver } from './PathResolver';
 
+function isTemplateChildren(value: unknown): value is Extract<ChildrenProperty, { componentId: string; path: string }> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'componentId' in value &&
+    typeof value.componentId === 'string' &&
+    'path' in value &&
+    typeof value.path === 'string'
+  );
+}
+
+function isChildrenProperty(value: unknown): value is ChildrenProperty {
+  return (Array.isArray(value) && value.every((item) => typeof item === 'string')) || isTemplateChildren(value);
+}
+
+function isTabItem(value: unknown): value is { child: string } {
+  return typeof value === 'object' && value !== null && 'child' in value && typeof value.child === 'string';
+}
+
 /**
  * 组件树构建器
  */
@@ -45,14 +64,14 @@ export class ComponentTree {
     };
 
     // 处理 children
-    const children = (component as any).children as ChildrenProperty | undefined;
-    if (children) {
+    const children = component.children;
+    if (isChildrenProperty(children)) {
       resolved.resolvedChildren = this.resolveChildren(children, dataContextPath);
     }
 
     // 处理 child (Card, Button 等单子组件)
-    const child = (component as any).child as string | undefined;
-    if (child && typeof child === 'string') {
+    const child = component.child;
+    if (typeof child === 'string') {
       const resolvedChild = this.buildTree(child, dataContextPath);
       if (resolvedChild) {
         resolved.resolvedChildren = [resolvedChild];
@@ -60,8 +79,8 @@ export class ComponentTree {
     }
 
     // 处理 tabItems
-    const tabItems = (component as any).tabItems as Array<{ title: any; child: string }> | undefined;
-    if (tabItems && Array.isArray(tabItems)) {
+    const tabItems = component.tabItems;
+    if (Array.isArray(tabItems) && tabItems.every(isTabItem)) {
       resolved.resolvedChildren = tabItems
         .map((item) => this.buildTree(item.child, dataContextPath))
         .filter((c): c is ResolvedComponent => c !== null);

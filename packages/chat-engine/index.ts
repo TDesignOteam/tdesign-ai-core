@@ -3,6 +3,7 @@ import type { ChatEventBusOptions, IChatEventBus } from './event-bus';
 import { ChatEngineEventType, ChatEventBus } from './event-bus';
 import MessageProcessor from './processor';
 import { LLMService } from './server';
+import { isSnapshotMessageContent } from './adapters/agui/utils';
 import {
   createStreamHandler,
   type AGUIStreamHandler,
@@ -340,7 +341,7 @@ export default class ChatEngine implements IChatEngine {
   public processMessageResult(messageId: string, result: AIMessageContent | AIMessageContent[] | null) {
     if (!result) return;
 
-    if (Array.isArray(result) && (result as any)._isSnapshot) {
+    if (Array.isArray(result) && isSnapshotMessageContent(result)) {
       // MESSAGES_SNAPSHOT：整体替换，避免与已有内容拼接冲突
       this.messageStore.replaceContent(messageId, result);
     } else {

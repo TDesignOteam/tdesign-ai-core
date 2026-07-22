@@ -16,6 +16,15 @@ import { OpenClawAdapter, type OpenClawAdapterConfig } from '../adapters/opencla
 import type { IStreamHandler, StreamContext, StreamLifecycleContext, StreamProtocol } from './types';
 import type { LLMService } from '../server';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function toRecord(value: unknown): Record<string, unknown> {
+  // onRequest 是用户扩展边界；OpenClaw 只接受对象参数，非对象返回值不参与协议发送。
+  return isRecord(value) ? value : {};
+}
+
 export interface OpenClawStreamHandlerOptions {
   /** LLM 服务引用（用于 SSE/Batch 的 abort） */
   llmService: LLMService;
@@ -78,10 +87,10 @@ export class OpenClawStreamHandler implements IStreamHandler {
       }
 
       // 通过 onRequest 获取用户自定义的业务参数
-      const requestParams = (await config.onRequest?.(params)) || {};
+      const requestParams = toRecord(await config.onRequest?.(params));
 
       // 发送消息（requestParams 包含用户自定义的 sessionKey、token 等）
-      await this.openclawAdapter!.sendMessage(params, requestParams as Record<string, unknown>);
+      await this.openclawAdapter!.sendMessage(params, requestParams);
     } catch (error) {
       if (messageId) {
         context.handleError(messageId, error);
@@ -128,11 +137,11 @@ export class OpenClawStreamHandler implements IStreamHandler {
 
     try {
       // 用空的 params 调用 onRequest，仅获取 auth 信息
-      const requestParams = await config.onRequest({ prompt: '' } as ChatRequestParams);
+      const requestParams = toRecord(await config.onRequest({ prompt: '' } as ChatRequestParams));
       if (requestParams) {
-        const { auth } = requestParams as Record<string, unknown>;
-        if (auth && typeof auth === 'object') {
-          this.openclawAdapter.setConnectAuth(auth as Record<string, unknown>);
+        const { auth } = requestParams;
+        if (isRecord(auth)) {
+          this.openclawAdapter.setConnectAuth(auth);
         }
       }
     } catch (error) {

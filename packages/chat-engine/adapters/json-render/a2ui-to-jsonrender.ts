@@ -11,7 +11,13 @@
 
 import type { UIElement } from '@json-render/core';
 import type { JsonRenderSchema } from './types/core';
-import type { A2UIComponent, A2UIMessage, A2UISurfaceState } from './types/a2ui';
+import type {
+  A2UIComponent,
+  A2UIMessage,
+  A2UIRootDataModelUpdate,
+  A2UISurfaceState,
+  A2UIUpdateDataModel,
+} from './types/a2ui';
 
 /**
  * 组件类型映射表
@@ -42,20 +48,82 @@ const TYPE_MAPPING: Record<string, string> = {
   Modal: 'Dialog',
 };
 
+type DataNode = Record<string, unknown> | unknown[];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function recordOrEmpty(value: unknown): Record<string, unknown> {
+  return isRecord(value) ? value : {};
+}
+
+function isDataNode(value: unknown): value is DataNode {
+  return isRecord(value) || Array.isArray(value);
+}
+
+function isArrayIndex(key: string): boolean {
+  return /^\d+$/.test(key);
+}
+
+function getNodeValue(node: DataNode, key: string): unknown {
+  return Array.isArray(node) ? node[parseInt(key, 10)] : node[key];
+}
+
+function setNodeValue(node: DataNode, key: string, value: unknown): void {
+  if (Array.isArray(node)) {
+    node[parseInt(key, 10)] = value;
+  } else {
+    node[key] = value;
+  }
+}
+
+function hasNodeValue(node: DataNode, key: string): boolean {
+  return Array.isArray(node) ? isArrayIndex(key) && parseInt(key, 10) in node : key in node;
+}
+
+function deleteNodeValue(node: DataNode, key: string): void {
+  if (Array.isArray(node) && isArrayIndex(key)) {
+    node.splice(parseInt(key, 10), 1);
+  } else if (!Array.isArray(node)) {
+    delete node[key];
+  }
+}
+
+function isRootDataReplacement<TData extends Record<string, unknown>, TValue>(
+  update: A2UIUpdateDataModel<TData, TValue>,
+): update is A2UIRootDataModelUpdate<TData> {
+  return (
+    (update.op === undefined || update.op === 'replace') &&
+    (update.path === undefined || update.path === '' || update.path === '/')
+  );
+}
+
+function createEmptyDataModel<TData extends Record<string, unknown>>(): TData {
+  // 用户数据模型由 A2UI 路径更新逐步构造；TData 是调用方声明的编译期契约，不在转换器内做字段级校验。
+  return {} as TData;
+}
+
+function cloneDataModel<TData extends Record<string, unknown>>(data: TData | undefined): TData {
+  // 保留调用方的 TData 契约，同时只复制 json-render 支持的对象根。
+  return data ? { ...data } : createEmptyDataModel<TData>();
+}
+
 /**
  * 属性映射函数
  * 将 A2UI v0.9.1 组件属性转换为 json-render 组件属性
  */
-function mapProps(component: A2UIComponent): Record<string, any> {
+function mapProps<TProps extends Record<string, unknown>>(component: A2UIComponent<TProps>): Record<string, unknown> {
   // 排除 A2UI 特有字段，保留其他属性
   const { id: _id, component: componentType, weight, child: _child, children: _children, ...restProps } = component;
 
-  const mappedProps: Record<string, any> = { ...restProps };
+  // 用户/组件目录自定义 props 默认透传，只对已知 A2UI 字段做局部转换。
+  const mappedProps: Record<string, unknown> = { ...restProps };
 
   // 处理 weight（flex-grow）
   if (weight !== undefined) {
     mappedProps.style = {
-      ...mappedProps.style,
+      ...recordOrEmpty(mappedProps.style),
       flexGrow: weight,
     };
   }
@@ -70,12 +138,12 @@ function mapProps(component: A2UIComponent): Record<string, any> {
       }
       // A2UI action 格式转换：{ name, context } → { name, params }
       // context 中的 { path: "/xxx" } 会在运行时被 Button 组件解析
-      if (mappedProps.action && typeof mappedProps.action === 'object') {
-        const a2uiAction = mappedProps.action as { name: string; context?: Record<string, unknown> };
+      if (isRecord(mappedProps.action) && typeof mappedProps.action.name === 'string') {
+        const a2uiAction = mappedProps.action;
         mappedProps.action = {
           name: a2uiAction.name,
           // 将 context 转为 params，保留动态绑定引用供运行时解析
-          params: a2uiAction.context || {},
+          params: recordOrEmpty(a2uiAction.context),
         };
       }
       // 处理 theme 映射（A2UI 的 theme: 'primary' → TDesign 的 theme: 'primary'）
@@ -84,7 +152,7 @@ function mapProps(component: A2UIComponent): Record<string, any> {
 
     case 'TextField':
       // A2UI TextField 的 text 属性（数据绑定）→ json-render 的 value
-      if (mappedProps.text && typeof mappedProps.text === 'object' && mappedProps.text.path) {
+      if (isRecord(mappedProps.text) && typeof mappedProps.text.path === 'string') {
         mappedProps.valuePath = mappedProps.text.path;
         delete mappedProps.text;
       }
@@ -92,7 +160,7 @@ function mapProps(component: A2UIComponent): Record<string, any> {
 
     case 'CheckBox':
       // A2UI CheckBox 的 checked 属性（数据绑定）
-      if (mappedProps.checked && typeof mappedProps.checked === 'object' && mappedProps.checked.path) {
+      if (isRecord(mappedProps.checked) && typeof mappedProps.checked.path === 'string') {
         mappedProps.valuePath = mappedProps.checked.path;
         delete mappedProps.checked;
       }
@@ -104,7 +172,7 @@ function mapProps(component: A2UIComponent): Record<string, any> {
         mappedProps.size = mappedProps.gap;
         // 同时设置 CSS gap 作为后备方案
         mappedProps.style = {
-          ...mappedProps.style,
+          ...recordOrEmpty(mappedProps.style),
           display: 'flex',
           flexDirection: 'column',
           gap: `${mappedProps.gap}px`,
@@ -119,7 +187,7 @@ function mapProps(component: A2UIComponent): Record<string, any> {
         mappedProps.gutter = mappedProps.gap;
         // 同时设置 CSS gap 作为后备方案
         mappedProps.style = {
-          ...mappedProps.style,
+          ...recordOrEmpty(mappedProps.style),
           display: 'flex',
           flexDirection: 'row',
           gap: `${mappedProps.gap}px`,
@@ -127,7 +195,7 @@ function mapProps(component: A2UIComponent): Record<string, any> {
         delete mappedProps.gap;
       }
       // A2UI Row 的 distribution 属性 → json-render Row 的 justify 属性
-      if (mappedProps.distribution) {
+      if (typeof mappedProps.distribution === 'string') {
         const distributionMap: Record<string, string> = {
           start: 'start',
           end: 'end',
@@ -138,7 +206,7 @@ function mapProps(component: A2UIComponent): Record<string, any> {
         mappedProps.justify = distributionMap[mappedProps.distribution] || mappedProps.distribution;
         // 同时设置 CSS justifyContent
         mappedProps.style = {
-          ...mappedProps.style,
+          ...recordOrEmpty(mappedProps.style),
           justifyContent: mappedProps.distribution === 'end' ? 'flex-end' : mappedProps.distribution,
         };
         delete mappedProps.distribution;
@@ -150,7 +218,7 @@ function mapProps(component: A2UIComponent): Record<string, any> {
   }
 
   // 处理通用的 disabled 数据绑定
-  if (mappedProps.disabled && typeof mappedProps.disabled === 'object' && mappedProps.disabled.path) {
+  if (isRecord(mappedProps.disabled) && typeof mappedProps.disabled.path === 'string') {
     mappedProps.disabledPath = mappedProps.disabled.path;
     delete mappedProps.disabled;
   }
@@ -161,7 +229,7 @@ function mapProps(component: A2UIComponent): Record<string, any> {
 /**
  * 转换单个 A2UI 组件为 json-render UIElement
  */
-function convertComponent(component: A2UIComponent): UIElement {
+function convertComponent<TProps extends Record<string, unknown>>(component: A2UIComponent<TProps>): UIElement {
   // A2UI 使用 'component' 字段，不是 json-render 的 'type'
   const a2uiType = component.component;
   const mappedType = TYPE_MAPPING[a2uiType] || a2uiType;
@@ -194,8 +262,10 @@ function convertComponent(component: A2UIComponent): UIElement {
  * 从 A2UI 消息数组构建 Surface 状态
  * 累积处理所有消息类型
  */
-function buildSurfaceState(messages: A2UIMessage[]): A2UISurfaceState | null {
-  let surfaceState: A2UISurfaceState | null = null;
+function buildSurfaceState<TProps extends Record<string, unknown>, TData extends Record<string, unknown>, TValue>(
+  messages: A2UIMessage<TProps, TData, TValue>[],
+): A2UISurfaceState<TProps, TData> | null {
+  let surfaceState: A2UISurfaceState<TProps, TData> | null = null;
 
   for (const msg of messages) {
     // 1. createSurface - 初始化 Surface
@@ -204,7 +274,7 @@ function buildSurfaceState(messages: A2UIMessage[]): A2UISurfaceState | null {
         surfaceId: msg.createSurface.surfaceId,
         catalogId: msg.createSurface.catalogId,
         components: new Map(),
-        dataModel: {},
+        dataModel: createEmptyDataModel<TData>(),
       };
     }
 
@@ -224,9 +294,11 @@ function buildSurfaceState(messages: A2UIMessage[]): A2UISurfaceState | null {
       const { path, op, value } = msg.updateDataModel;
       const operation = op || 'replace';
 
-      if (operation === 'replace' && (path === '/' || !path)) {
-        // 替换整个数据模型
-        surfaceState.dataModel = value as Record<string, unknown>;
+      if (isRootDataReplacement(msg.updateDataModel)) {
+        // dataModel 是用户可定义对象；协议根替换只接受对象，避免把非对象写入 json-render data。
+        if (isRecord(msg.updateDataModel.value)) {
+          surfaceState.dataModel = msg.updateDataModel.value;
+        }
       } else if (operation === 'replace' && path) {
         // 替换指定路径
         setValueByPath(surfaceState.dataModel, path, value);
@@ -254,20 +326,22 @@ function buildSurfaceState(messages: A2UIMessage[]): A2UISurfaceState | null {
  */
 function setValueByPath(obj: Record<string, unknown>, path: string, value: unknown): void {
   const parts = path.split('/').filter(Boolean);
-  let current: any = obj;
+  let current: DataNode = obj;
 
   for (let i = 0; i < parts.length - 1; i++) {
     const key = parts[i];
     const nextKey = parts[i + 1];
-    if (!(key in current)) {
+    if (!hasNodeValue(current, key)) {
       // 如果下一个 key 是数字，创建数组；否则创建对象
-      current[key] = /^\d+$/.test(nextKey) ? [] : {};
+      setNodeValue(current, key, isArrayIndex(nextKey) ? [] : {});
     }
-    current = current[key];
+    const next = getNodeValue(current, key);
+    if (!isDataNode(next)) return;
+    current = next;
   }
 
   if (parts.length > 0) {
-    current[parts[parts.length - 1]] = value;
+    setNodeValue(current, parts[parts.length - 1], value);
   }
 }
 
@@ -277,29 +351,27 @@ function setValueByPath(obj: Record<string, unknown>, path: string, value: unkno
  */
 function deleteValueByPath(obj: Record<string, unknown>, path: string): void {
   const parts = path.split('/').filter(Boolean);
-  let current: any = obj;
+  let current: DataNode = obj;
 
   for (let i = 0; i < parts.length - 1; i++) {
     const key = parts[i];
-    if (!(key in current)) return;
-    current = current[key];
+    if (!hasNodeValue(current, key)) return;
+    const next = getNodeValue(current, key);
+    if (!isDataNode(next)) return;
+    current = next;
   }
 
   if (parts.length > 0) {
-    const lastKey = parts[parts.length - 1];
-    if (Array.isArray(current) && /^\d+$/.test(lastKey)) {
-      // 数组元素删除
-      current.splice(parseInt(lastKey, 10), 1);
-    } else {
-      delete current[lastKey];
-    }
+    deleteNodeValue(current, parts[parts.length - 1]);
   }
 }
 
 /**
  * 将 Surface 状态转换为 json-render Schema
  */
-function surfaceStateToSchema(state: A2UISurfaceState): JsonRenderSchema {
+function surfaceStateToSchema<TProps extends Record<string, unknown>, TData extends Record<string, unknown>>(
+  state: A2UISurfaceState<TProps, TData>,
+): JsonRenderSchema<TData> {
   const elements: Record<string, UIElement> = {};
 
   // 遍历所有组件，转换为 json-render elements
@@ -326,7 +398,11 @@ function surfaceStateToSchema(state: A2UISurfaceState): JsonRenderSchema {
  * @param messages A2UI 消息数组
  * @returns json-render Schema 或 null
  */
-export function convertA2UIMessagesToJsonRender(messages: A2UIMessage[]): JsonRenderSchema | null {
+export function convertA2UIMessagesToJsonRender<
+  TProps extends Record<string, unknown> = Record<string, unknown>,
+  TData extends Record<string, unknown> = Record<string, unknown>,
+  TValue = unknown,
+>(messages: A2UIMessage<TProps, TData, TValue>[]): JsonRenderSchema<TData> | null {
   if (!messages || messages.length === 0) {
     return null;
   }
@@ -354,7 +430,10 @@ export function convertA2UIMessagesToJsonRender(messages: A2UIMessage[]): JsonRe
  * @param components A2UI updateComponents 的组件数组
  * @returns 更新后的 Schema
  */
-export function applyA2UIUpdates(schema: JsonRenderSchema, components: A2UIComponent[]): JsonRenderSchema {
+export function applyA2UIUpdates<
+  TProps extends Record<string, unknown> = Record<string, unknown>,
+  TData extends Record<string, unknown> = Record<string, unknown>,
+>(schema: JsonRenderSchema<TData>, components: A2UIComponent<TProps>[]): JsonRenderSchema<TData> {
   if (!Array.isArray(components)) {
     return schema;
   }
@@ -381,18 +460,35 @@ export function applyA2UIUpdates(schema: JsonRenderSchema, components: A2UICompo
  * @param value 值
  * @returns 更新后的 Schema
  */
-export function applyA2UIDataUpdate(
-  schema: JsonRenderSchema,
+export function applyA2UIDataUpdate<TData extends Record<string, unknown> = Record<string, unknown>>(
+  schema: JsonRenderSchema<TData>,
+  path: '/' | '' | undefined,
+  op?: 'replace',
+  value?: TData,
+): JsonRenderSchema<TData>;
+export function applyA2UIDataUpdate<TData extends Record<string, unknown> = Record<string, unknown>, TValue = unknown>(
+  schema: JsonRenderSchema<TData>,
+  path: string | undefined,
+  op?: 'add' | 'replace' | 'remove',
+  value?: TValue,
+): JsonRenderSchema<TData>;
+export function applyA2UIDataUpdate<TData extends Record<string, unknown> = Record<string, unknown>>(
+  schema: JsonRenderSchema<TData>,
   path: string | undefined,
   op: 'add' | 'replace' | 'remove' = 'replace',
   value?: unknown,
-): JsonRenderSchema {
-  const newData = { ...schema.data };
+): JsonRenderSchema<TData> {
+  const newData = cloneDataModel(schema.data);
 
   if (op === 'replace' && (path === '/' || !path)) {
+    // data 是用户可定义对象；协议根替换只接受对象，非对象 payload 保持现有 data。
+    if (!isRecord(value)) {
+      return schema;
+    }
     return {
       ...schema,
-      data: value as Record<string, unknown>,
+      // 根数据替换采用调用方声明的 TData 契约；运行时只校验 json-render 支持对象根。
+      data: value as TData,
     };
   }
 

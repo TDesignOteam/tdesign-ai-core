@@ -3,7 +3,17 @@
  * 提供数据验证、默认值填充、错误恢复等能力
  */
 
-import type { A2UIComponent, A2UIOperation, A2UIAction } from '../types';
+import type { A2UIComponent, A2UIOperation, A2UIOperationType, A2UIAction } from '../types';
+
+const VALID_OPERATION_TYPES: readonly A2UIOperationType[] = ['create', 'update', 'patch', 'delete', 'action'];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isOperationType(value: unknown): value is A2UIOperationType {
+  return typeof value === 'string' && VALID_OPERATION_TYPES.some((operationType) => operationType === value);
+}
 
 // ============= 错误类型 =============
 
@@ -186,7 +196,7 @@ export function validateOperation(
   const errors: A2UIValidationError[] = [];
   let repaired = false;
 
-  if (!operation || typeof operation !== 'object') {
+  if (!isRecord(operation)) {
     return {
       success: false,
       errors: [
@@ -201,18 +211,17 @@ export function validateOperation(
     };
   }
 
-  const op = operation as Record<string, unknown>;
+  const op = operation;
 
   // 验证 type
-  const validTypes = ['create', 'update', 'patch', 'delete', 'action'];
-  if (!op.type || !validTypes.includes(op.type as string)) {
+  if (!isOperationType(op.type)) {
     if (opts.strict) {
       return {
         success: false,
         errors: [
           {
             type: 'INVALID_OPERATION',
-            message: `Invalid operation type: ${op.type}. Must be one of: ${validTypes.join(', ')}`,
+            message: `Invalid operation type: ${op.type}. Must be one of: ${VALID_OPERATION_TYPES.join(', ')}`,
             path: 'type',
             value: op.type,
             recoverable: false,
@@ -233,6 +242,17 @@ export function validateOperation(
         recoverable: true,
       });
     }
+  }
+
+  if (!isOperationType(op.type)) {
+    errors.push({
+      type: 'INVALID_OPERATION',
+      message: `Invalid operation type: ${op.type}. Must be one of: ${VALID_OPERATION_TYPES.join(', ')}`,
+      path: 'type',
+      value: op.type,
+      recoverable: false,
+    });
+    return { success: false, errors, repaired };
   }
 
   // 验证 surfaceId
@@ -261,7 +281,7 @@ export function validateOperation(
   }
 
   // 验证 payload（如果有）
-  if (op.payload && ['create', 'update'].includes(op.type as string)) {
+  if (op.payload && (op.type === 'create' || op.type === 'update')) {
     const payloadResult = validateComponent(op.payload, opts);
     if (payloadResult.data) {
       op.payload = payloadResult.data;
@@ -279,9 +299,20 @@ export function validateOperation(
     console.warn('[A2UI] Operation validation warnings:', errors);
   }
 
+  const data: A2UIOperation = {
+    type: op.type,
+    surfaceId: op.surfaceId,
+  };
+  if (typeof op.componentId === 'string') {
+    data.componentId = op.componentId;
+  }
+  if (isRecord(op.payload)) {
+    data.payload = op.payload;
+  }
+
   return {
     success: errors.filter((e) => !e.recoverable).length === 0,
-    data: op as unknown as A2UIOperation,
+    data,
     errors,
     repaired,
   };

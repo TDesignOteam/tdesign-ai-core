@@ -79,6 +79,7 @@ export type OpenClawFrame<T = unknown> =
  * connect 方法参数
  */
 export interface ConnectParams {
+  [key: string]: unknown;
   /** 最小协议版本 */
   minProtocol: number;
   /** 最大协议版本 */

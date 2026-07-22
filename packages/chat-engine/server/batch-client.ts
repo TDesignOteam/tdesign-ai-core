@@ -17,7 +17,12 @@ export class BatchClient extends EventEmitter {
    * @param timeout 超时时间（毫秒）
    * @returns 响应数据
    */
-  async request<T>(endpoint: string, request: RequestInit, timeout = 1000000): Promise<T> {
+  /**
+   * 兼容历史契约：公开类型长期承诺 `Promise<T>`，但失败时运行时返回空值。
+   * 实现签名保留真实的 `unknown` 返回，避免在内部伪造泛型值；后续大版本可统一错误契约。
+   */
+  async request<T>(endpoint: string, request: RequestInit, timeout?: number): Promise<T>;
+  async request(endpoint: string, request: RequestInit, timeout = 1000000): Promise<unknown> {
     // 中止上一个请求
     this.abort();
 
@@ -37,15 +42,15 @@ export class BatchClient extends EventEmitter {
 
       if (!response.ok) {
         this.emit('error', new ConnectionError(`HTTP error! status: ${response.status}`));
-        return null as T;
+        return null;
       }
-      return (await response.json()) as T;
+      return response.json();
     } catch (error: unknown) {
-      if ((error as Error).name !== 'AbortError') {
+      if (!(error instanceof Error) || error.name !== 'AbortError') {
         this.logger.error('Batch request failed:', error);
         this.emit('error', error);
       }
-      return undefined as unknown as T;
+      return undefined;
     } finally {
       clearTimeout(timeoutId);
       this.controller = null;
