@@ -459,10 +459,10 @@ export type ContentPayload = ChatJSONValue | object;
 
 export type AIContentHandler<T extends ChatBaseContent<string, ContentPayload>> = (chunk: T, existing?: T) => T;
 
-export interface ContentTypeDefinition<T extends string = string, D extends ContentPayload = ContentPayload, R = void> {
+export interface ContentTypeDefinition<T extends string = string, D extends ContentPayload = ContentPayload> {
   type: T;
   handler?: AIContentHandler<ChatBaseContent<T, D>>;
-  renderer?: ContentRenderer<ChatBaseContent<T, D>, R>;
+  renderer?: ContentRenderer<ChatBaseContent<T, D>>;
 }
 
-export type ContentRenderer<T extends ChatBaseContent<string, ContentPayload>, R = void> = (content: T) => R;
+export type ContentRenderer<T extends ChatBaseContent<string, ContentPayload>> = (content: T) => void;
