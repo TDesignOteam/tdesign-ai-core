@@ -9,8 +9,6 @@
  *   If the path does not exist or is null/undefined, it will be initialized with the value.
  *   Example: {"op": "append", "path": "/content", "value": "示例"}
  */
-declare var require: any;
-
 import { PatchError, _deepClone, isInteger, unescapePathComponent, hasUndefined } from './helpers';
 
 export const JsonPatchError = PatchError;

@@ -19,6 +19,7 @@ import type {
   ChatServiceConfig,
   ChatServiceConfigSetter,
   ChatStatus,
+  ChatStreamPayload,
   IChatEngine,
   SystemMessage,
 } from './type';
@@ -581,7 +582,7 @@ export default class ChatEngine implements IChatEngine {
    * 先让用户 `onComplete` 回调有机会自定义内容；否则按各内容块状态结算，
    * 并广播 `REQUEST_COMPLETE` 或 `REQUEST_ABORT` 事件。
    */
-  private handleComplete(id: string, isAborted: boolean, params: ChatRequestParams, chunk?: unknown) {
+  private handleComplete(id: string, isAborted: boolean, params: ChatRequestParams, chunk?: ChatStreamPayload) {
     const customResult = this.config.onComplete?.(isAborted, params, chunk);
     if (Array.isArray(customResult) || (customResult && 'status' in customResult)) {
       this.processMessageResult(id, customResult);

@@ -7,7 +7,13 @@
  * 生命周期（可选钩子）：
  *   initialize → handleStream(* n) → afterMessageUpdate(* n) → abort? → destroy?
  */
-import type { AIMessageContent, ChatMessagesData, ChatRequestParams, ChatServiceConfig } from '../type';
+import type {
+  AIMessageContent,
+  ChatMessagesData,
+  ChatRequestParams,
+  ChatServiceConfig,
+  ChatStreamPayload,
+} from '../type';
 import type { IChatEventBus } from '../event-bus';
 import type { MessageStore } from '../store/message';
 
@@ -33,7 +39,7 @@ export interface StreamContext {
   /** 错误处理 */
   handleError: (messageId: string, error: unknown) => void;
   /** 完成处理 */
-  handleComplete: (messageId: string, isAborted: boolean, params: ChatRequestParams, chunk?: unknown) => void;
+  handleComplete: (messageId: string, isAborted: boolean, params: ChatRequestParams, chunk?: ChatStreamPayload) => void;
   /** 消息存储（用于获取消息） */
   messageStore: MessageStore;
   /** 事件总线 */

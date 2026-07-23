@@ -15,7 +15,8 @@ import type { MessageStore } from '../store/message';
 import { isAIMessage } from '../utils';
 
 export default class MessageProcessor {
-  private contentHandlers: Map<string, (chunk: any, existing?: any) => any> = new Map();
+  private contentHandlers: Map<string, (chunk: AIMessageContent, existing?: AIMessageContent) => AIMessageContent> =
+    new Map();
 
   constructor() {
     this.registerDefaultHandlers();
@@ -195,7 +196,12 @@ export default class MessageProcessor {
     type: T['type'], // 使用类型中定义的type字段作为参数类型
     handler: (chunk: T, existing?: T) => T,
   ) {
-    this.contentHandlers.set(type, handler);
+    this.contentHandlers.set(type, (chunk, existing) => {
+      if (chunk.type !== type || (existing && existing.type !== type)) {
+        return chunk;
+      }
+      return handler(chunk as T, existing as T | undefined);
+    });
   }
 
   private generateID() {

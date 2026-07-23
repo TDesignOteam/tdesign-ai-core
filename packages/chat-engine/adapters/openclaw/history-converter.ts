@@ -326,7 +326,7 @@ function convertAssistantContent(
         const toolCall = {
           toolCallId,
           toolCallName,
-          eventType: toolResult ? 'TOOL_CALL_RESULT' : 'TOOL_CALL_START',
+          eventType: toolResult ? ('TOOL_CALL_RESULT' as const) : ('TOOL_CALL_START' as const),
           parentMessageId: '',
           args: argsStr,
           result: resultStr,

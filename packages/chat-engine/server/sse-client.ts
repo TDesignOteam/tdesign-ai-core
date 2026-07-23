@@ -176,8 +176,8 @@ export class SSEClient extends EventEmitter {
         return;
       }
       this.reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
         this.logger.error('sse request failed:', error);
         this.emit('error', error);
       }

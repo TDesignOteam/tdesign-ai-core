@@ -63,11 +63,11 @@ export class LLMService implements ILLMService {
   ): Promise<AIMessageContent | AIMessageContent[]> {
     // 确保只有一个客户端实例
     this.batchClient = this.batchClient || new BatchClient();
-    this.batchClient.on('error', (error) => {
+    this.batchClient.on('error', (error: Error | Response) => {
       config.onError?.(error);
     });
 
-    const req = (await config.onRequest?.(params)) || params;
+    const req: ChatRequestParams & Partial<RequestInit> = (await config.onRequest?.(params)) || params;
 
     try {
       const data = await this.batchClient.request<AIMessageContent>(
@@ -117,7 +117,7 @@ export class LLMService implements ILLMService {
     this.wsPersistent = true;
 
     // 设置基础事件处理器
-    this.wsClient.on('start', (chunk) => {
+    this.wsClient.on('start', (chunk: string) => {
       config.onStart?.(chunk);
     });
 
@@ -164,7 +164,7 @@ export class LLMService implements ILLMService {
     const req = (await config.onRequest?.(params)) || {};
 
     // 设置事件处理器
-    this.sseClient.on('start', (chunk) => {
+    this.sseClient.on('start', (chunk: string) => {
       config.onStart?.(chunk);
     });
 
@@ -175,11 +175,11 @@ export class LLMService implements ILLMService {
       config.onMessage?.(chunk);
     });
 
-    this.sseClient.on('error', (error) => {
+    this.sseClient.on('error', (error: Error | Response) => {
       config.onError?.(error);
     });
 
-    this.sseClient.on('complete', (isAborted) => {
+    this.sseClient.on('complete', (isAborted: boolean) => {
       config.onComplete?.(isAborted, req);
     });
 
@@ -205,7 +205,7 @@ export class LLMService implements ILLMService {
     this.wsClient!.removeAllListeners();
 
     // 设置事件处理器（与 SSE 事件模型一致）
-    this.wsClient!.on('start', (chunk) => {
+    this.wsClient!.on('start', (chunk: string) => {
       config.onStart?.(chunk);
     });
 
@@ -215,11 +215,11 @@ export class LLMService implements ILLMService {
       config.onMessage?.(chunk);
     });
 
-    this.wsClient!.on('error', (error) => {
+    this.wsClient!.on('error', (error: Error | Response) => {
       config.onError?.(error);
     });
 
-    this.wsClient!.on('complete', (isAborted) => {
+    this.wsClient!.on('complete', (isAborted: boolean) => {
       config.onComplete?.(isAborted, params);
     });
 
@@ -257,7 +257,7 @@ export class LLMService implements ILLMService {
   /**
    * 获取 SSE 连接统计
    */
-  getSSEStats(): { id: string; status: string; info: any } | null {
+  getSSEStats(): { id: string; status: string; info: unknown } | null {
     if (!this.sseClient) return null;
 
     return {
@@ -270,7 +270,7 @@ export class LLMService implements ILLMService {
   /**
    * 获取 WebSocket 连接统计
    */
-  getWSStats(): { id: string; status: string; info: any } | null {
+  getWSStats(): { id: string; status: string; info: unknown } | null {
     if (!this.wsClient) return null;
 
     return {

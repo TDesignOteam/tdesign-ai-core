@@ -23,7 +23,7 @@ export interface SSEClientConfig extends Omit<RequestInit & ChatRequestParams, '
 // 事件接口
 export interface SSEEvent {
   event?: string;
-  data?: any;
+  data?: unknown;
   id?: string;
   retry?: number;
   timestamp?: number;

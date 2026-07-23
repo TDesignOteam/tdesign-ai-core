@@ -5,7 +5,7 @@ import { LoggerManager } from '../utils/logger';
  */
 export interface SSEEvent {
   event?: string;
-  data?: any;
+  data?: unknown;
   id?: string;
 }
 
@@ -98,7 +98,7 @@ export class SSEParser {
     if (this.currentEvent.data !== undefined && this.onMessage) {
       try {
         // 尝试解析JSON，失败则保持原始字符串
-        let data: any;
+        let data: unknown;
         try {
           data = JSON.parse(this.currentEvent.data);
         } catch {
