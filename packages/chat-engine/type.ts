@@ -1,4 +1,5 @@
 import type { ToolCallEventType } from './adapters/agui/types/events';
+import type { MessageStore } from './store/message';
 
 export type ChatMessageRole = 'user' | 'assistant' | 'system';
 export type ChatMessageStatus = 'pending' | 'streaming' | 'complete' | 'stop' | 'error';
@@ -17,15 +18,20 @@ export type ChatContentType =
   | 'activity';
 
 export type AttachmentType = 'image' | 'video' | 'audio' | 'pdf' | 'doc' | 'ppt' | 'txt';
+export type ChatJSONPrimitive = string | number | boolean | null;
+export type ChatJSONValue = ChatJSONPrimitive | ChatJSONObject | ChatJSONValue[];
+export interface ChatJSONObject {
+  [key: string]: ChatJSONValue;
+}
 
 // 基础类型
-export interface ChatBaseContent<T extends string, TData> {
+export interface ChatBaseContent<T extends string, TData, TExt extends object = object> {
   type: T;
   data: TData;
   status?: ChatMessageStatus;
   id?: string;
   strategy?: 'merge' | 'append';
-  ext?: Record<string, any>;
+  ext?: TExt;
 }
 
 // 内容类型
@@ -69,7 +75,7 @@ export type SuggestionItem = {
 export type SuggestionContent = ChatBaseContent<'suggestion', SuggestionItem[]>;
 
 // 附件消息
-export type AttachmentItem = {
+export type AttachmentItem<TMetadata extends object = object> = {
   fileType: AttachmentType;
   size?: number;
   name?: string;
@@ -78,7 +84,7 @@ export type AttachmentItem = {
   width?: number;
   height?: number;
   extension?: string; // 自定义文件后缀，默认按照name文件名后缀识别
-  metadata?: Record<string, any>;
+  metadata?: TMetadata;
 };
 export type AttachmentContent = ChatBaseContent<'attachment', AttachmentItem[]>;
 
@@ -104,7 +110,7 @@ export type ToolCall = {
 export type ToolCallContent = ChatBaseContent<'toolcall', ToolCall>;
 
 // Activity 内容
-export type ActivityData<TContent = Record<string, any>> = {
+export type ActivityData<TContent extends object = object> = {
   activityType: string;
   messageId?: string;
   content: TContent;
@@ -115,16 +121,21 @@ export type ActivityData<TContent = Record<string, any>> = {
   };
 };
 
-export type ActivityContent<TContent = Record<string, any>> = ChatBaseContent<'activity', ActivityData<TContent>>;
+export type ActivityContent<TContent extends object = object> = ChatBaseContent<'activity', ActivityData<TContent>>;
+
+export type CustomContent = ChatBaseContent<'custom', { name: string; value: ChatJSONValue }>;
+export type DynamicToolCallContent = ChatBaseContent<`toolcall-${string}`, ToolCall>;
+export type DynamicActivityContent = ChatBaseContent<`activity-${string}`, ActivityData<ChatJSONObject>>;
+export type SystemTextContent = ChatBaseContent<'system-text', string>;
 
 // 消息主体
 // 基础消息结构
 
-export interface ChatBaseMessage {
+export interface ChatBaseMessage<TExt extends object = object> {
   id: string;
   status?: ChatMessageStatus;
   datetime?: string;
-  ext?: any;
+  ext?: TExt;
 }
 
 // 类型扩展机制
@@ -141,6 +152,10 @@ type AIContentTypeMap = {
   suggestion: SuggestionContent;
   toolcall: ToolCallContent;
   activity: ActivityContent;
+  custom: CustomContent;
+  'system-text': SystemTextContent;
+  [type: `toolcall-${string}`]: DynamicToolCallContent;
+  [type: `activity-${string}`]: DynamicActivityContent;
 } & AIContentTypeOverrides;
 
 export type AIContentType = keyof AIContentTypeMap;
@@ -170,17 +185,18 @@ export interface SystemMessage extends ChatBaseMessage {
 export type ChatMessagesData = UserMessage | AIMessage | SystemMessage;
 
 // 回答消息体配置
-export type SSEChunkData = {
+export type ChatStreamPayload = ChatJSONValue | AIMessageContent | AIMessageContent[];
+
+export type SSEChunkData<TData = ChatStreamPayload> = {
   event?: string;
-  data: any;
+  data: TData;
 };
 
-export interface ChatRequestParams {
+export type ChatRequestParams<TExt extends object = object> = {
   prompt?: string;
   messageID?: string;
   attachments?: AttachmentContent['data'];
-  [key: string]: any;
-}
+} & TExt;
 
 // 基础配置类型
 export type AIContentChunkUpdate = AIMessageContent;
@@ -263,7 +279,7 @@ export interface DefaultEngineCallbacks {
   onComplete?: (
     isAborted: boolean,
     params?: ChatRequestParams,
-    result?: any,
+    result?: AIMessageContent | AIMessageContent[] | ChatJSONValue,
   ) => AIMessageContent | AIMessageContent[] | void;
   onAbort?: () => Promise<void>;
   /** 错误处理 */
@@ -303,7 +319,9 @@ export interface DefaultEngineCallbacks {
 export interface ChatServiceConfig extends ChatNetworkConfig, DefaultEngineCallbacks {}
 
 // 联合类型支持静态配置和动态生成
-export type ChatServiceConfigSetter = ChatServiceConfig | ((params?: any) => ChatServiceConfig);
+export type ChatServiceConfigSetter<TParams extends ChatRequestParams = ChatRequestParams> =
+  | ChatServiceConfig
+  | ((params?: TParams) => ChatServiceConfig);
 
 // 统一的引擎接口
 export interface IChatEngine {
@@ -313,7 +331,7 @@ export interface IChatEngine {
    * @param messages 初始消息列表，用于恢复历史对话
    * @description 必须在使用其他方法前调用此方法进行初始化
    */
-  init(config?: any, messages?: ChatMessagesData[]): void | Promise<void>;
+  init(config?: ChatServiceConfigSetter, messages?: ChatMessagesData[]): void | Promise<void>;
 
   /**
    * 发送用户消息并获取AI回复
@@ -396,7 +414,7 @@ export interface IChatEngine {
    * 获取消息存储实例
    * @returns 消息存储对象
    */
-  get messageStore(): any; // 抽象化，不同引擎可能有不同的store
+  get messageStore(): MessageStore;
 
   /**
    * 更新 WS 端点地址
@@ -437,12 +455,14 @@ export interface ChatState {
 
 export type ChatMessageSetterMode = 'replace' | 'prepend' | 'append';
 
-export type AIContentHandler<T extends ChatBaseContent<any, any>> = (chunk: T, existing?: T) => T;
+export type ContentPayload = ChatJSONValue | object;
 
-export interface ContentTypeDefinition<T extends string = string, D = any> {
+export type AIContentHandler<T extends ChatBaseContent<string, ContentPayload>> = (chunk: T, existing?: T) => T;
+
+export interface ContentTypeDefinition<T extends string = string, D extends ContentPayload = ContentPayload> {
   type: T;
   handler?: AIContentHandler<ChatBaseContent<T, D>>;
   renderer?: ContentRenderer<ChatBaseContent<T, D>>;
 }
 
-export type ContentRenderer<T extends ChatBaseContent<any, any>> = (content: T) => unknown;
+export type ContentRenderer<T extends ChatBaseContent<string, ContentPayload>> = (content: T) => void;

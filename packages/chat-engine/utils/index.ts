@@ -26,9 +26,9 @@ import { applyPatchImmutable, type Operation } from './immutable-patch';
  * @param delta 包含patch操作的数组
  * @returns 更新后的新状态对象（结构共享）
  */
-export function applyJsonPatch(state: any, delta: any[]): any {
+export function applyJsonPatch<T>(state: T, delta: Operation[]): T {
   try {
-    return applyPatchImmutable(state, delta as Operation[]);
+    return applyPatchImmutable(state, delta);
   } catch (error) {
     console.warn('JSON Patch操作失败，返回原始状态:', error);
     return state;
@@ -43,13 +43,13 @@ export function applyJsonPatch(state: any, delta: any[]): any {
  * @param errorContext 错误上下文，用于日志输出
  * @returns 解析后的值或回退值
  */
-export function safeParseJSON<T = any>(value: any, fallbackValue?: T, errorContext?: string): T {
+export function safeParseJSON<T = unknown>(value: string, fallbackValue?: T, errorContext?: string): T | string {
   if (typeof value !== 'string') {
     return value; // 如果不是字符串，直接返回
   }
 
   try {
-    return JSON.parse(value);
+    return JSON.parse(value) as T;
   } catch (error) {
     const context = errorContext ? ` (${errorContext})` : '';
     console.warn(`Failed to parse JSON${context}:`, error);

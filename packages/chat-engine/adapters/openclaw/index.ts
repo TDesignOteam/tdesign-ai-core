@@ -261,6 +261,10 @@ export class OpenClawAdapter extends EventEmitter {
    */
   handleEvent(chunk: SSEChunkData): AIMessageContent | AIMessageContent[] | null {
     // 将 SSE 格式转换为 OpenClaw 帧格式
+    if (chunk.data === null || (typeof chunk.data !== 'string' && typeof chunk.data !== 'object')) {
+      return null;
+    }
+
     const frame = parseFrame(chunk.data);
     if (!frame || frame.type !== 'event') {
       return null;

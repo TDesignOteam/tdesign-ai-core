@@ -9,7 +9,7 @@ export class SSEError extends Error {
     public readonly code: string,
     public readonly statusCode?: number,
     public readonly isRetryable: boolean = false,
-    public readonly details?: any,
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = 'SSEError';
@@ -18,7 +18,7 @@ export class SSEError extends Error {
 
 // 连接错误
 export class ConnectionError extends SSEError {
-  constructor(message: string, statusCode?: number, details?: any) {
+  constructor(message: string, statusCode?: number, details?: unknown) {
     super(message, 'CONNECTION_ERROR', statusCode, true, details);
     this.name = 'ConnectionError';
   }
@@ -26,7 +26,7 @@ export class ConnectionError extends SSEError {
 
 // 超时错误
 export class TimeoutError extends SSEError {
-  constructor(details?: any, message = '请求超时') {
+  constructor(details?: unknown, message = '请求超时') {
     super(message, 'TIMEOUT_ERROR', undefined, true, details);
     this.name = 'TimeoutError';
   }
@@ -34,7 +34,7 @@ export class TimeoutError extends SSEError {
 
 // 解析错误
 export class ParseError extends SSEError {
-  constructor(message: string, details?: any) {
+  constructor(message: string, details?: unknown) {
     super(message, 'PARSE_ERROR', undefined, false, details);
     this.name = 'ParseError';
   }
@@ -42,7 +42,7 @@ export class ParseError extends SSEError {
 
 // 验证错误
 export class ValidationError extends SSEError {
-  constructor(message: string, details?: any) {
+  constructor(message: string, details?: unknown) {
     super(message, 'VALIDATION_ERROR', undefined, false, details);
     this.name = 'ValidationError';
   }

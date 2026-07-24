@@ -13,6 +13,25 @@
 import { getByPath } from '@json-render/core';
 import type { ActionBinding } from '@json-render/core';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isPathBinding(value: unknown): value is { path: string } {
+  return isRecord(value) && typeof value.path === 'string' && Object.keys(value).length === 1;
+}
+
+function setActionParam(target: Record<string, unknown>, key: string, value: unknown): void {
+  // 兼容历史 action params：constructor / prototype / __proto__ 都应作为普通业务参数保留。
+  // 使用 defineProperty 写入，避免 `__proto__` 经过对象 setter 触发原型变更。
+  Object.defineProperty(target, key, {
+    value,
+    enumerable: true,
+    configurable: true,
+    writable: true,
+  });
+}
+
 /**
  * resolveActionParams 配置
  */
@@ -24,7 +43,8 @@ export interface ResolveActionParamsOptions {
 /**
  * 解析 action params 中的动态数据绑定
  *
- * 把 params 里形如 `{ path: '/userInfo/name' }` 的引用替换为 data 中的实际值。
+ * 把 params 里形如 `{ path: '/userInfo/name' }` 的纯绑定对象替换为 data 中的实际值。
+ * 含有额外字段的对象会被视为业务对象保留，避免误吞业务参数。
  * 支持嵌套对象，使用栈迭代实现，避免深递归调用栈过长。
  *
  * @param params 待解析的参数对象（一般来自 action.params 或 action.context）
@@ -61,27 +81,28 @@ export function resolveActionParams(
 
     if (depth >= maxDepth) {
       // 防止无限递归：超过深度后整个对象按值拷贝放入
-      Object.assign(target, source);
+      for (const [key, value] of Object.entries(source)) {
+        setActionParam(target, key, value);
+      }
       continue;
     }
 
     for (const [key, value] of Object.entries(source)) {
-      if (value && typeof value === 'object' && 'path' in value) {
+      if (isPathBinding(value)) {
         // 动态绑定：{ path: '/userInfo' } → 实际数据
-        const pathValue = (value as { path: string }).path;
-        target[key] = getByPath(data as any, pathValue);
-      } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+        setActionParam(target, key, getByPath(data, value.path));
+      } else if (isRecord(value)) {
         // 嵌套对象，加入栈处理
         const nestedTarget: Record<string, unknown> = {};
-        target[key] = nestedTarget;
+        setActionParam(target, key, nestedTarget);
         stack.push({
-          source: value as Record<string, unknown>,
+          source: value,
           target: nestedTarget,
           depth: depth + 1,
         });
       } else {
         // 静态值（含数组、原始值）直接保留
-        target[key] = value;
+        setActionParam(target, key, value);
       }
     }
   }
@@ -94,8 +115,26 @@ export function resolveActionParams(
  */
 export type ActionLike =
   | string
-  | (ActionBinding & { name?: string; context?: Record<string, unknown> })
-  | { name?: string; context?: Record<string, unknown>; action?: string; params?: Record<string, unknown> };
+  | {
+      name?: string;
+      context?: Record<string, unknown>;
+      action?: string;
+      params?: Record<string, unknown>;
+      confirm?: ActionBinding['confirm'];
+      onSuccess?: ActionBinding['onSuccess'];
+      onError?: ActionBinding['onError'];
+      preventDefault?: boolean;
+    };
+
+/**
+ * 已归一化的 A2UI action。
+ *
+ * `params` 仍可能包含 A2UI 的 `{ path }` 绑定，调用方应先使用
+ * {@link resolveActionParams} 解析后，再交给只接受 json-render `DynamicValue` 的 ActionBinding 消费者。
+ */
+export type NormalizedActionBinding = Omit<ActionBinding, 'params'> & {
+  params: Record<string, unknown>;
+};
 
 /**
  * 把不同形态的 action 字段归一化为标准 ActionBinding
@@ -105,22 +144,22 @@ export type ActionLike =
  * 2. 标准 ActionBinding：{ action, params? }
  * 3. 旧版 A2UI / mock 数据：{ name, context? } → { action: name, params: context }
  *
- * @returns 归一化后的 ActionBinding；当无法识别时返回 null（调用方应当报错）
+ * @returns 归一化后的 A2UI action；当无法识别时返回 null（调用方应当报错）
  */
-export function normalizeActionBinding(action: ActionLike | null | undefined): ActionBinding | null {
+export function normalizeActionBinding(action: ActionLike | null | undefined): NormalizedActionBinding | null {
   if (!action) return null;
 
   if (typeof action === 'string') {
     return { action, params: {} };
   }
 
-  const raw = action as ActionBinding & { name?: string; context?: Record<string, unknown> };
-  const actionName = raw.action ?? raw.name ?? '';
+  const { name, context, action: explicitAction, params, ...bindingOptions } = action;
+  const actionName = explicitAction ?? name ?? '';
   if (!actionName) return null;
 
   return {
-    ...raw,
+    ...bindingOptions,
     action: actionName,
-    params: raw.params ?? raw.context ?? {},
+    params: params ?? context ?? {},
   };
 }

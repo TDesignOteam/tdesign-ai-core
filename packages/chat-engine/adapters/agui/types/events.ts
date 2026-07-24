@@ -1,6 +1,19 @@
 import { z } from 'zod';
 
-import { AGUIMessageSchema, StateSchema } from './schema';
+import type { Operation } from '../../../../shared/immutable-patch';
+import { AGUIMessageSchema, ChatJSONObjectSchema, ChatJSONValueSchema, StateSchema } from './schema';
+
+const isOperation = (value: unknown): value is Operation => {
+  if (typeof value !== 'object' || value === null || !('op' in value) || !('path' in value)) return false;
+  const operation = value as { op?: unknown; path?: unknown; from?: unknown };
+  return (
+    typeof operation.path === 'string' &&
+    ['add', 'remove', 'replace', 'move', 'copy', 'append'].includes(String(operation.op)) &&
+    (!['move', 'copy'].includes(String(operation.op)) || typeof operation.from === 'string')
+  );
+};
+
+const OperationSchema = z.custom<Operation>(isOperation, 'Expected a JSON Patch operation');
 
 export type ToolCallEventType =
   | 'TOOL_CALL_START'
@@ -130,7 +143,7 @@ export function isStateEvent(eventType: string): boolean {
 const BaseEventSchema = z.object({
   type: z.enum(AGUIEventType),
   timestamp: z.number().optional(),
-  rawEvent: z.any().optional(),
+  rawEvent: ChatJSONValueSchema.optional(),
 });
 
 export const TextMessageStartEventSchema = BaseEventSchema.extend({
@@ -148,6 +161,7 @@ export const TextMessageContentEventSchema = BaseEventSchema.extend({
 export const TextMessageEndEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.TEXT_MESSAGE_END),
   messageId: z.string(),
+  delta: z.string().optional(),
 });
 
 export const TextMessageChunkEventSchema = BaseEventSchema.extend({
@@ -186,17 +200,20 @@ export const ThinkingTextMessageEndEventSchema = BaseEventSchema.extend({
 export const ReasoningStartEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.REASONING_START),
   messageId: z.string().optional(),
+  title: z.string().optional(),
 });
 
 export const ReasoningEndEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.REASONING_END),
   messageId: z.string().optional(),
+  title: z.string().optional(),
 });
 
 export const ReasoningMessageStartEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.REASONING_MESSAGE_START),
   messageId: z.string(),
   role: z.literal('reasoning').optional(),
+  title: z.string().optional(),
 });
 
 export const ReasoningMessageContentEventSchema = BaseEventSchema.extend({
@@ -208,6 +225,7 @@ export const ReasoningMessageContentEventSchema = BaseEventSchema.extend({
 export const ReasoningMessageEndEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.REASONING_MESSAGE_END),
   messageId: z.string(),
+  title: z.string().optional(),
 });
 
 export const ReasoningMessageChunkEventSchema = BaseEventSchema.extend({
@@ -215,6 +233,7 @@ export const ReasoningMessageChunkEventSchema = BaseEventSchema.extend({
   messageId: z.string().optional(),
   role: z.literal('reasoning').optional(),
   delta: z.string().optional(),
+  title: z.string().optional(),
 });
 
 export const ReasoningEncryptedValueEventSchema = BaseEventSchema.extend({
@@ -263,7 +282,7 @@ export const ActivitySnapshotEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.ACTIVITY_SNAPSHOT),
   messageId: z.string().optional(),
   activityType: z.string(),
-  content: z.record(z.string(), z.any()),
+  content: ChatJSONObjectSchema,
   replace: z.boolean().optional(),
 });
 
@@ -271,7 +290,7 @@ export const ActivityDeltaEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.ACTIVITY_DELTA),
   messageId: z.string().optional(),
   activityType: z.string().optional(),
-  patch: z.array(z.any()).optional(), // JSON Patch (RFC 6902)
+  patch: z.array(OperationSchema).optional(), // JSON Patch (RFC 6902)
 });
 
 export const ThinkingStartEventSchema = BaseEventSchema.extend({
@@ -291,7 +310,7 @@ export const StateSnapshotEventSchema = BaseEventSchema.extend({
 
 export const StateDeltaEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.STATE_DELTA),
-  delta: z.array(z.any()), // JSON Patch (RFC 6902)
+  delta: z.array(OperationSchema), // JSON Patch (RFC 6902)
 });
 
 export const MessagesSnapshotEventSchema = BaseEventSchema.extend({
@@ -301,14 +320,14 @@ export const MessagesSnapshotEventSchema = BaseEventSchema.extend({
 
 export const RawEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.RAW),
-  event: z.any(),
+  event: ChatJSONValueSchema,
   source: z.string().optional(),
 });
 
 export const CustomEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.CUSTOM),
   name: z.string(),
-  value: z.any(),
+  value: ChatJSONValueSchema,
 });
 
 export const RunStartedEventSchema = BaseEventSchema.extend({
@@ -321,7 +340,7 @@ export const RunFinishedEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.RUN_FINISHED),
   threadId: z.string(),
   runId: z.string(),
-  result: z.any().optional(),
+  result: ChatJSONValueSchema.optional(),
 });
 
 export const RunErrorEventSchema = BaseEventSchema.extend({
@@ -345,6 +364,8 @@ export const EventSchemas = z.discriminatedUnion('type', [
   TextMessageContentEventSchema,
   TextMessageEndEventSchema,
   TextMessageChunkEventSchema,
+  ThinkingStartEventSchema,
+  ThinkingEndEventSchema,
   ThinkingTextMessageStartEventSchema,
   ThinkingTextMessageContentEventSchema,
   ThinkingTextMessageEndEventSchema,
@@ -410,3 +431,4 @@ export type RunFinishedEvent = z.infer<typeof RunFinishedEventSchema>;
 export type RunErrorEvent = z.infer<typeof RunErrorEventSchema>;
 export type StepStartedEvent = z.infer<typeof StepStartedEventSchema>;
 export type StepFinishedEvent = z.infer<typeof StepFinishedEventSchema>;
+export type AGUIEvent = z.infer<typeof EventSchemas>;

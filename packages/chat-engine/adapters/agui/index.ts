@@ -1,5 +1,8 @@
 import type {
   AIMessageContent,
+  AttachmentType,
+  ChatJSONObject,
+  ChatJSONValue,
   ChatMessagesData,
   ChatRequestParams,
   SSEChunkData,
@@ -83,9 +86,8 @@ export class AGUIAdapter {
      * 处理消息组，构建AI消息的content数组
      * 复用 utils.ts 中的 processMessageGroup 公共函数
      */
-    const processGroup = (messages: AGUIHistoryMessage[]): AIMessageContent[] => {
-      return processMessageGroup(messages, toolCallMap) as AIMessageContent[];
-    };
+    const processGroup = (messages: AGUIHistoryMessage[]): AIMessageContent[] =>
+      processMessageGroup(messages, toolCallMap);
 
     /**
      * 创建AI消息
@@ -113,33 +115,35 @@ export class AGUIAdapter {
      * 2. 后端返回格式：content 是数组 [{ type, text }]（text 字段存储文本）
      * 3. 已转换格式：content 已经是数组 [{ type, data }]
      */
-    const processUserContent = (content: any): UserMessageContent[] => {
+    const processUserContent = (content: AGUIUserHistoryMessage['content']): UserMessageContent[] => {
       // 如果 content 已经是数组格式，需要做字段适配
       if (Array.isArray(content)) {
-        return content.map((item: any) => {
+        return content.map((item) => {
           // 如果已经有 data 字段，说明已经是 ChatEngine 格式
-          if (item.data !== undefined) {
-            return item as UserMessageContent;
+          const normalized = normalizeUserMessageContent(item);
+          if (normalized) {
+            return normalized;
           }
           // 后端返回的格式用 text 字段存储文本，需要映射为 data 字段
-          if (item.type === 'text' && item.text !== undefined) {
+          if (isChatJSONObject(item) && item.type === 'text' && typeof item.text === 'string') {
             return {
-              type: 'text' as const,
+              type: 'text',
               data: item.text,
             };
           }
           // 其他类型的数组元素，尝试用 text 字段兜底
+          const record = isChatJSONObject(item) ? item : {};
           return {
-            type: item.type || 'text',
-            data: item.text || item.data || '',
-          } as UserMessageContent;
+            type: 'text',
+            data: textFromUserContentRecord(record),
+          };
         });
       }
       // 如果是字符串，包装为标准格式
       return [
         {
           type: 'text',
-          data: content,
+          data: typeof content === 'string' ? content : '',
         },
       ];
     };
@@ -288,3 +292,37 @@ export class AGUIAdapter {
 export * from './StateManager';
 export * from './ActivityManager';
 export * from './types';
+
+function normalizeUserMessageContent(value: ChatJSONValue): UserMessageContent | null {
+  if (!isChatJSONObject(value) || typeof value.type !== 'string') return null;
+  if (value.type === 'text' && typeof value.data === 'string') return { type: 'text', data: value.data };
+  if (value.type !== 'attachment' || !Array.isArray(value.data)) return null;
+  const attachments = value.data.filter(isAttachmentItemLike).map((item) => ({
+    fileType: item.fileType,
+    ...(typeof item.size === 'number' ? { size: item.size } : {}),
+    ...(typeof item.name === 'string' ? { name: item.name } : {}),
+    ...(typeof item.url === 'string' ? { url: item.url } : {}),
+    ...(typeof item.isReference === 'boolean' ? { isReference: item.isReference } : {}),
+    ...(typeof item.width === 'number' ? { width: item.width } : {}),
+    ...(typeof item.height === 'number' ? { height: item.height } : {}),
+    ...(typeof item.extension === 'string' ? { extension: item.extension } : {}),
+  }));
+  return { type: 'attachment', data: attachments };
+}
+
+function isAttachmentItemLike(value: ChatJSONValue): value is ChatJSONObject & { fileType: AttachmentType } {
+  return isChatJSONObject(value) && isAttachmentType(value.fileType);
+}
+
+function isAttachmentType(value: ChatJSONValue | undefined): value is AttachmentType {
+  return typeof value === 'string' && ['image', 'video', 'audio', 'pdf', 'doc', 'ppt', 'txt'].includes(value);
+}
+
+function isChatJSONObject(value: ChatJSONValue): value is ChatJSONObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function textFromUserContentRecord(record: ChatJSONObject): string {
+  const text = record.text ?? record.data;
+  return typeof text === 'string' ? text : '';
+}

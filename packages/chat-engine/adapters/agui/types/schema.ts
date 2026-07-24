@@ -2,7 +2,20 @@
 // https://github.com/ag-ui-protocol/ag-ui/blob/main/sdks/typescript/packages/core/src/types.ts
 
 import { z } from 'zod';
-import type { UserMessageContent } from '../../../type';
+import type { ChatJSONValue, UserMessageContent } from '../../../type';
+
+const isChatJSONValue = (value: unknown): value is ChatJSONValue => {
+  if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) return true;
+  if (Array.isArray(value)) return value.every(isChatJSONValue);
+  return typeof value === 'object' && Object.values(value).every(isChatJSONValue);
+};
+
+export const ChatJSONValueSchema = z.custom<ChatJSONValue>(isChatJSONValue, 'Expected a JSON value');
+export const ChatJSONObjectSchema = z.custom<Record<string, ChatJSONValue>>(
+  (value): value is Record<string, ChatJSONValue> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value) && isChatJSONValue(value),
+  'Expected a JSON object',
+);
 
 export const FunctionCallSchema = z.object({
   name: z.string(),
@@ -47,7 +60,7 @@ const AssistantMessageSchema = BaseMessageSchema.extend({
  */
 const UserMessageSchema = BaseMessageSchema.extend({
   role: z.literal('user'),
-  content: z.union([z.string(), z.array(z.any())]),
+  content: z.union([z.string(), z.array(ChatJSONValueSchema)]),
 });
 
 // 扩展类型定义，支持两种 content 格式
@@ -65,7 +78,7 @@ const ActivityMessageSchema = z.object({
   id: z.string(),
   role: z.literal('activity'),
   activityType: z.string(),
-  content: z.record(z.string(), z.any()),
+  content: ChatJSONObjectSchema,
   timestamp: z.number().optional(),
 });
 
@@ -127,20 +140,20 @@ export const ContextSchema = z.object({
 export const ToolSchema = z.object({
   name: z.string(),
   description: z.string(),
-  parameters: z.any(), // JSON Schema for the tool parameters
+  parameters: ChatJSONValueSchema, // JSON Schema for the tool parameters
 });
 
 export const RunAgentInputSchema = z.object({
   threadId: z.string(),
   runId: z.string(),
-  state: z.any(),
+  state: ChatJSONObjectSchema,
   messages: z.array(AGUIMessageSchema),
   tools: z.array(ToolSchema),
   context: z.array(ContextSchema),
-  forwardedProps: z.any(),
+  forwardedProps: ChatJSONObjectSchema,
 });
 
-export const StateSchema = z.any();
+export const StateSchema = ChatJSONObjectSchema;
 
 export type AGUIToolCall = z.infer<typeof ToolCallSchema>;
 export type AGUIFunctionCall = z.infer<typeof FunctionCallSchema>;

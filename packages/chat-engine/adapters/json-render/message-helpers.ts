@@ -54,8 +54,12 @@ export function hasCreationMessages(messages: A2UIMessage[]): boolean {
  *
  * 没有 surfaceId 的消息会被丢弃（理论上不应出现，做容错）。
  */
-export function groupMessagesBySurface(messages: A2UIMessage[]): Map<string, A2UIMessage[]> {
-  const map = new Map<string, A2UIMessage[]>();
+export function groupMessagesBySurface<
+  TProps extends Record<string, unknown> = Record<string, unknown>,
+  TData extends Record<string, unknown> = Record<string, unknown>,
+  TValue = unknown,
+>(messages: A2UIMessage<TProps, TData, TValue>[]): Map<string, A2UIMessage<TProps, TData, TValue>[]> {
+  const map = new Map<string, A2UIMessage<TProps, TData, TValue>[]>();
   for (const msg of messages) {
     let surfaceId: string | undefined;
     if (msg.createSurface) surfaceId = msg.createSurface.surfaceId;
