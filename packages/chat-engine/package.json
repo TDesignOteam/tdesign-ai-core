@@ -1,6 +1,6 @@
 {
   "name": "@tdesign/ai-chat-engine",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "TDesign ChatEngine - Framework-agnostic AI chat engine core",
   "type": "module",
   "exports": {
@@ -9,8 +9,9 @@
   },
   "files": [
     "dist",
-    "**/*.ts",
-    "!**/*.test.ts"
+    "README.md",
+    "README-zh_CN.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsdown"
