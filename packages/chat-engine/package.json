@@ -25,8 +25,8 @@
         "import": "./dist/index.mjs",
         "default": "./dist/index.mjs"
       },
-      "./browser": {
-        "default": "./dist/index.esm-browser.js"
+      "./iife": {
+        "default": "./dist/index.iife.js"
       }
     }
   },
