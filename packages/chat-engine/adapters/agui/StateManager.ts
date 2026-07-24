@@ -4,10 +4,10 @@ import type { StateDeltaEvent, StateSnapshotEvent } from './types/events';
 
 export interface StateManager {
   getCurrentStateKey: () => string | null;
-  getCurrentState: <TState extends ChatJSONObject = ChatJSONObject>() => TState | null;
-  getState: <TState extends ChatJSONObject = ChatJSONObject>(stateKey: string) => TState | undefined;
+  getCurrentState: <TState = ChatJSONObject>() => TState | null;
+  getState: <TState = ChatJSONObject>(stateKey: string) => TState | undefined;
   getAllStateKeys: () => string[];
-  subscribe: <TState extends ChatJSONObject = ChatJSONObject>(
+  subscribe: <TState = ChatJSONObject>(
     callback: (state: TState, stateKey: string) => void,
     targetStateKey?: string,
   ) => () => void;
@@ -25,11 +25,11 @@ export class StateManagerImpl implements StateManager {
     return this.currentStateKey;
   }
 
-  getCurrentState<TState extends ChatJSONObject = ChatJSONObject>(): TState | null {
+  getCurrentState<TState = ChatJSONObject>(): TState | null {
     return this.currentStateKey ? (this.states[this.currentStateKey] as TState | undefined) || null : null;
   }
 
-  getState<TState extends ChatJSONObject = ChatJSONObject>(stateKey: string): TState | undefined {
+  getState<TState = ChatJSONObject>(stateKey: string): TState | undefined {
     return this.states[stateKey] as TState | undefined;
   }
 
@@ -37,9 +37,7 @@ export class StateManagerImpl implements StateManager {
     return Object.keys(this.states);
   }
 
-  subscribeToLatest<TState extends ChatJSONObject = ChatJSONObject>(
-    callback: (state: TState, stateKey: string) => void,
-  ): () => void {
+  subscribeToLatest<TState = ChatJSONObject>(callback: (state: TState, stateKey: string) => void): () => void {
     const subscriber = callback as (state: ChatJSONObject, stateKey: string) => void;
     this.latestSubscribers.add(subscriber);
     const state = this.getCurrentState<TState>();
@@ -47,7 +45,7 @@ export class StateManagerImpl implements StateManager {
     return () => this.latestSubscribers.delete(subscriber);
   }
 
-  subscribe<TState extends ChatJSONObject = ChatJSONObject>(
+  subscribe<TState = ChatJSONObject>(
     callback: (state: TState, stateKey: string) => void,
     targetStateKey?: string,
   ): () => void {
@@ -56,10 +54,7 @@ export class StateManagerImpl implements StateManager {
       : this.subscribeToLatest(callback);
   }
 
-  subscribeToState<TState extends ChatJSONObject = ChatJSONObject>(
-    stateKey: string,
-    callback: (state: TState) => void,
-  ): () => void {
+  subscribeToState<TState = ChatJSONObject>(stateKey: string, callback: (state: TState) => void): () => void {
     const subscribers = this.boundSubscribers.get(stateKey) || new Set<(state: ChatJSONObject) => void>();
     const subscriber = callback as (state: ChatJSONObject) => void;
     subscribers.add(subscriber);
