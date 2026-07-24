@@ -4,17 +4,9 @@
   "description": "TDesign ChatEngine - Framework-agnostic AI chat engine core",
   "type": "module",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.mts",
-      "import": "./dist/index.mjs",
-      "default": "./dist/index.mjs"
-    },
-    "./iife": {
-      "default": "./dist/index.iife.js"
-    }
+    ".": "./index.ts",
+    "./*": "./*.ts"
   },
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
   "files": [
     "dist",
     "README.md",
@@ -25,7 +17,19 @@
     "build": "tsdown"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.mts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "./iife": {
+        "default": "./dist/index.iife.js"
+      }
+    }
   },
   "repository": {
     "type": "git",
