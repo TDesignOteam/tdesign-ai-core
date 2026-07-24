@@ -9,8 +9,9 @@
     "lint:fix": "eslint packages --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "verify": "pnpm build && pnpm type-check && pnpm lint && pnpm format:check",
-    "prepare": "husky"
+    "verify": "pnpm build && pnpm verify:iife && pnpm type-check && pnpm lint && pnpm format:check",
+    "prepare": "husky",
+    "verify:iife": "node scripts/verify-iife.mjs"
   },
   "lint-staged": {
     "{packages/**/*.ts}": [

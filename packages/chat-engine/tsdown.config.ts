@@ -16,19 +16,21 @@ export default defineConfig([
   },
   {
     entry: ['index.ts'],
-    format: ['esm'],
+    format: ['iife'],
+    globalName: 'TDesignAIChatEngine',
     dts: false,
     sourcemap: true,
     clean: false,
     outDir: 'dist',
     platform: 'browser',
-    // Browser ESM 面向 CDN `<script type="module">` 使用：打成 standalone，避免浏览器无法解析裸模块依赖。
+    // IIFE 面向 CDN `<script>` 使用：挂到 window.TDesignAIChatEngine，standalone 避免浏览器解析裸模块依赖。
     deps: {
       alwaysBundle: ['@tdesign/ai-shared', '@json-render/core', 'immer', 'zod', 'expr-eval'],
       onlyBundle: false,
     },
     outputOptions: {
-      entryFileNames: 'index.esm-browser.js',
+      entryFileNames: 'index.iife.js',
+      exports: 'named',
     },
   },
 ]);
