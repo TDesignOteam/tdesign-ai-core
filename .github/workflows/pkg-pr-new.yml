@@ -1,0 +1,23 @@
+name: pkg-pr-new
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+
+      - run: pnpm install
+
+      - run: pnpm build
+
+      - run: pnpm dlx pkg-pr-new publish './packages/chat-engine' --packageManager=npm,pnpm,bun
