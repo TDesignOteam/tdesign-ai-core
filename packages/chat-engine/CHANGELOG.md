@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.2
+
+### Fixes
+
+- Remove the private workspace dependency `@tdesign/ai-shared` from the published dependency manifest and keep it bundled into build artifacts.
+- Move published `exports`, `module`, and `types` entries to top-level `package.json` fields so both npm and pnpm publish flows resolve `dist` artifacts correctly.
+- Normalize the repository URL for npm package metadata.
+
 ## 0.0.1
 
 首个公开版本，提供框架无关的 TDesign AI 聊天引擎核心能力。

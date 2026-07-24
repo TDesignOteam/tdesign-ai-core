@@ -1,12 +1,20 @@
 {
   "name": "@tdesign/ai-chat-engine",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "TDesign ChatEngine - Framework-agnostic AI chat engine core",
   "type": "module",
   "exports": {
-    ".": "./index.ts",
-    "./*": "./*.ts"
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./iife": {
+      "default": "./dist/index.iife.js"
+    }
   },
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "files": [
     "dist",
     "README.md",
@@ -17,23 +25,11 @@
     "build": "tsdown"
   },
   "publishConfig": {
-    "access": "public",
-    "module": "./dist/index.mjs",
-    "types": "./dist/index.d.mts",
-    "exports": {
-      ".": {
-        "types": "./dist/index.d.mts",
-        "import": "./dist/index.mjs",
-        "default": "./dist/index.mjs"
-      },
-      "./iife": {
-        "default": "./dist/index.iife.js"
-      }
-    }
+    "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Tencent/tdesign-ai-core.git",
+    "url": "git+https://github.com/Tencent/tdesign-ai-core.git",
     "directory": "packages/chat-engine"
   },
   "license": "MIT",
