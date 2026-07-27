@@ -25,7 +25,7 @@ export default defineConfig([
     platform: 'browser',
     // IIFE 面向 CDN `<script>` 使用：挂到 window.TDesignAIChatEngine，standalone 避免浏览器解析裸模块依赖。
     deps: {
-      alwaysBundle: ['@tdesign/ai-shared', '@json-render/core', 'immer', 'zod', 'expr-eval'],
+      alwaysBundle: ['@tdesign/ai-shared', '@json-render/core', 'immer', 'zod'],
       onlyBundle: false,
     },
     outputOptions: {
