@@ -1,4 +1,12 @@
 import { defineConfig } from 'tsdown';
+import pkg from './package.json' with { type: 'json' };
+
+const banner = `/**
+ * ${pkg.name} v${pkg.version}
+ * (c) ${new Date().getFullYear()} ${pkg.author}
+ * @license ${pkg.license}
+ */
+`;
 
 export default defineConfig([
   {
@@ -10,6 +18,9 @@ export default defineConfig([
     deps: {
       alwaysBundle: ['@tdesign/ai-shared'],
       neverBundle: ['immer', '@json-render/core'],
+    },
+    outputOptions: {
+      banner,
     },
   },
   {
@@ -24,6 +35,7 @@ export default defineConfig([
       alwaysBundle: ['@tdesign/ai-shared', '@json-render/core', 'immer', 'zod'],
     },
     outputOptions: {
+      banner,
       entryFileNames: 'index.iife.js',
       exports: 'named',
     },
