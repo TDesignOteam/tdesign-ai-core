@@ -33,8 +33,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Tencent/tdesign-ai-core.git",
+    "url": "git+https://github.com/TDesignOteam/tdesign-ai-core.git",
     "directory": "packages/chat-engine"
+  },
+  "homepage": "https://github.com/TDesignOteam/tdesign-ai-core#readme",
+  "bugs": {
+    "url": "https://github.com/TDesignOteam/tdesign-ai-core/issues"
   },
   "license": "MIT",
   "dependencies": {
