@@ -36,6 +36,7 @@
     "url": "git+https://github.com/Tencent/tdesign-ai-core.git",
     "directory": "packages/chat-engine"
   },
+  "author": "tdesign",
   "license": "MIT",
   "dependencies": {
     "@json-render/core": "^0.19.0",
