@@ -19,10 +19,6 @@
       "eslint --fix --cache"
     ]
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Tencent/tdesign-ai-core.git"
-  },
   "license": "MIT",
   "engines": {
     "node": "^22.22.1 || >=24.11.0"
