@@ -58,9 +58,17 @@ export class AGUIEventMapper {
 
   private toolCallChunkStarted: Set<string> = new Set(); // 已自动触发 TOOL_CALL_START 的 toolCallId
 
-  // Reasoning 消息状态跟踪（和 currentTextMessageId 风格对齐）
-  // 首次出现 messageId 时 append 新块；同 messageId → merge；不同 messageId → append 新块。
+  // 记录已经"开过块"的 text messageId，首次出现 → append 新块；已出现过 → merge 到对应块。
+  // 使用 Set 而非单值状态，确保多个 messageId 交错推送时也能正确路由到各自的块。
+  private textMessageIdsOpened: Set<string> = new Set();
+
+  // Reasoning 消息状态跟踪
+  // currentReasoningMessageId 仅用于标准模式的 START/CONTENT/END 生命周期跟踪；
+  // CHUNK 模式下的"是否首次"判断使用 reasoningMessageIdsOpened Set，支持交错场景。
   private currentReasoningMessageId: string | null = null;
+
+  // 记录已经"开过块"的 reasoning messageId，语义同 textMessageIdsOpened。
+  private reasoningMessageIdsOpened: Set<string> = new Set();
 
   // REASONING_START 携带的 title 暂存，由首个创建块的事件（MESSAGE_START / MESSAGE_CHUNK）消费。
   // REASONING_START 自身不再直接 append 空块，避免 CHUNK 模式下产生一个悬空的 streaming 块。
@@ -155,8 +163,10 @@ export class AGUIEventMapper {
     // 重置简化模式状态
     this.currentTextMessageId = null;
     this.currentTextMessageRole = null;
+    this.textMessageIdsOpened.clear();
     this.toolCallChunkStarted.clear();
     this.currentReasoningMessageId = null;
+    this.reasoningMessageIdsOpened.clear();
     this.pendingReasoningTitle = null;
     // 清理 activityManager 状态
     activityManager.clear();
@@ -180,17 +190,23 @@ export class AGUIEventMapper {
     switch (event.type) {
       case AGUIEventType.TEXT_MESSAGE_START:
         this.currentTextMessageId = event.messageId || null; // 标记当前消息 ID
-        return createMarkdownContent('', 'streaming', 'append');
+        return createMarkdownContent('', 'streaming', 'append', 'assistant', event.messageId || undefined);
 
       case AGUIEventType.TEXT_MESSAGE_CHUNK:
         return this.handleTextMessageChunk(event);
 
       case AGUIEventType.TEXT_MESSAGE_CONTENT:
-        return createMarkdownContent(event.delta || '', 'streaming', 'merge');
+        return createMarkdownContent(
+          event.delta || '',
+          'streaming',
+          'merge',
+          'assistant',
+          event.messageId || this.currentTextMessageId || undefined,
+        );
 
       case AGUIEventType.TEXT_MESSAGE_END:
         this.currentTextMessageId = null; // 重置状态
-        return createMarkdownContent(event.delta || '', 'complete', 'merge');
+        return createMarkdownContent(event.delta || '', 'complete', 'merge', 'assistant', event.messageId || undefined);
 
       default:
         return null;
@@ -208,16 +224,27 @@ export class AGUIEventMapper {
     const messageId = event.messageId || 'default';
     const role = event?.role || 'assistant';
 
-    // 如果是新的 messageId，需要创建新的内容块
-    if (this.currentTextMessageId !== messageId) {
-      this.currentTextMessageId = messageId;
-      this.currentTextMessageRole = role;
-      // 创建新内容块，使用 append 策略，通过 ext.role 传递角色信息
-      return createMarkdownContent(event.delta || '', 'streaming', 'append', role);
+    // 首次出现该 messageId：append 新块；已出现过：merge 到对应块
+    // 依赖 processor 层按 (id, type) 精确 merge，支持多个 messageId 交错的场景
+    const isFirstChunk = !this.textMessageIdsOpened.has(messageId);
+
+    this.currentTextMessageId = messageId;
+    this.currentTextMessageRole = role;
+
+    if (isFirstChunk) {
+      this.textMessageIdsOpened.add(messageId);
+      // 创建新内容块，使用 append 策略，通过 ext.role 传递角色信息，使用 messageId 作为 id
+      return createMarkdownContent(event.delta || '', 'streaming', 'append', role, event.messageId || undefined);
     }
 
-    // 同一个 messageId，使用 merge 策略追加内容
-    return createMarkdownContent(event.delta || '', 'streaming', 'merge', this.currentTextMessageRole || role);
+    // 已开启过的 messageId：merge 到对应块
+    return createMarkdownContent(
+      event.delta || '',
+      'streaming',
+      'merge',
+      this.currentTextMessageRole || role,
+      event.messageId || undefined,
+    );
   }
 
   /**
@@ -271,29 +298,71 @@ export class AGUIEventMapper {
 
       case AGUIEventType.REASONING_MESSAGE_CONTENT:
       case AGUIEventType.THINKING_TEXT_MESSAGE_CONTENT:
-        return createThinkingContent({ text: event.delta || '' }, 'streaming', 'merge', false);
+        return createThinkingContent(
+          { text: event.delta || '' },
+          'streaming',
+          'merge',
+          false,
+          undefined,
+          // REASONING_MESSAGE_CONTENT 带 messageId；THINKING_TEXT_MESSAGE_CONTENT 不带，回退到当前追踪的 id
+          (event.type === AGUIEventType.REASONING_MESSAGE_CONTENT ? event.messageId : undefined) ||
+            this.currentReasoningMessageId ||
+            undefined,
+        );
 
       case AGUIEventType.REASONING_MESSAGE_END:
-      case AGUIEventType.THINKING_TEXT_MESSAGE_END:
-        this.currentReasoningMessageId = null;
-        return null;
+      case AGUIEventType.THINKING_TEXT_MESSAGE_END: {
+        // 仅当关闭的正好是"当前"块时同步清理 currentReasoningMessageId
+        // （并行场景下不能盲目清空，否则会破坏另一条正在进行的 reasoning 追踪）
+        const endMessageId =
+          event.type === AGUIEventType.REASONING_MESSAGE_END ? event.messageId : this.currentReasoningMessageId;
+        if (this.currentReasoningMessageId === endMessageId) {
+          this.currentReasoningMessageId = null;
+        }
+        // 发出 complete + merge 事件，让 processor 按 (id, type) 精确匹配到对应块并标记完成
+        return createThinkingContent(
+          { title: event.type === AGUIEventType.REASONING_MESSAGE_END ? event.title || '思考结束' : '思考结束' },
+          'complete',
+          'merge',
+          true,
+          undefined,
+          endMessageId || undefined,
+        );
+      }
 
       case AGUIEventType.REASONING_MESSAGE_CHUNK:
         return this.handleReasoningMessageChunk(event);
 
       case AGUIEventType.REASONING_ENCRYPTED_VALUE:
         // encryptedValue 仅用于跨轮状态连续性，透传到 ext 由业务层在下一轮回传
-        return createThinkingContent({}, 'streaming', 'merge', false, {
-          encryptedValue: event.encryptedValue,
-          subtype: event.subtype,
-          entityId: event.entityId,
-        });
+        return createThinkingContent(
+          {},
+          'streaming',
+          'merge',
+          false,
+          {
+            encryptedValue: event.encryptedValue,
+            subtype: event.subtype,
+            entityId: event.entityId,
+          },
+          this.currentReasoningMessageId || undefined,
+        );
 
       case AGUIEventType.REASONING_END:
-      case AGUIEventType.THINKING_END:
+      case AGUIEventType.THINKING_END: {
+        const closingId = this.currentReasoningMessageId || undefined;
         this.currentReasoningMessageId = null;
         this.pendingReasoningTitle = null;
-        return createThinkingContent({ title: event.title || '思考结束' }, 'complete', 'merge', true);
+        return createThinkingContent(
+          { title: event.title || '思考结束' },
+          'complete',
+          'merge',
+          true,
+          undefined,
+          // REASONING_END 可能带 messageId，优先使用；THINKING_END 不带，回退到当前追踪的 id
+          (event.type === AGUIEventType.REASONING_END ? event.messageId : undefined) || closingId,
+        );
+      }
 
       default:
         return null;
@@ -312,27 +381,45 @@ export class AGUIEventMapper {
   private handleReasoningMessageChunk(event: ReasoningMessageChunkEvent): AIMessageContent | null {
     const messageId = event.messageId || null;
     const delta = event.delta ?? '';
+    const messageKey = messageId || '__default__';
 
-    // 规范: empty delta implicitly closes the message
-    if (delta === '' && messageId && this.currentReasoningMessageId === messageId) {
-      this.currentReasoningMessageId = null;
-      return createThinkingContent({ title: '思考结束' }, 'complete', 'merge', true);
+    // 规范: empty delta implicitly closes the message（仅当该 messageId 已被打开过）
+    if (delta === '' && this.reasoningMessageIdsOpened.has(messageKey)) {
+      // 若关闭的正好是"当前"块，同步清理 currentReasoningMessageId
+      if (this.currentReasoningMessageId === messageId) {
+        this.currentReasoningMessageId = null;
+      }
+      return createThinkingContent({ title: '思考结束' }, 'complete', 'merge', true, undefined, messageId || undefined);
     }
 
-    if (this.currentReasoningMessageId !== messageId) {
+    // 首次出现该 messageId → append 新块；已出现过 → merge 到对应块
+    if (!this.reasoningMessageIdsOpened.has(messageKey)) {
       return this.openReasoningBlock(messageId, event.title, delta);
     }
-    return createThinkingContent({ text: delta }, 'streaming', 'merge', false);
+
+    // 已开过块的 messageId，走 merge 路径
+    this.currentReasoningMessageId = messageId;
+    return createThinkingContent({ text: delta }, 'streaming', 'merge', false, undefined, messageId || undefined);
   }
 
   /**
    * 创建新的 reasoning 内容块，消费 pendingReasoningTitle
+   *
+   * 会记录 messageId 到 reasoningMessageIdsOpened，后续同 messageId 的 chunk 将走 merge 路径。
    */
   private openReasoningBlock(messageId: string | null, title: string | undefined, text: string): AIMessageContent {
     this.currentReasoningMessageId = messageId;
+    this.reasoningMessageIdsOpened.add(messageId || '__default__');
     const resolvedTitle = title || this.pendingReasoningTitle || '思考中...';
     this.pendingReasoningTitle = null;
-    return createThinkingContent({ text, title: resolvedTitle }, 'streaming', 'append', false);
+    return createThinkingContent(
+      { text, title: resolvedTitle },
+      'streaming',
+      'append',
+      false,
+      undefined,
+      messageId || undefined,
+    );
   }
 
   /**
@@ -381,15 +468,18 @@ export class AGUIEventMapper {
     event: EventOf<AGUIEventType.ACTIVITY_SNAPSHOT | AGUIEventType.ACTIVITY_DELTA>,
   ): AIMessageContent | null {
     const activityType = event.activityType || 'unknown';
+
+    // 关键：先判断"是否首次"，再交给 activityManager 处理（handleActivityEvent 会写入缓存）
+    // 首次 DELTA 定义：按 (activityType, messageId) 精确 key 未命中
+    const isSnapshot = event.type === AGUIEventType.ACTIVITY_SNAPSHOT;
+    const isFirstDelta =
+      event.type === AGUIEventType.ACTIVITY_DELTA && !activityManager.getActivity(activityType, event.messageId);
+
     // 委托给 activityManager 处理
     const activityData = activityManager.handleActivityEvent(event);
     if (!activityData) {
       return null;
     }
-
-    // 根据事件类型决定 strategy
-    const isSnapshot = event.type === AGUIEventType.ACTIVITY_SNAPSHOT;
-    const isFirstDelta = event.type === AGUIEventType.ACTIVITY_DELTA && !activityManager.getActivity(activityType);
 
     return createActivityContent(
       activityType,
@@ -398,6 +488,8 @@ export class AGUIEventMapper {
       // SNAPSHOT 或首次 DELTA 使用 append 创建新内容块，后续使用 merge
       isSnapshot || isFirstDelta ? 'append' : 'merge',
       activityData.deltaInfo,
+      // 优先使用事件自带的 messageId，回退到 activityManager 缓存的 messageId
+      event.messageId || activityData.messageId || undefined,
     );
   }
 
