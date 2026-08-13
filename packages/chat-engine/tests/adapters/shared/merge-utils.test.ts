@@ -19,7 +19,7 @@ describe('shared merge utilities', () => {
   });
 
   it('concatenates partial non-JSON strings and replaces parsed scalar values', () => {
-    expect(mergeStringContent('hel', 'lo')).toBe('hello');
+    expect(mergeStringContent('part', 'ial')).toBe('partial');
     expect(mergeStringContent('1', '2')).toBe('2');
   });
 
