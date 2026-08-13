@@ -26,6 +26,23 @@ jobs:
 
       - run: pnpm run verify
 
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+
+      - run: pnpm install
+
+      - run: pnpm run test
+
+      - run: pnpm run test:coverage
+
   build:
     runs-on: ubuntu-latest
     steps:

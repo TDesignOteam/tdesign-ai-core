@@ -14,7 +14,8 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsdown"
+    "build": "tsdown",
+    "test": "vitest run --root ../.. packages/chat-engine/tests"
   },
   "publishConfig": {
     "access": "public",

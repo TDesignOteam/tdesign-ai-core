@@ -4,6 +4,9 @@
   "description": "TDesign AIGC framework-agnostic core SDKs",
   "scripts": {
     "build": "pnpm -r run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "type-check": "tsc --noEmit",
     "lint": "eslint packages --max-warnings 0",
     "lint:fix": "eslint packages --fix",
@@ -25,12 +28,16 @@
   },
   "packageManager": "pnpm@9.15.9",
   "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^10.5.0",
     "husky": "^9.1.7",
+    "jsdom": "^30.0.1",
     "lint-staged": "^17.0.4",
     "prettier": "^3.8.4",
     "tsdown": "^0.22.3",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.61.1"
+    "typescript-eslint": "^8.61.1",
+    "vitest": "^4.1.10"
   }
 }

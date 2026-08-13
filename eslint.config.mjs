@@ -147,4 +147,10 @@ export default defineConfig(
       // '@typescript-eslint/await-thenable': 'error',
     },
   },
+  {
+    files: ['packages/**/tests/**/*.ts'],
+    rules: {
+      '@typescript-eslint/unbound-method': 'off',
+    },
+  },
 );
