@@ -115,5 +115,25 @@ describe('AGUIEventMapper', () => {
     ]);
   });
 
-  it.todo('uses append strategy for the first ACTIVITY_DELTA before a snapshot');
+  it('uses append strategy for the first ACTIVITY_DELTA before a snapshot', () => {
+    const first = mapper.mapEvent({
+      data: {
+        type: 'ACTIVITY_DELTA',
+        messageId: 'm1',
+        activityType: 'plan',
+        patch: [{ op: 'add', path: '/operations/-', value: { title: 'first' } }],
+      },
+    });
+    const second = mapper.mapEvent({
+      data: {
+        type: 'ACTIVITY_DELTA',
+        messageId: 'm1',
+        activityType: 'plan',
+        patch: [{ op: 'add', path: '/operations/-', value: { title: 'second' } }],
+      },
+    });
+
+    expect(first).toMatchObject({ type: 'activity-plan', strategy: 'append' });
+    expect(second).toMatchObject({ type: 'activity-plan', strategy: 'merge' });
+  });
 });

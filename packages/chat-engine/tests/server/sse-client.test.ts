@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TimeoutError } from '../../server/errors';
+import { ConnectionError, TimeoutError } from '../../server/errors';
 import { SSEClient } from '../../server/sse-client';
 import { SSEConnectionState } from '../../server/types';
 
@@ -123,7 +123,21 @@ describe('SSEClient', () => {
     expect(first).toMatchObject({ id: client.connectionId, url: '/events', state: SSEConnectionState.DISCONNECTED });
   });
 
-  it.todo('stops connection setup after a non-OK HTTP response instead of entering CONNECTED state');
+  it('stops connection setup after a non-OK HTTP response instead of entering CONNECTED state', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401, statusText: 'Unauthorized', body: {} }));
+    const client = new SSEClient('/events');
+    const onError = vi.fn();
+    const onStateChange = vi.fn();
+    client.on('error', onError);
+    client.on('stateChange', onStateChange);
+
+    await client.connect({ timeout: 0 });
+
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledWith(expect.any(ConnectionError));
+    expect(client.getStatus()).toBe(SSEConnectionState.ERROR);
+    expect(onStateChange.mock.calls.map(([event]) => event.to)).not.toContain(SSEConnectionState.CONNECTED);
+  });
   it.todo('puts timeout descriptions in TimeoutError.message instead of details');
   it.todo('resets the first-token flag when a client instance reconnects');
 });

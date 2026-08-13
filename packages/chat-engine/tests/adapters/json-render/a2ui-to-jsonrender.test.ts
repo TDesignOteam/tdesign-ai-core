@@ -114,5 +114,20 @@ describe('A2UI to json-render conversion', () => {
   });
 
   it.todo('decodes escaped JSON Pointer tokens (~1 and ~0) in data paths');
-  it.todo('keeps prior schemas immutable when a later nested data update is applied');
+  it('keeps prior schemas immutable when a later nested data update is applied', () => {
+    const schema: JsonRenderSchema = {
+      root: 'root',
+      elements: {},
+      data: { profile: { name: 'Ada' }, items: [{ id: 1 }] },
+    };
+
+    const updated = applyA2UIDataUpdate(schema, '/profile/name', 'replace', 'Grace');
+    const appended = applyA2UIDataUpdate(updated, '/items/1', 'add', { id: 2 });
+
+    expect(schema.data).toEqual({ profile: { name: 'Ada' }, items: [{ id: 1 }] });
+    expect(updated.data).toEqual({ profile: { name: 'Grace' }, items: [{ id: 1 }] });
+    expect(appended.data).toEqual({ profile: { name: 'Grace' }, items: [{ id: 1 }, { id: 2 }] });
+    expect(updated.data?.profile).not.toBe(schema.data?.profile);
+    expect(appended.data?.items).not.toBe(updated.data?.items);
+  });
 });

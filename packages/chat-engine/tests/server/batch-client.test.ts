@@ -110,5 +110,35 @@ describe('BatchClient', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
+  it('keeps the latest request abortable after the previous request settles', async () => {
+    const signals: AbortSignal[] = [];
+    let resolveSecond!: (response: { ok: boolean; json: () => Promise<unknown> }) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise((resolve, reject) => {
+            const signal = init.signal as AbortSignal;
+            signals.push(signal);
+            if (signals.length === 2) resolveSecond = resolve;
+            signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+          }),
+      ),
+    );
+    const client = new BatchClient();
+
+    const first = client.request('/first', {}, 500);
+    const second = client.request('/second', {}, 500);
+    await first;
+    client.abort();
+    resolveSecond({ ok: true, json: vi.fn().mockResolvedValue({ answer: 'ok' }) });
+
+    await expect(second).resolves.toBeUndefined();
+    expect(signals).toHaveLength(2);
+    expect(signals[0].aborted).toBe(true);
+    expect(signals[1].aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it.todo('puts the configured duration in TimeoutError.message instead of TimeoutError.details');
 });
