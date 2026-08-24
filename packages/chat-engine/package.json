@@ -15,7 +15,7 @@
   ],
   "scripts": {
     "build": "tsdown",
-    "test": "vitest run --root ../.. packages/chat-engine/tests"
+    "test": "vitest run --root ../.. packages/chat-engine"
   },
   "publishConfig": {
     "access": "public",

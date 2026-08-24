@@ -13,6 +13,6 @@
     "!**/*.test.ts"
   ],
   "scripts": {
-    "test": "vitest run --root ../.. packages/shared/tests"
+    "test": "vitest run --root ../.. packages/shared"
   }
 }
