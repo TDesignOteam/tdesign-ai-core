@@ -59,6 +59,17 @@ describe('ConnectionManager', () => {
     expect(manager.getStats()).toEqual({});
   });
 
+  it('handles non-timeout errors without the timeout-specific log', () => {
+    const manager = new ConnectionManager('connection-1');
+    const error = new Error('socket hang up');
+
+    expect(manager.handleConnectionError(error)).toBe(false);
+
+    expect(logger.error).toHaveBeenCalledWith('Connection connection-1 error:', error);
+    expect(logger.info).not.toHaveBeenCalledWith('Timeout error occurred, no retry will be attempted');
+    expect(manager.getStats()).toEqual({});
+  });
+
   it('clears recorded statistics during cleanup', () => {
     const manager = new ConnectionManager('connection-1');
     manager.updateState(SSEConnectionState.ERROR, new Error('failed'));

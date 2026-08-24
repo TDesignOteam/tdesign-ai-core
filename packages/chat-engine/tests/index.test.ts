@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ChatServiceConfig } from '../type';
+import type { ChatRequestParams, ChatServiceConfig } from '../type';
 
 const mocks = vi.hoisted(() => {
   const serviceInstances: Array<Record<string, ReturnType<typeof vi.fn>>> = [];
@@ -208,6 +208,132 @@ describe('ChatEngine', () => {
     expect(onAbort).toHaveBeenCalledOnce();
     expect(mocks.serviceInstances[0].closeConnect).toHaveBeenCalledOnce();
     expect(mocks.handlerInstances[0].abort).toHaveBeenCalledOnce();
+  });
+
+  it('removes the trailing assistant message when aborting a fetch request', async () => {
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'fetch' });
+    await engine.sendAIMessage({ sendRequest: false });
+    expect(engine.messages).toHaveLength(1);
+
+    await engine.abortChat();
+
+    expect(mocks.serviceInstances[0].closeConnect).toHaveBeenCalledOnce();
+    expect(engine.messages).toEqual([]);
+  });
+
+  it('completes the streaming message and forwards abort requests on websocket transport', async () => {
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'ws', endpoint: 'ws://chat', abortRequest: { prompt: '/stop' } });
+    const onAbortEvent = vi.fn();
+    engine.eventBus.on(ChatEngineEventType.REQUEST_ABORT, onAbortEvent);
+
+    await engine.sendAIMessage({ params: { prompt: 'hello' } });
+    const messageId = engine.messages.at(-1)!.id;
+    expect(engine.messages.at(-1)!.status).toBe('streaming');
+
+    await engine.abortChat();
+
+    expect(engine.messages.at(-1)!.status).toBe('stop');
+    expect(onAbortEvent).toHaveBeenCalledWith({
+      messageId,
+      params: { prompt: 'hello', messageID: messageId },
+    });
+    expect(mocks.handlerInstances[0].handleStream).toHaveBeenLastCalledWith(
+      expect.objectContaining({ prompt: '/stop' }),
+      expect.anything(),
+    );
+    expect(mocks.serviceInstances[0].closeConnect).not.toHaveBeenCalled();
+  });
+
+  it('applies custom onComplete content when the handler completes a stream', async () => {
+    const customContent = [{ type: 'text' as const, data: 'custom answer' }];
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'sse', onComplete: vi.fn(() => customContent) });
+    const handler = mocks.handlerInstances[0] as unknown as { handleStream: ReturnType<typeof vi.fn> };
+    handler.handleStream.mockImplementation(
+      async (
+        params: Parameters<ChatEngine['sendRequest']>[0],
+        context: { messageId?: string; handleComplete: (id: string, isAborted: boolean, params: unknown) => void },
+      ) => {
+        context.handleComplete(context.messageId!, false, params);
+      },
+    );
+    const onCompleteEvent = vi.fn();
+    engine.eventBus.on(ChatEngineEventType.REQUEST_COMPLETE, onCompleteEvent);
+
+    await engine.sendAIMessage({ params: { prompt: 'hello' } });
+    const messageId = engine.messages.at(-1)!.id;
+
+    expect(engine.messages.at(-1)!.content).toEqual(customContent);
+    expect(onCompleteEvent).toHaveBeenCalledWith(expect.objectContaining({ messageId }));
+  });
+
+  it('resumes a run with a pending assistant message and returns its id', async () => {
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'sse' });
+
+    const id = await engine.resumeRun({ threadId: 'thread-1' } as ChatRequestParams<{ threadId: string }>);
+
+    expect(engine.messages).toHaveLength(1);
+    expect(id).toBe(engine.messages[0].id);
+    expect(engine.messages[0]).toEqual(expect.objectContaining({ role: 'assistant', status: 'streaming' }));
+    expect(mocks.handlerInstances[0].handleStream).toHaveBeenCalledWith(
+      { threadId: 'thread-1', messageID: id },
+      expect.objectContaining({ messageId: id }),
+    );
+  });
+
+  it('regenerates by replacing the last assistant message and reusing prior params', async () => {
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'sse' }, [initialMessage]);
+    await engine.sendRequest({ prompt: 'first', messageID: 'initial-1' });
+
+    await engine.regenerateAIMessage();
+
+    expect(engine.messages).toHaveLength(1);
+    const regenerated = engine.messages[0];
+    expect(regenerated.id).not.toBe('initial-1');
+    expect(mocks.handlerInstances[0].handleStream).toHaveBeenLastCalledWith(
+      expect.objectContaining({ prompt: 'first', messageID: regenerated.id }),
+      expect.objectContaining({ messageId: regenerated.id }),
+    );
+  });
+
+  it('stores system messages without triggering requests', async () => {
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'sse' });
+    const requestSpy = vi.spyOn(engine, 'sendRequest');
+
+    await engine.sendSystemMessage('be helpful');
+
+    expect(engine.messages).toHaveLength(1);
+    expect(engine.messages[0]).toEqual(expect.objectContaining({ role: 'system' }));
+    expect(engine.messages[0].content).toContainEqual({ type: 'text', data: 'be helpful' });
+    expect(requestSpy).not.toHaveBeenCalled();
+    expect(mocks.handlerInstances[0].handleStream).not.toHaveBeenCalled();
+  });
+
+  it('updates the endpoint declaratively and uses it on the next connect', async () => {
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'ws', endpoint: 'wss://first' });
+
+    engine.updateEndpoint('wss://second');
+    await engine.connect();
+
+    expect(mocks.serviceInstances[0].initWSConnection).toHaveBeenCalledWith(
+      expect.objectContaining({ endpoint: 'wss://second' }),
+    );
+  });
+
+  it('disconnect tears down the websocket without aborting the handler', async () => {
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'ws', endpoint: 'ws://chat' });
+
+    engine.disconnect();
+
+    expect(mocks.serviceInstances[0].disconnectWS).toHaveBeenCalledOnce();
+    expect(mocks.handlerInstances[0].abort).not.toHaveBeenCalled();
   });
 
   it('destroys initialized resources and clears messages', async () => {

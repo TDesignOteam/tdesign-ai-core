@@ -118,9 +118,20 @@ describe('SSEClient', () => {
     const client = new SSEClient('/events');
     const first = client.getInfo();
     const second = client.getInfo();
-
     expect(first).not.toBe(second);
     expect(first).toMatchObject({ id: client.connectionId, url: '/events', state: SSEConnectionState.DISCONNECTED });
+  });
+
+  it('reports fetch network failures as connection errors', async () => {
+    const networkError = new TypeError('fetch failed');
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkError));
+    const client = new SSEClient('/events');
+    const onError = vi.fn();
+    client.on('error', onError);
+
+    await client.connect({ timeout: 0 });
+
+    expect(onError).toHaveBeenCalledWith(networkError);
   });
 
   it.fails('stops connection setup after a non-OK HTTP response instead of entering CONNECTED state', async () => {

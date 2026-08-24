@@ -72,6 +72,33 @@ describe('applyPatchImmutable', () => {
     expect(result.items).toEqual(['a', 'b', 'c']);
   });
 
+  it.fails('moves an array element without dropping the elements after the target index', () => {
+    const result = applyPatchImmutable({ v: ['a', 'b', 'c'] }, [{ op: 'move', from: '/v/0', path: '/v/1' }]);
+
+    expect(result.v).toEqual(['b', 'a', 'c']);
+  });
+
+  it.fails('ignores remove on the array append marker instead of deleting the first element', () => {
+    const result = applyPatchImmutable({ items: ['a', 'b', 'c'] }, [{ op: 'remove', path: '/items/-' }]);
+
+    expect(result.items).toEqual(['a', 'b', 'c']);
+  });
+
+  it('coerces a primitive parent into an object when setting a deeper path', () => {
+    const result = applyPatchImmutable({ name: 'x' }, [{ op: 'replace', path: '/name/first', value: 1 }]);
+
+    expect(result).toEqual({ name: { first: 1 } });
+  });
+
+  it('falls back to null and undefined destinations when copying or moving missing sources', () => {
+    const copied = applyPatchImmutable({ keep: 1 }, [{ op: 'copy', from: '/missing', path: '/dest' }]);
+    const moved = applyPatchImmutable({ keep: 1 }, [{ op: 'move', from: '/missing', path: '/dest' }]);
+
+    expect(copied).toEqual({ keep: 1, dest: null });
+    expect(moved).toHaveProperty('dest', undefined);
+    expect(moved).toEqual({ keep: 1, dest: undefined });
+  });
+
   it('supports escaped slash and tilde JSON Pointer segments', () => {
     const original = {
       'a/b': { '~key': { value: 1 }, stable: { id: 1 } },
@@ -157,10 +184,19 @@ describe('applyPatchImmutable', () => {
     expect(applyPatchImmutable(original, [{ op: 'add', path: '', value: { added: true } }])).toEqual({
       added: true,
     });
-    expect(applyPatchImmutable(original, [{ op: 'replace', path: '/', value: 'replacement' }])).toBe('replacement');
+    expect(applyPatchImmutable(original, [{ op: 'replace', path: '', value: 'replacement' }])).toBe('replacement');
     expect(applyPatchImmutable('hello', [{ op: 'append', path: '', value: ' world' }])).toBe('hello world');
     expect(applyPatchImmutable(original, [{ op: 'remove', path: '' }])).toBeUndefined();
     expect(original).toEqual({ value: 1 });
+  });
+
+  it.fails('treats path "/" as the empty-string key per RFC 6902 instead of the root', () => {
+    const original = { value: 1 };
+
+    expect(applyPatchImmutable(original, [{ op: 'replace', path: '/', value: 'replacement' }])).toEqual({
+      '': 'replacement',
+      value: 1,
+    });
   });
 
   it('supports copy and move to the root', () => {

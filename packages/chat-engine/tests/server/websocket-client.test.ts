@@ -180,6 +180,52 @@ describe('WebSocketClient', () => {
     expect(logger.warn).toHaveBeenCalledWith('Cannot send message: WebSocket not connected (state: disconnected)');
   });
 
+  it('closes the raw socket and reports an error when closed during connecting', async () => {
+    const client = new WebSocketClient('ws://chat');
+    const onError = vi.fn();
+    const onComplete = vi.fn();
+    client.on('error', onError);
+    client.on('complete', onComplete);
+
+    const pending = client.connect({ timeout: 0 });
+    const socket = FakeWebSocket.instances[0];
+    expect(client.getStatus()).toBe(WebSocketConnectionState.CONNECTING);
+
+    await client.close();
+    await pending;
+
+    expect(socket.close).toHaveBeenCalledWith(1000, 'Client initiated close');
+    expect(onComplete).toHaveBeenCalledWith(true);
+    expect(onError).toHaveBeenCalledWith(expect.any(ConnectionError));
+  });
+
+  it('emits a connection error when the native socket reports onerror', async () => {
+    const client = new WebSocketClient('ws://chat');
+    const onError = vi.fn();
+    client.on('error', onError);
+    const socket = await connect(client);
+
+    socket.onerror?.({ type: 'error' } as Event);
+
+    expect(onError).toHaveBeenCalledWith(expect.any(ConnectionError));
+  });
+
+  it('treats a server close with code 1000 as a normal completion', async () => {
+    const client = new WebSocketClient('ws://chat');
+    const onComplete = vi.fn();
+    const onError = vi.fn();
+    client.on('complete', onComplete);
+    client.on('error', onError);
+    const socket = await connect(client, { maxRetries: 3, timeout: 0 });
+
+    socket.serverClose(1000, 'done');
+
+    expect(onComplete).toHaveBeenCalledWith(false);
+    expect(onError).not.toHaveBeenCalled();
+    expect(client.getStatus()).toBe(WebSocketConnectionState.CLOSED);
+    expect(FakeWebSocket.instances).toHaveLength(1);
+  });
+
   it.todo('puts the configured connection duration in TimeoutError.message instead of details');
   it.todo('closes the timed-out native socket before scheduling or attempting another connection');
 });

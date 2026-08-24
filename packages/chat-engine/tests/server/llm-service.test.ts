@@ -146,6 +146,65 @@ describe('LLMService', () => {
     expect(onError).toHaveBeenCalledWith(error);
   });
 
+  it.fails('registers one batch error listener instead of accumulating across requests', async () => {
+    const service = new LLMService();
+    const onError = vi.fn();
+    const first = service.handleBatchRequest({}, { endpoint: '/chat', onError });
+    const client = clientMocks.BatchClientMock.instances[0];
+    client.request.mockResolvedValue(undefined);
+    await first;
+
+    await service.handleBatchRequest({}, { endpoint: '/chat', onError });
+
+    client.emit('error', new Error('boom'));
+
+    expect(onError).toHaveBeenCalledOnce();
+  });
+
+  it('rethrows batch request failures after reporting them', async () => {
+    const service = new LLMService();
+    const onError = vi.fn();
+    const error = new Error('network down');
+    const pending = service.handleBatchRequest({}, { endpoint: '/chat', onError });
+    const client = clientMocks.BatchClientMock.instances[0];
+    client.request.mockRejectedValue(error);
+
+    await expect(pending).rejects.toBe(error);
+    expect(onError).toHaveBeenCalledWith(error);
+  });
+
+  it('exposes SSE connection statistics after a stream request', async () => {
+    const service = new LLMService();
+    expect(service.getSSEStats()).toBeNull();
+
+    await service.handleStreamRequest({ prompt: 'hi' }, { endpoint: '/events' });
+
+    expect(service.getSSEStats()).toEqual({ id: 'client-1', status: 'connected', info: { id: 'client-1' } });
+  });
+
+  it('replaces an existing WebSocket connection on re-init', async () => {
+    const service = new LLMService();
+    await service.initWSConnection({ endpoint: 'ws://first' });
+    const first = clientMocks.WebSocketClientMock.instances[0];
+
+    await service.initWSConnection({ endpoint: 'ws://second' });
+    const second = clientMocks.WebSocketClientMock.instances[1];
+
+    expect(first.removeAllListeners).toHaveBeenCalled();
+    expect(first.close).toHaveBeenCalledOnce();
+    expect(second.connect).toHaveBeenCalledOnce();
+  });
+
+  it('closes the persistent WebSocket on disconnectWS', async () => {
+    const service = new LLMService();
+    await service.initWSConnection({ endpoint: 'ws://chat' });
+    const client = clientMocks.WebSocketClientMock.instances[0];
+
+    service.disconnectWS();
+
+    expect(client.close).toHaveBeenCalledOnce();
+  });
+
   it('connects SSE, filters messages, and forwards lifecycle events', async () => {
     const service = new LLMService();
     const params = { prompt: 'hello' };

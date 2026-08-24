@@ -169,4 +169,48 @@ describe('OpenClawStreamHandler', () => {
     expect(adapter.destroy).toHaveBeenCalledOnce();
     expect(handler.getAdapter()).toBeNull();
   });
+
+  it('tolerates abort and destroy before initialization', async () => {
+    const handler = new OpenClawStreamHandler({ llmService: {} as never });
+
+    expect(() => handler.abort()).not.toThrow();
+    await expect(handler.destroy()).resolves.toBeUndefined();
+    expect(handler.getAdapter()).toBeNull();
+  });
+
+  it('skips preconnection entirely without an endpoint', async () => {
+    const handler = new OpenClawStreamHandler({ llmService: {} as never });
+
+    await handler.initialize({}, lifecycleContext());
+
+    expect(adapterState.instances).toHaveLength(0);
+    expect(handler.getAdapter()).toBeNull();
+  });
+
+  it('keeps the store untouched when history is empty', async () => {
+    const config: ChatServiceConfig = { endpoint: 'wss://gateway.example', onHistoryLoaded: vi.fn() };
+    const context = lifecycleContext();
+    const handler = new OpenClawStreamHandler({ llmService: {} as never });
+    await handler.initialize(config, context);
+
+    adapterState.instances[0].callbacks.onHistoryLoaded([] as never);
+
+    expect(context.messageStore.setMessages).not.toHaveBeenCalled();
+    expect(config.onHistoryLoaded).not.toHaveBeenCalled();
+  });
+
+  it('ignores stream messages while stop receiving is asserted', async () => {
+    const config: ChatServiceConfig = { endpoint: 'wss://gateway.example' };
+    const context = streamContext(config);
+    vi.mocked(context.getStopReceive).mockReturnValue(true);
+    const handler = new OpenClawStreamHandler({ llmService: {} as never });
+    await handler.initialize(config, lifecycleContext());
+    adapterState.instances[0].authenticated = true;
+
+    await handler.handleStream({ prompt: 'hello' }, context);
+    adapterState.instances[0].callbacks.onMessage({ type: 'text', data: 'late' } as never);
+
+    expect(context.eventBus.emit).not.toHaveBeenCalled();
+    expect(context.processMessageResult).not.toHaveBeenCalled();
+  });
 });

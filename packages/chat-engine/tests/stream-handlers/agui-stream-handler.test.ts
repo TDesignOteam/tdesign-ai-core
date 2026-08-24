@@ -131,6 +131,62 @@ describe('AGUIStreamHandler', () => {
     expect(context.handleComplete).toHaveBeenCalledWith('assistant-1', true, params);
   });
 
+  it('suppresses the AGUI run complete event for aborted runs', async () => {
+    const params = { prompt: 'hello' };
+    const { adapter, context, handler, getRequestConfig } = setup();
+    adapter.handleAGUIEvent.mockImplementation((_chunk: SSEChunkData, callbacks: AGUIAdapterCallbacks) => {
+      callbacks.onRunComplete?.(true, params);
+      return null;
+    });
+
+    await handler.handleStream(params, context);
+    getRequestConfig()!.onMessage?.({ data: 'run event' });
+
+    expect(context.handleComplete).toHaveBeenCalledWith('assistant-1', true, params, undefined);
+    expect(context.eventBus.emit).not.toHaveBeenCalledWith(ChatEngineEventType.AGUI_RUN_COMPLETE, expect.anything());
+  });
+
+  it('delegates run errors and publishes an AGUI run error event', async () => {
+    const { adapter, context, handler, getRequestConfig } = setup();
+    const error = { type: AGUIEventType.RUN_ERROR as const, message: 'agent exploded' };
+    adapter.handleAGUIEvent.mockImplementation((_chunk: SSEChunkData, callbacks: AGUIAdapterCallbacks) => {
+      callbacks.onRunError?.(error);
+      return null;
+    });
+
+    await handler.handleStream({ prompt: 'hello' }, context);
+    getRequestConfig()!.onMessage?.({ data: 'run event' });
+
+    expect(context.handleError).toHaveBeenCalledWith('assistant-1', error);
+    expect(context.eventBus.emit).toHaveBeenCalledWith(ChatEngineEventType.AGUI_RUN_ERROR, { error });
+  });
+
+  it('skips chunks filtered out by onChunk before mapping', async () => {
+    const config: ChatServiceConfig = { onChunk: vi.fn(() => null) };
+    const { adapter, context, handler, getRequestConfig } = setup(config);
+    adapter.handleAGUIEvent.mockReturnValue({ type: 'text', data: 'mapped' } as const);
+
+    await handler.handleStream({ prompt: 'hello' }, context);
+    const result = getRequestConfig()!.onMessage?.({ data: 'raw' });
+
+    expect(result).toBeNull();
+    expect(adapter.handleAGUIEvent).not.toHaveBeenCalled();
+    expect(context.eventBus.emit).not.toHaveBeenCalled();
+    expect(context.processMessageResult).not.toHaveBeenCalled();
+  });
+
+  it('drops chunks while stop receiving is asserted', async () => {
+    const { context, handler, getRequestConfig } = setup();
+    vi.mocked(context.getStopReceive).mockReturnValue(true);
+
+    await handler.handleStream({ prompt: 'hello' }, context);
+    const result = getRequestConfig()!.onMessage?.({ data: 'late chunk' });
+
+    expect(result).toBeNull();
+    expect(context.eventBus.emit).not.toHaveBeenCalled();
+    expect(context.processMessageResult).not.toHaveBeenCalled();
+  });
+
   it('publishes activity and tool-call content after a message update', () => {
     const { context, handler } = setup();
     const contents = [
