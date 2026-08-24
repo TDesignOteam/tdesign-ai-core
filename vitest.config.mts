@@ -10,7 +10,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['packages/*/tests/**/*.test.ts'],
+    include: ['packages/**/__tests__/*.{test,spec}.ts'],
     clearMocks: true,
     restoreMocks: true,
     coverage: {
@@ -18,7 +18,7 @@ export default defineConfig({
       reporter: ['text', 'html', 'json-summary'],
       include: ['packages/{chat-engine,shared}/**/*.ts'],
       exclude: [
-        'packages/*/tests/**',
+        'packages/**/__tests__/**',
         'packages/**/*.d.ts',
         'packages/*/dist/**',
         'packages/chat-engine/**/types/**',
