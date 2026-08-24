@@ -194,6 +194,21 @@ describe('MessageStore', () => {
     ]);
   });
 
+  it('同类型多实例内容按 (id, type) 精确匹配而非首个同类型', () => {
+    store.createMessage(
+      assistantMessage('assistant', [
+        { id: 'md-1', type: 'markdown', data: 'first', status: 'streaming' },
+        { id: 'md-2', type: 'markdown', data: 'second', status: 'streaming' },
+      ]),
+    );
+
+    store.updateMultipleContents('assistant', [{ id: 'md-2', type: 'markdown', data: 'second!', status: 'complete' }]);
+
+    const content = (store.getMessageByID('assistant') as AIMessage).content!;
+    expect(content[0]).toMatchObject({ id: 'md-1', data: 'first' });
+    expect(content[1]).toMatchObject({ id: 'md-2', data: 'second!', status: 'complete' });
+  });
+
   it('当更新包含错误时将消息标记为错误并停止流式内容', () => {
     store.createMessage(
       assistantMessage('assistant', [

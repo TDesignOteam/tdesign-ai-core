@@ -60,4 +60,71 @@ describe('ActivityManagerImpl', () => {
     expect(manager.getCurrentActivity()).toBeNull();
     expect(manager.getAllActivityTypes()).toEqual([]);
   });
+
+  it('相同 activityType 的不同 messageId 维护独立实例', () => {
+    const manager = new ActivityManagerImpl();
+    manager.handleActivityEvent({
+      type: AGUIEventType.ACTIVITY_SNAPSHOT,
+      activityType: 'plan',
+      messageId: 'm1',
+      content: { operations: ['a'] },
+    });
+    manager.handleActivityEvent({
+      type: AGUIEventType.ACTIVITY_SNAPSHOT,
+      activityType: 'plan',
+      messageId: 'm2',
+      content: { operations: ['x'] },
+    });
+
+    expect(manager.getActivity('plan', 'm1')?.content).toEqual({ operations: ['a'] });
+    expect(manager.getActivity('plan', 'm2')?.content).toEqual({ operations: ['x'] });
+    expect(manager.getAllActivityTypes()).toEqual(['plan']);
+    expect(manager.getCurrentActivity()).toMatchObject({ messageId: 'm2' });
+  });
+
+  it('无 messageId 的增量回退到最近实例并保持 key 稳定', () => {
+    const manager = new ActivityManagerImpl();
+    manager.handleActivityEvent({
+      type: AGUIEventType.ACTIVITY_SNAPSHOT,
+      activityType: 'plan',
+      messageId: 'm1',
+      content: { operations: ['a'] },
+    });
+
+    const updated = manager.handleActivityEvent({
+      type: AGUIEventType.ACTIVITY_DELTA,
+      activityType: 'plan',
+      patch: [{ op: 'add', path: '/operations/-', value: 'b' }],
+    });
+
+    expect(updated).toMatchObject({ messageId: 'm1', content: { operations: ['a', 'b'] } });
+    expect(manager.getActivity('plan', 'm1')?.content).toEqual({ operations: ['a', 'b'] });
+    expect(manager.getActivity('plan')?.content).toEqual({ operations: ['a', 'b'] });
+  });
+
+  it('带 messageId 的增量不影响其他实例的内容', () => {
+    const manager = new ActivityManagerImpl();
+    manager.handleActivityEvent({
+      type: AGUIEventType.ACTIVITY_SNAPSHOT,
+      activityType: 'plan',
+      messageId: 'm1',
+      content: { operations: ['a'] },
+    });
+    manager.handleActivityEvent({
+      type: AGUIEventType.ACTIVITY_SNAPSHOT,
+      activityType: 'plan',
+      messageId: 'm2',
+      content: { operations: ['x'] },
+    });
+
+    manager.handleActivityEvent({
+      type: AGUIEventType.ACTIVITY_DELTA,
+      activityType: 'plan',
+      messageId: 'm1',
+      patch: [{ op: 'add', path: '/operations/-', value: 'b' }],
+    });
+
+    expect(manager.getActivity('plan', 'm1')?.content).toEqual({ operations: ['a', 'b'] });
+    expect(manager.getActivity('plan', 'm2')?.content).toEqual({ operations: ['x'] });
+  });
 });

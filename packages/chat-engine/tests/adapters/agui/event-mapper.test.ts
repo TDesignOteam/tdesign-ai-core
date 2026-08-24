@@ -115,7 +115,7 @@ describe('AGUIEventMapper', () => {
     ]);
   });
 
-  it.fails('快照之前的第一个 ACTIVITY_DELTA 使用追加策略', () => {
+  it('快照之前的第一个 ACTIVITY_DELTA 使用追加策略', () => {
     const first = mapper.mapEvent({
       data: {
         type: 'ACTIVITY_DELTA',
@@ -135,5 +135,122 @@ describe('AGUIEventMapper', () => {
 
     expect(first).toMatchObject({ type: 'activity-plan', strategy: 'append' });
     expect(second).toMatchObject({ type: 'activity-plan', strategy: 'merge' });
+  });
+
+  it('交错的 TEXT_MESSAGE_CHUNK 按 messageId 路由到各自的块', () => {
+    const a1 = mapper.mapEvent({ data: { type: 'TEXT_MESSAGE_CHUNK', messageId: 't1', delta: 'A1' } });
+    const b1 = mapper.mapEvent({ data: { type: 'TEXT_MESSAGE_CHUNK', messageId: 't2', delta: 'B1' } });
+    const a2 = mapper.mapEvent({ data: { type: 'TEXT_MESSAGE_CHUNK', messageId: 't1', delta: 'A2' } });
+
+    expect(a1).toMatchObject({ type: 'markdown', strategy: 'append', id: 't1', data: 'A1' });
+    expect(b1).toMatchObject({ type: 'markdown', strategy: 'append', id: 't2', data: 'B1' });
+    expect(a2).toMatchObject({ type: 'markdown', strategy: 'merge', id: 't1', data: 'A2' });
+  });
+
+  it('标准文本生命周期事件携带 messageId 作为内容 id', () => {
+    expect(mapper.mapEvent({ data: { type: 'TEXT_MESSAGE_START', messageId: 'm1', role: 'assistant' } })).toMatchObject(
+      { type: 'markdown', strategy: 'append', id: 'm1' },
+    );
+    expect(mapper.mapEvent({ data: { type: 'TEXT_MESSAGE_CONTENT', messageId: 'm1', delta: 'Hi' } })).toMatchObject({
+      strategy: 'merge',
+      id: 'm1',
+    });
+    expect(mapper.mapEvent({ data: { type: 'TEXT_MESSAGE_END', messageId: 'm1' } })).toMatchObject({
+      status: 'complete',
+      strategy: 'merge',
+      id: 'm1',
+    });
+  });
+
+  it('交错的 REASONING_MESSAGE_CHUNK 按 messageId 路由到各自的块', () => {
+    const r1a = mapper.mapEvent({ data: { type: 'REASONING_MESSAGE_CHUNK', messageId: 'r1', delta: 'one' } });
+    const r2a = mapper.mapEvent({ data: { type: 'REASONING_MESSAGE_CHUNK', messageId: 'r2', delta: 'two' } });
+    const r1b = mapper.mapEvent({ data: { type: 'REASONING_MESSAGE_CHUNK', messageId: 'r1', delta: ' more' } });
+
+    expect(r1a).toMatchObject({ type: 'thinking', strategy: 'append', id: 'r1' });
+    expect(r2a).toMatchObject({ type: 'thinking', strategy: 'append', id: 'r2' });
+    expect(r1b).toMatchObject({ type: 'thinking', strategy: 'merge', id: 'r1', data: { text: ' more' } });
+  });
+
+  it('REASONING_MESSAGE_END 按 messageId 关闭指定块且不破坏其他块的追踪', () => {
+    mapper.mapEvent({ data: { type: 'REASONING_MESSAGE_CHUNK', messageId: 'r1', delta: 'a' } });
+    mapper.mapEvent({ data: { type: 'REASONING_MESSAGE_CHUNK', messageId: 'r2', delta: 'b' } });
+
+    const ended = mapper.mapEvent({ data: { type: 'REASONING_MESSAGE_END', messageId: 'r1' } });
+    expect(ended).toMatchObject({
+      type: 'thinking',
+      status: 'complete',
+      strategy: 'merge',
+      id: 'r1',
+      ext: { collapsed: true },
+    });
+
+    const r2b = mapper.mapEvent({ data: { type: 'REASONING_MESSAGE_CHUNK', messageId: 'r2', delta: 'c' } });
+    expect(r2b).toMatchObject({ type: 'thinking', strategy: 'merge', id: 'r2', data: { text: 'c' } });
+  });
+
+  it('空 delta 仅关闭自身 messageId 的推理块', () => {
+    mapper.mapEvent({ data: { type: 'REASONING_MESSAGE_CHUNK', messageId: 'r1', delta: 'a' } });
+    mapper.mapEvent({ data: { type: 'REASONING_MESSAGE_CHUNK', messageId: 'r2', delta: 'b' } });
+
+    const closed = mapper.mapEvent({ data: { type: 'REASONING_MESSAGE_CHUNK', messageId: 'r1', delta: '' } });
+    expect(closed).toMatchObject({ status: 'complete', strategy: 'merge', id: 'r1' });
+
+    const r2b = mapper.mapEvent({ data: { type: 'REASONING_MESSAGE_CHUNK', messageId: 'r2', delta: 'c' } });
+    expect(r2b).toMatchObject({ strategy: 'merge', id: 'r2', data: { text: 'c' } });
+  });
+
+  it('相同 activityType 的不同 messageId 增量携带各自 id 并合并回原实例', () => {
+    const first = mapper.mapEvent({
+      data: {
+        type: 'ACTIVITY_DELTA',
+        messageId: 'm1',
+        activityType: 'plan',
+        patch: [{ op: 'add', path: '/operations/-', value: { title: 'first' } }],
+      },
+    });
+    const firstAgain = mapper.mapEvent({
+      data: {
+        type: 'ACTIVITY_DELTA',
+        messageId: 'm1',
+        activityType: 'plan',
+        patch: [{ op: 'add', path: '/operations/-', value: { title: 'more' } }],
+      },
+    });
+
+    expect(first).toMatchObject({ type: 'activity-plan', strategy: 'append', id: 'm1' });
+    expect(firstAgain).toMatchObject({ type: 'activity-plan', strategy: 'merge', id: 'm1' });
+  });
+
+  it.fails('新 messageId 的首个增量使用追加策略而不是被回退查询误判为已存在', () => {
+    mapper.mapEvent({
+      data: {
+        type: 'ACTIVITY_DELTA',
+        messageId: 'm1',
+        activityType: 'plan',
+        patch: [{ op: 'add', path: '/operations/-', value: { title: 'first' } }],
+      },
+    });
+
+    const other = mapper.mapEvent({
+      data: {
+        type: 'ACTIVITY_DELTA',
+        messageId: 'm2',
+        activityType: 'plan',
+        patch: [{ op: 'add', path: '/operations/-', value: { title: 'other' } }],
+      },
+    });
+
+    expect(other).toMatchObject({ type: 'activity-plan', strategy: 'append', id: 'm2' });
+  });
+
+  it('重置后已打开的 messageId 重新走追加策略', () => {
+    mapper.mapEvent({ data: { type: 'TEXT_MESSAGE_CHUNK', messageId: 't1', delta: 'A' } });
+    mapper.reset();
+
+    expect(mapper.mapEvent({ data: { type: 'TEXT_MESSAGE_CHUNK', messageId: 't1', delta: 'B' } })).toMatchObject({
+      strategy: 'append',
+      id: 't1',
+    });
   });
 });

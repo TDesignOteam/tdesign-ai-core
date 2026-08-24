@@ -195,6 +195,58 @@ describe('MessageProcessor', () => {
     });
   });
 
+  it('带 id 的增量按 (id, type) 精确合并到同类型多实例中的目标块', () => {
+    store.createMessage(
+      assistantMessage('assistant', [
+        { type: 'markdown', id: 'md-1', data: 'first', status: 'streaming' },
+        { type: 'markdown', id: 'md-2', data: 'second', status: 'streaming' },
+      ]),
+    );
+
+    processor.applyContentUpdate(store, 'assistant', { type: 'markdown', id: 'md-1', data: ' update' });
+
+    const content = (store.getMessageByID('assistant') as AIMessage).content!;
+    expect(content[0]).toMatchObject({ id: 'md-1', data: 'first update' });
+    expect(content[1]).toMatchObject({ id: 'md-2', data: 'second' });
+  });
+
+  it('带 id 的增量未命中时回退到最后一个同类型块', () => {
+    store.createMessage(
+      assistantMessage('assistant', [
+        { type: 'markdown', id: 'md-1', data: 'first' },
+        { type: 'markdown', id: 'md-2', data: 'second' },
+      ]),
+    );
+
+    processor.applyContentUpdate(store, 'assistant', { type: 'markdown', id: 'md-404', data: ' fallback' });
+
+    const content = (store.getMessageByID('assistant') as AIMessage).content!;
+    expect(content).toHaveLength(2);
+    expect(content[0]).toMatchObject({ data: 'first' });
+    expect(content[1]).toMatchObject({ data: 'second fallback' });
+  });
+
+  it('跨消息按 id 精确匹配工具调用', () => {
+    store.createMultiMessages([
+      assistantMessage('older', [
+        { type: 'toolcall-search', id: 'call-2', data: { toolCallId: 'call-2', toolCallName: 'search', args: '{}' } },
+        { type: 'toolcall-search', id: 'call-1', data: { toolCallId: 'call-1', toolCallName: 'search', args: '{}' } },
+      ]),
+      assistantMessage('current'),
+    ]);
+
+    processor.applyContentUpdate(store, 'current', {
+      type: 'toolcall-search',
+      id: 'call-2',
+      data: { toolCallId: 'call-2', toolCallName: 'search', result: 'done' },
+    });
+
+    const older = (store.getMessageByID('older') as AIMessage).content!;
+    expect(older[0].data).toMatchObject({ toolCallId: 'call-2', result: 'done' });
+    expect(older[1].data).not.toHaveProperty('result');
+    expect((store.getMessageByID('current') as AIMessage).content).toEqual([]);
+  });
+
   it('不存在匹配内容时追加合并数据块', () => {
     store.createMessage(assistantMessage('assistant'));
     processor.applyContentUpdate(store, 'assistant', { type: 'image', data: { url: 'image.png' } });
