@@ -53,7 +53,8 @@ export function processMessageGroup(
   const allContent: AGUIMessageContent[] = [];
   messages.forEach((message) => {
     if (message.role === 'assistant') {
-      if (typeof message.content === 'string') allContent.push(createMarkdownContent(message.content));
+      if (typeof message.content === 'string')
+        allContent.push(createMarkdownContent(message.content, 'complete', 'append', 'assistant', message.id));
       if (message.toolCalls?.length) allContent.push(...processToolCalls(message.toolCalls, toolCallMap));
       return;
     }
@@ -71,6 +72,7 @@ export function processMessageGroup(
                 ...(message.entityId ? { entityId: message.entityId } : {}),
               }
             : undefined,
+          message.id,
         ),
       );
       return;
@@ -80,7 +82,9 @@ export function processMessageGroup(
         const content = message.content;
         allContent.push(createCustomContent({ name: stringAt(content, 'name'), value: jsonAt(content, 'value') }));
       } else {
-        allContent.push(createActivityContent(message.activityType, message.content, 'complete'));
+        allContent.push(
+          createActivityContent(message.activityType, message.content, 'complete', 'append', undefined, message.id),
+        );
       }
     }
   });
@@ -139,8 +143,9 @@ export function createThinkingContent(
   strategy: 'append' | 'merge' = 'append',
   collapsed = false,
   extraExt?: ChatJSONObject,
+  id?: string,
 ): Extract<AIMessageContent, { type: 'thinking' }> {
-  return { type: 'thinking', data, status, strategy, ext: { collapsed, ...extraExt } };
+  return { type: 'thinking', data, status, strategy, ext: { collapsed, ...extraExt }, ...(id ? { id } : {}) };
 }
 
 export function createToolCallContent(
@@ -157,12 +162,14 @@ export function createActivityContent(
   status: 'streaming' | 'complete' = 'complete',
   strategy: 'append' | 'merge' = 'append',
   deltaInfo?: ActivityData<ChatJSONObject>['deltaInfo'],
+  id?: string,
 ): DynamicActivityContent {
   return {
     type: `activity-${activityType}`,
     data: { activityType, content },
     status,
     strategy,
+    ...(id ? { id } : {}),
     ...(deltaInfo ? { ext: { deltaInfo } } : {}),
   };
 }
@@ -172,10 +179,11 @@ export function createMarkdownContent(
   status: 'streaming' | 'complete' = 'complete',
   strategy: 'append' | 'merge' = 'append',
   role: 'assistant' | 'system' = 'assistant',
+  id?: string,
 ): AIMessageContent {
   return role === 'system'
-    ? { type: 'system-text', data, status, strategy, ext: { role } }
-    : { type: 'markdown', data, status, strategy };
+    ? { type: 'system-text', data, status, strategy, ext: { role }, ...(id ? { id } : {}) }
+    : { type: 'markdown', data, status, strategy, ...(id ? { id } : {}) };
 }
 
 export function createSuggestionContent(data: SuggestionItem[]): Extract<AIMessageContent, { type: 'suggestion' }> {

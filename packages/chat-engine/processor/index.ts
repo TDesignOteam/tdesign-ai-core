@@ -121,8 +121,10 @@ export default class MessageProcessor {
     if (rawChunk.strategy === 'append') {
       targetIndex = -1;
     } else {
-      // merge 策略：按 type 查找最后一个匹配的类型
-      targetIndex = this.findLastContentIndex(message.content, rawChunk.type);
+      // merge 策略：优先按 id 精确匹配（用于同类型多个块并行穿插的场景，
+      // 如 markdown/thinking/activity 通过 messageId 作为 id 区分不同实例）；
+      // 未命中再回退到按 type 查找最后一个匹配（老后端不带 messageId 的兜底）。
+      targetIndex = this.findLastContentIndex(message.content, rawChunk.type, rawChunk.id);
 
       // 跨消息查找：当前消息没找到，向前搜索历史 AI 消息
       // 仅对 toolcall 类型生效。典型场景：交互式 Toolcall 的 start 在前一条消息中，
@@ -130,7 +132,7 @@ export default class MessageProcessor {
       // 注意：Activity 类型不做跨消息查找，因为其 merge 语义是同一消息内的增量更新，
       // 跨消息时应由后端重新发 SNAPSHOT 创建新内容块。
       if (targetIndex === -1 && rawChunk.type.startsWith('toolcall-')) {
-        const crossResult = this.findContentInPreviousMessages(messageStore, messageId, rawChunk.type);
+        const crossResult = this.findContentInPreviousMessages(messageStore, messageId, rawChunk.type, rawChunk.id);
         if (crossResult) {
           targetMessageId = crossResult.messageId;
           targetIndex = crossResult.contentIndex;
@@ -149,9 +151,21 @@ export default class MessageProcessor {
   }
 
   /**
-   * 在消息内容数组中查找最后一个匹配 type 的索引
+   * 在消息内容数组中查找最后一个匹配的索引
+   *
+   * 匹配策略：
+   * - 传入 id 时：优先按 (id === id && type === type) 精确匹配；
+   *   未命中时回退到仅按 type 匹配（兼容老后端不带 id 的场景）。
+   * - 未传 id 时：仅按 type 匹配最后一个。
    */
-  private findLastContentIndex(contents: AIMessageContent[], type: string): number {
+  private findLastContentIndex(contents: AIMessageContent[], type: string, id?: string): number {
+    if (id) {
+      for (let i = contents.length - 1; i >= 0; i--) {
+        if (contents[i].type === type && contents[i].id === id) {
+          return i;
+        }
+      }
+    }
     for (let i = contents.length - 1; i >= 0; i--) {
       if (contents[i].type === type) {
         return i;
@@ -172,6 +186,7 @@ export default class MessageProcessor {
     messageStore: MessageStore,
     currentMessageId: string,
     type: string,
+    id?: string,
   ): { messageId: string; contentIndex: number } | null {
     const messages = messageStore.messages;
     const currentIndex = messages.findIndex((m) => m.id === currentMessageId);
@@ -182,7 +197,7 @@ export default class MessageProcessor {
       const msg = messages[i];
       if (!isAIMessage(msg) || !msg.content) continue;
 
-      const contentIndex = this.findLastContentIndex(msg.content, type);
+      const contentIndex = this.findLastContentIndex(msg.content, type, id);
       if (contentIndex !== -1) {
         return { messageId: msg.id, contentIndex };
       }
