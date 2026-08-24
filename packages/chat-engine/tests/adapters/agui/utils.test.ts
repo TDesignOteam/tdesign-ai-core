@@ -12,6 +12,7 @@ import {
   isSnapshotMessageContent,
   mergeStringContent,
   parseSSEData,
+  processMessageGroup,
   processToolCalls,
 } from '../../../adapters/agui/utils';
 
@@ -74,6 +75,26 @@ describe('AG-UI 工具函数', () => {
       data: { toolCallId: 'call-1', result: 'found' },
     });
     expect(buildToolCallMap(messages).get('call-1')).toEqual({ toolCallId: 'call-1', result: 'found' });
+  });
+
+  it('processMessageGroup 将消息 id 透传为内容块 id', () => {
+    const contents = processMessageGroup(
+      [
+        { id: 'a1', role: 'assistant', content: 'hello' },
+        { id: 'r1', role: 'reasoning', content: 'why', title: 'Plan' },
+        { id: 'act1', role: 'activity', activityType: 'plan', content: { operations: [] } },
+      ],
+      new Map(),
+    );
+
+    expect(contents).toHaveLength(3);
+    expect(contents[0]).toMatchObject({ type: 'markdown', id: 'a1', data: 'hello', status: 'complete' });
+    expect(contents[1]).toMatchObject({ type: 'thinking', id: 'r1', data: { text: 'why', title: 'Plan' } });
+    expect(contents[2]).toMatchObject({
+      type: 'activity-plan',
+      id: 'act1',
+      data: { activityType: 'plan', content: { operations: [] } },
+    });
   });
 
   it('将格式错误的建议工具结果转换为空建议列表', () => {

@@ -127,4 +127,28 @@ describe('ActivityManagerImpl', () => {
     expect(manager.getActivity('plan', 'm1')?.content).toEqual({ operations: ['a', 'b'] });
     expect(manager.getActivity('plan', 'm2')?.content).toEqual({ operations: ['x'] });
   });
+
+  it('带新 messageId 的首个增量从空内容开始且精确查询不回退', () => {
+    const manager = new ActivityManagerImpl();
+    manager.handleActivityEvent({
+      type: AGUIEventType.ACTIVITY_SNAPSHOT,
+      activityType: 'plan',
+      messageId: 'm1',
+      content: { operations: ['a'] },
+    });
+
+    const created = manager.handleActivityEvent({
+      type: AGUIEventType.ACTIVITY_DELTA,
+      activityType: 'plan',
+      messageId: 'm2',
+      patch: [{ op: 'add', path: '/operations/-', value: 'x' }],
+    });
+
+    expect(created).toMatchObject({ messageId: 'm2', content: { operations: ['x'] } });
+    expect(manager.getActivity('plan', 'm2')?.content).toEqual({ operations: ['x'] });
+    // 已有实例不受新实例增量的影响
+    expect(manager.getActivity('plan', 'm1')?.content).toEqual({ operations: ['a'] });
+    // 无 messageId 的查询仍回退到最近实例
+    expect(manager.getActivity('plan')?.content).toEqual({ operations: ['x'] });
+  });
 });

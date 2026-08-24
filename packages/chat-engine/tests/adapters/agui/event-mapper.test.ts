@@ -200,6 +200,39 @@ describe('AGUIEventMapper', () => {
     expect(r2b).toMatchObject({ strategy: 'merge', id: 'r2', data: { text: 'c' } });
   });
 
+  it('REASONING_END 按 messageId 关闭指定块且不影响其他推理块', () => {
+    mapper.mapEvent({ data: { type: 'REASONING_MESSAGE_CHUNK', messageId: 'r1', delta: 'a' } });
+    mapper.mapEvent({ data: { type: 'REASONING_MESSAGE_CHUNK', messageId: 'r2', delta: 'b' } });
+
+    const ended = mapper.mapEvent({ data: { type: 'REASONING_END', messageId: 'r1', title: 'Done' } });
+    expect(ended).toMatchObject({
+      type: 'thinking',
+      status: 'complete',
+      strategy: 'merge',
+      id: 'r1',
+      data: { title: 'Done' },
+      ext: { collapsed: true },
+    });
+
+    const r2b = mapper.mapEvent({ data: { type: 'REASONING_MESSAGE_CHUNK', messageId: 'r2', delta: 'c' } });
+    expect(r2b).toMatchObject({ strategy: 'merge', id: 'r2', data: { text: 'c' } });
+  });
+
+  it('REASONING_ENCRYPTED_VALUE 关联到当前追踪的推理块', () => {
+    mapper.mapEvent({ data: { type: 'REASONING_MESSAGE_CHUNK', messageId: 'r1', delta: 'a' } });
+
+    const encrypted = mapper.mapEvent({
+      data: { type: 'REASONING_ENCRYPTED_VALUE', subtype: 'message', entityId: 'e1', encryptedValue: 'xyz' },
+    });
+
+    expect(encrypted).toMatchObject({
+      type: 'thinking',
+      strategy: 'merge',
+      id: 'r1',
+      ext: { encryptedValue: 'xyz', subtype: 'message', entityId: 'e1' },
+    });
+  });
+
   it('相同 activityType 的不同 messageId 增量携带各自 id 并合并回原实例', () => {
     const first = mapper.mapEvent({
       data: {
@@ -222,7 +255,7 @@ describe('AGUIEventMapper', () => {
     expect(firstAgain).toMatchObject({ type: 'activity-plan', strategy: 'merge', id: 'm1' });
   });
 
-  it.fails('新 messageId 的首个增量使用追加策略而不是被回退查询误判为已存在', () => {
+  it('新 messageId 的首个增量使用追加策略且内容不受其他实例污染', () => {
     mapper.mapEvent({
       data: {
         type: 'ACTIVITY_DELTA',
@@ -241,7 +274,12 @@ describe('AGUIEventMapper', () => {
       },
     });
 
-    expect(other).toMatchObject({ type: 'activity-plan', strategy: 'append', id: 'm2' });
+    expect(other).toMatchObject({
+      type: 'activity-plan',
+      strategy: 'append',
+      id: 'm2',
+      data: { content: { operations: [{ title: 'other' }] } },
+    });
   });
 
   it('重置后已打开的 messageId 重新走追加策略', () => {

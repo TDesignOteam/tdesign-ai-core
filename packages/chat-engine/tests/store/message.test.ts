@@ -232,7 +232,22 @@ describe('MessageStore', () => {
     expect(standalone.messages).toHaveLength(1);
   });
 
+  it('无 id 的内容更新按类型匹配最后一个，而不是把缺失的 id 视为相等', () => {
+    store.createMessage(
+      assistantMessage('assistant', [
+        { id: 'ta', type: 'text', data: 'first', status: 'complete' },
+        { id: 'tb', type: 'text', data: 'second', status: 'complete' },
+      ]),
+    );
+
+    store.updateMultipleContents('assistant', [{ type: 'text', data: 'replaced' }]);
+
+    const content = (store.getMessageByID('assistant') as AIMessage).content!;
+    expect(content).toHaveLength(2);
+    expect(content[0]).toMatchObject({ id: 'ta', data: 'first' });
+    expect(content[1]).toMatchObject({ id: 'tb', data: 'replaced' });
+  });
+
   it.todo('创建消息分支时分配新的唯一 ID');
   it.todo('目标消息不存在时不派发状态或删除事件');
-  it.todo('无 id 的内容更新按类型匹配，而不是把缺失的 id 视为相等');
 });

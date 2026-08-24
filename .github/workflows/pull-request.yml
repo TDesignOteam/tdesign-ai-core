@@ -22,7 +22,7 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
 
       - run: pnpm run verify
 
@@ -37,7 +37,7 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
 
       - run: pnpm run test:coverage
 
@@ -52,6 +52,6 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
 
       - run: pnpm build

@@ -204,9 +204,13 @@ export class AGUIEventMapper {
           event.messageId || this.currentTextMessageId || undefined,
         );
 
-      case AGUIEventType.TEXT_MESSAGE_END:
+      case AGUIEventType.TEXT_MESSAGE_END: {
+        // END 可能不带 messageId，回退到当前追踪的 id（在重置前取用），
+        // 避免并行多个 markdown 块时无 id 的 merge 误命中"最后一个"块
+        const endMessageId = event.messageId || this.currentTextMessageId || undefined;
         this.currentTextMessageId = null; // 重置状态
-        return createMarkdownContent(event.delta || '', 'complete', 'merge', 'assistant', event.messageId || undefined);
+        return createMarkdownContent(event.delta || '', 'complete', 'merge', 'assistant', endMessageId);
+      }
 
       default:
         return null;

@@ -37,9 +37,13 @@ export class ActivityManagerImpl implements ActivityManager {
     return (key && this.activities[key]) || null;
   }
   getActivity(activityType: string, messageId?: string): ActivityData<ChatJSONObject> | null {
-    // 优先按精确 key 查询；未命中则回退到该 activityType 最近一次的实例（兼容老调用）
-    const exact = this.activities[buildActivityKey(activityType, messageId)];
-    if (exact) return exact;
+    // 带 messageId：按精确 key 查询，不回退。
+    // 否则同一 activityType 已有实例时，新 messageId 的首个增量会被误判为已存在，
+    // 导致策略误用 merge 且补丁被应用到其他实例的内容上。
+    if (messageId) {
+      return this.activities[buildActivityKey(activityType, messageId)] || null;
+    }
+    // 无 messageId：回退到该 activityType 最近一次的实例（兼容老后端不带 messageId 的场景）
     const fallbackKey = this.lastKeyByType[activityType];
     return (fallbackKey && this.activities[fallbackKey]) || null;
   }
@@ -57,7 +61,8 @@ export class ActivityManagerImpl implements ActivityManager {
       });
     }
     if (!event.activityType) return null;
-    // Delta：优先按精确 key 查找已有 snapshot；未命中时回退到该 activityType 最近一次实例
+    // Delta：带 messageId 时按精确 key 查找，未命中视为新实例从空内容开始；
+    // 无 messageId 时回退到该 activityType 最近一次实例
     const current = this.getActivity(event.activityType, event.messageId);
     const previousContent = current?.content || this.inferInitialContent(event.patch);
     const oldCount = this.getOperationsCount(previousContent);
