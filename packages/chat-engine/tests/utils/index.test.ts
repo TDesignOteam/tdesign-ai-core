@@ -21,8 +21,8 @@ import {
   safeParseJSON,
 } from '../../utils/index';
 
-describe('utils public helpers', () => {
-  it('applies patches without mutating the original state', () => {
+describe('utils 公开辅助函数', () => {
+  it('应用补丁且不修改原始状态', () => {
     const original = { nested: { count: 1 }, stable: { value: true } };
 
     const result = applyJsonPatch(original, [{ op: 'replace', path: '/nested/count', value: 2 }]);
@@ -32,7 +32,7 @@ describe('utils public helpers', () => {
     expect(original.nested.count).toBe(1);
   });
 
-  it('parses JSON and uses the requested fallback on failure', () => {
+  it('解析 JSON 并在失败时使用指定的回退值', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     expect(safeParseJSON<{ ok: boolean }>('{"ok":true}')).toEqual({ ok: true });
@@ -41,13 +41,13 @@ describe('utils public helpers', () => {
     expect(warn).toHaveBeenCalledWith('Failed to parse JSON (payload):', expect.any(SyntaxError));
   });
 
-  it('returns non-string runtime values unchanged', () => {
+  it('原样返回非字符串的运行时值', () => {
     const value = { alreadyParsed: true };
 
     expect(safeParseJSON(value as unknown as string)).toBe(value);
   });
 
-  it('finds the first matching HTMLElement in a composed event path', () => {
+  it('在组合事件路径中查找第一个匹配的 HTMLElement', () => {
     const button = document.createElement('button');
     button.className = 'action';
     const wrapper = document.createElement('div');
@@ -59,7 +59,7 @@ describe('utils public helpers', () => {
     expect(findTargetElement(event, '.missing')).toBeNull();
   });
 
-  it('identifies message roles and built-in content types', () => {
+  it('识别消息角色与内置内容类型', () => {
     const user: UserMessage = { id: 'u1', role: 'user', content: [{ type: 'text', data: 'hello' }] };
     const assistant: AIMessage = { id: 'a1', role: 'assistant', content: [] };
 
@@ -80,7 +80,7 @@ describe('utils public helpers', () => {
     );
   });
 
-  it('extracts text, markdown, and thinking text from assistant messages', () => {
+  it('从 AI 消息中提取文本、markdown 与思考文本', () => {
     const message: AIMessage = {
       id: 'a1',
       role: 'assistant',
@@ -96,7 +96,7 @@ describe('utils public helpers', () => {
     expect(getMessageContentForCopy({ id: 'a2', role: 'assistant' })).toBe('');
   });
 
-  it.fails('omits non-copyable content without adding blank lines', () => {
+  it.fails('忽略不可复制的内容且不产生空行', () => {
     const content = [
       { type: 'text', data: 'first' },
       { type: 'image', data: { url: '/image.png' } },

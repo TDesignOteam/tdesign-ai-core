@@ -7,8 +7,8 @@ import {
 } from '../../../adapters/json-render/a2ui-to-jsonrender';
 import type { JsonRenderSchema } from '../../../adapters/json-render/types/core';
 
-describe('A2UI to json-render conversion', () => {
-  it('builds a schema from incremental surface, component, and data messages', () => {
+describe('A2UI 到 json-render 的转换', () => {
+  it('从增量的 Surface、组件与数据消息构建 schema', () => {
     const schema = convertA2UIMessagesToJsonRender([
       { createSurface: { surfaceId: 's', catalogId: 'default' } },
       {
@@ -47,7 +47,7 @@ describe('A2UI to json-render conversion', () => {
     });
   });
 
-  it('maps list templates, single children, custom types, and row layout props', () => {
+  it('映射列表模板、单个子元素、自定义类型与行布局属性', () => {
     const schema = convertA2UIMessagesToJsonRender([
       { createSurface: { surfaceId: 's', catalogId: 'default' } },
       {
@@ -70,7 +70,7 @@ describe('A2UI to json-render conversion', () => {
     expect(schema?.elements.item).toEqual({ type: 'CustomWidget', props: { tone: 'quiet' } });
   });
 
-  it('requires a live surface with a root component', () => {
+  it('要求存在带根组件的活跃 Surface', () => {
     expect(convertA2UIMessagesToJsonRender([])).toBeNull();
     expect(convertA2UIMessagesToJsonRender([{ createSurface: { surfaceId: 's', catalogId: 'x' } }])).toBeNull();
     expect(
@@ -82,7 +82,7 @@ describe('A2UI to json-render conversion', () => {
     ).toBeNull();
   });
 
-  it('applies component updates immutably', () => {
+  it('以不可变方式应用组件更新', () => {
     const schema: JsonRenderSchema = {
       root: 'root',
       elements: { root: { type: 'Text', props: { text: 'old' } } },
@@ -94,7 +94,7 @@ describe('A2UI to json-render conversion', () => {
     expect(schema.elements.root.props).toEqual({ text: 'old' });
   });
 
-  it('adds, replaces, removes, and root-replaces data', () => {
+  it('新增、替换、移除数据以及替换根数据', () => {
     const schema: JsonRenderSchema = {
       root: 'root',
       elements: {},
@@ -107,14 +107,14 @@ describe('A2UI to json-render conversion', () => {
     expect(replaced.data).toEqual({ ready: true });
   });
 
-  it('constructs missing arrays for numeric paths and rejects non-object root replacement', () => {
+  it('为数字路径构造缺失的数组并拒绝非对象根替换', () => {
     const schema: JsonRenderSchema = { root: 'root', elements: {}, data: {} };
     expect(applyA2UIDataUpdate(schema, '/items/0/name', 'add', 'first').data).toEqual({ items: [{ name: 'first' }] });
     expect(applyA2UIDataUpdate(schema, '/', 'replace', null)).toBe(schema);
   });
 
-  it.todo('decodes escaped JSON Pointer tokens (~1 and ~0) in data paths');
-  it.fails('keeps prior schemas immutable when a later nested data update is applied', () => {
+  it.todo('解码数据路径中已转义的 JSON Pointer 令牌（~1 与 ~0）');
+  it.fails('应用后续嵌套数据更新时保持先前的 schema 不可变', () => {
     const schema: JsonRenderSchema = {
       root: 'root',
       elements: {},

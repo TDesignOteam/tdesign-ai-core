@@ -4,8 +4,8 @@ import * as sharedAdapters from '../../../adapters/shared';
 import * as aguiUtils from '../../../adapters/agui/utils';
 import { activityManager } from '../../../adapters/agui/ActivityManager';
 
-describe('adapters/shared re-exports', () => {
-  it('re-exports the AG-UI factories and merge utilities as the same implementations', () => {
+describe('adapters/shared 再导出', () => {
+  it('将 AG-UI 工厂与合并工具再导出为相同实现', () => {
     for (const name of [
       'createAIMessageContent',
       'createToolCallContent',
@@ -23,7 +23,7 @@ describe('adapters/shared re-exports', () => {
     }
   });
 
-  it('re-exports the AG-UI activity manager singleton', () => {
+  it('再导出 AG-UI 活动管理器单例', () => {
     expect(sharedAdapters.activityManager).toBe(activityManager);
   });
 });

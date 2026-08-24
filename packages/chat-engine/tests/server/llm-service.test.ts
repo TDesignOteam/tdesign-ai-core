@@ -99,11 +99,11 @@ describe('LLMService', () => {
     [{ stream: false }, 'fetch'],
     [{ stream: true }, 'sse'],
     [{}, 'sse'],
-  ] as const)('resolves transport for %o', (config, expected) => {
+  ] as const)('为 %o 解析传输方式', (config, expected) => {
     expect(LLMService.resolveTransport(config)).toBe(expected);
   });
 
-  it('performs batch requests, merges headers, and applies completion transforms', async () => {
+  it('执行批量请求、合并请求头并应用完成转换', async () => {
     const service = new LLMService();
     const params = { prompt: 'hello' };
     const transformedRequest = { ...params, headers: { Authorization: 'Bearer token' }, body: '{"prompt":"hello"}' };
@@ -133,7 +133,7 @@ describe('LLMService', () => {
     expect(config.onComplete).toHaveBeenCalledWith(false, transformedRequest, response);
   });
 
-  it('forwards batch client errors and returns an empty result for no data', async () => {
+  it('转发批量客户端错误并在无数据时返回空结果', async () => {
     const service = new LLMService();
     const onError = vi.fn();
     const pending = service.handleBatchRequest({}, { endpoint: '/chat', onError });
@@ -146,7 +146,7 @@ describe('LLMService', () => {
     expect(onError).toHaveBeenCalledWith(error);
   });
 
-  it.fails('registers one batch error listener instead of accumulating across requests', async () => {
+  it.fails('只注册一个批量错误监听器而不是随请求累积', async () => {
     const service = new LLMService();
     const onError = vi.fn();
     const first = service.handleBatchRequest({}, { endpoint: '/chat', onError });
@@ -161,7 +161,7 @@ describe('LLMService', () => {
     expect(onError).toHaveBeenCalledOnce();
   });
 
-  it('rethrows batch request failures after reporting them', async () => {
+  it('上报批量请求失败后重新抛出', async () => {
     const service = new LLMService();
     const onError = vi.fn();
     const error = new Error('network down');
@@ -173,7 +173,7 @@ describe('LLMService', () => {
     expect(onError).toHaveBeenCalledWith(error);
   });
 
-  it('exposes SSE connection statistics after a stream request', async () => {
+  it('流式请求后暴露 SSE 连接统计信息', async () => {
     const service = new LLMService();
     expect(service.getSSEStats()).toBeNull();
 
@@ -182,7 +182,7 @@ describe('LLMService', () => {
     expect(service.getSSEStats()).toEqual({ id: 'client-1', status: 'connected', info: { id: 'client-1' } });
   });
 
-  it('replaces an existing WebSocket connection on re-init', async () => {
+  it('重新初始化时替换已存在的 WebSocket 连接', async () => {
     const service = new LLMService();
     await service.initWSConnection({ endpoint: 'ws://first' });
     const first = clientMocks.WebSocketClientMock.instances[0];
@@ -195,7 +195,7 @@ describe('LLMService', () => {
     expect(second.connect).toHaveBeenCalledOnce();
   });
 
-  it('closes the persistent WebSocket on disconnectWS', async () => {
+  it('disconnectWS 时关闭长连接 WebSocket', async () => {
     const service = new LLMService();
     await service.initWSConnection({ endpoint: 'ws://chat' });
     const client = clientMocks.WebSocketClientMock.instances[0];
@@ -205,7 +205,7 @@ describe('LLMService', () => {
     expect(client.close).toHaveBeenCalledOnce();
   });
 
-  it('connects SSE, filters messages, and forwards lifecycle events', async () => {
+  it('连接 SSE、过滤消息并转发生命周期事件', async () => {
     const service = new LLMService();
     const params = { prompt: 'hello' };
     const request = { body: 'serialized' } as ChatRequestParams & RequestInit;
@@ -236,7 +236,7 @@ describe('LLMService', () => {
     expect(config.onComplete).toHaveBeenCalledWith(false, request);
   });
 
-  it('initializes and reuses a persistent WebSocket connection', async () => {
+  it('初始化并复用长连接 WebSocket 连接', async () => {
     const service = new LLMService();
     const onMessage = vi.fn();
     const config: ChatServiceConfig = {
@@ -259,7 +259,7 @@ describe('LLMService', () => {
     expect(service.getWSStats()).toEqual({ id: 'client-1', status: 'connected', info: { id: 'client-1' } });
   });
 
-  it('keeps a persistent WebSocket open on closeConnect and closes it on destroy', async () => {
+  it('closeConnect 时保持长连接 WebSocket 打开并在 destroy 时关闭', async () => {
     const service = new LLMService();
     await service.initWSConnection({ endpoint: 'ws://chat' });
     const client = clientMocks.WebSocketClientMock.instances[0];
@@ -272,7 +272,7 @@ describe('LLMService', () => {
     expect(client.close).toHaveBeenCalledOnce();
   });
 
-  it('does nothing for stream requests without an endpoint', async () => {
+  it('对无端点的流式请求不做任何处理', async () => {
     const service = new LLMService();
 
     await service.handleStreamRequest({}, {});

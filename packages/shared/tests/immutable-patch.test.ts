@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { applyPatch, applyPatchImmutable } from '../immutable-patch';
 
 describe('applyPatchImmutable', () => {
-  it('applies multiple nested operations without mutating the input', () => {
+  it('应用多个嵌套操作且不修改输入', () => {
     const original = {
       profile: { name: 'Ada', status: 'ready', obsolete: true },
       stable: { id: 1 },
@@ -23,7 +23,7 @@ describe('applyPatchImmutable', () => {
     expect(original.profile).toEqual({ name: 'Ada', status: 'ready', obsolete: true });
   });
 
-  it('rebuilds only ancestors of a changed nested value', () => {
+  it('仅重建变更嵌套值的祖先节点', () => {
     const original = {
       changed: { nested: { value: 1 }, sibling: { retained: true } },
       untouched: { stable: true },
@@ -38,7 +38,7 @@ describe('applyPatchImmutable', () => {
     expect(result.untouched).toBe(original.untouched);
   });
 
-  it('replaces and removes array elements immutably', () => {
+  it('不可变地替换和删除数组元素', () => {
     const retained = { id: 'retained' };
     const original = { items: [{ id: 'first' }, retained, { id: 'last' }], stable: { value: true } };
 
@@ -54,7 +54,7 @@ describe('applyPatchImmutable', () => {
     expect(original.items).toHaveLength(3);
   });
 
-  it('appends to an array with the dash segment', () => {
+  it('通过 "-" 段向数组追加元素', () => {
     const first = { id: 1 };
     const original = { items: [first], stable: { value: true } };
 
@@ -66,31 +66,31 @@ describe('applyPatchImmutable', () => {
     expect(original.items).toEqual([first]);
   });
 
-  it.fails('inserts an array add operation at the target index instead of replacing it', () => {
+  it.fails('数组的 add 操作在目标索引处插入而非替换', () => {
     const result = applyPatchImmutable({ items: ['a', 'c'] }, [{ op: 'add', path: '/items/1', value: 'b' }]);
 
     expect(result.items).toEqual(['a', 'b', 'c']);
   });
 
-  it.fails('moves an array element without dropping the elements after the target index', () => {
+  it.fails('move 数组元素且不丢失目标索引之后的元素', () => {
     const result = applyPatchImmutable({ v: ['a', 'b', 'c'] }, [{ op: 'move', from: '/v/0', path: '/v/1' }]);
 
     expect(result.v).toEqual(['b', 'a', 'c']);
   });
 
-  it.fails('ignores remove on the array append marker instead of deleting the first element', () => {
+  it.fails('忽略对数组追加标记 "-" 的 remove 而非删除第一个元素', () => {
     const result = applyPatchImmutable({ items: ['a', 'b', 'c'] }, [{ op: 'remove', path: '/items/-' }]);
 
     expect(result.items).toEqual(['a', 'b', 'c']);
   });
 
-  it('coerces a primitive parent into an object when setting a deeper path', () => {
+  it('设置更深层路径时将原始类型父节点转换为对象', () => {
     const result = applyPatchImmutable({ name: 'x' }, [{ op: 'replace', path: '/name/first', value: 1 }]);
 
     expect(result).toEqual({ name: { first: 1 } });
   });
 
-  it('falls back to null and undefined destinations when copying or moving missing sources', () => {
+  it('copy 或 move 缺失来源时目标回退为 null 和 undefined', () => {
     const copied = applyPatchImmutable({ keep: 1 }, [{ op: 'copy', from: '/missing', path: '/dest' }]);
     const moved = applyPatchImmutable({ keep: 1 }, [{ op: 'move', from: '/missing', path: '/dest' }]);
 
@@ -99,7 +99,7 @@ describe('applyPatchImmutable', () => {
     expect(moved).toEqual({ keep: 1, dest: undefined });
   });
 
-  it('supports escaped slash and tilde JSON Pointer segments', () => {
+  it('支持转义斜杠和波浪号的 JSON Pointer 段', () => {
     const original = {
       'a/b': { '~key': { value: 1 }, stable: { id: 1 } },
       untouched: { id: 2 },
@@ -112,7 +112,7 @@ describe('applyPatchImmutable', () => {
     expect(result.untouched).toBe(original.untouched);
   });
 
-  it('appends strings and initializes missing or null values', () => {
+  it('追加字符串并初始化缺失或为 null 的值', () => {
     const original = { existing: 'hello', empty: null, stable: { id: 1 } };
 
     const result = applyPatchImmutable(original, [
@@ -130,7 +130,7 @@ describe('applyPatchImmutable', () => {
     expect(result.stable).toBe(original.stable);
   });
 
-  it('moves a nested value and removes its source', () => {
+  it('move 嵌套值并删除其来源', () => {
     const original = {
       source: { movable: { id: 1 }, retained: { id: 2 } },
       target: { existing: true },
@@ -156,7 +156,7 @@ describe('applyPatchImmutable', () => {
     expect(result.stable).toBe(original.stable);
   });
 
-  it('deep-clones copied values while retaining unrelated references', () => {
+  it('深拷贝复制的值并保留无关引用', () => {
     const original = {
       source: { nested: { id: 1 } },
       target: { existing: true },
@@ -178,7 +178,7 @@ describe('applyPatchImmutable', () => {
     expect(result.stable).toBe(original.stable);
   });
 
-  it('supports add, replace, append, and remove at the root', () => {
+  it('支持在根上执行 add、replace、append 和 remove', () => {
     const original = { value: 1 };
 
     expect(applyPatchImmutable(original, [{ op: 'add', path: '', value: { added: true } }])).toEqual({
@@ -190,7 +190,7 @@ describe('applyPatchImmutable', () => {
     expect(original).toEqual({ value: 1 });
   });
 
-  it.fails('treats path "/" as the empty-string key per RFC 6902 instead of the root', () => {
+  it.fails('按 RFC 6902 将路径 "/" 视为空字符串键而非根', () => {
     const original = { value: 1 };
 
     expect(applyPatchImmutable(original, [{ op: 'replace', path: '/', value: 'replacement' }])).toEqual({
@@ -199,7 +199,7 @@ describe('applyPatchImmutable', () => {
     });
   });
 
-  it('supports copy and move to the root', () => {
+  it('支持 copy 和 move 到根', () => {
     const original = { source: { nested: { value: 1 } }, stable: { id: 2 } };
 
     const copied = applyPatchImmutable(original, [
@@ -216,7 +216,7 @@ describe('applyPatchImmutable', () => {
     expect(original).toEqual({ source: { nested: { value: 1 } }, stable: { id: 2 } });
   });
 
-  it('returns the original document for an empty patch', () => {
+  it('空补丁时返回原始文档', () => {
     const original = { stable: { id: 1 } };
 
     expect(applyPatchImmutable(original, [])).toBe(original);
@@ -224,7 +224,7 @@ describe('applyPatchImmutable', () => {
 });
 
 describe('applyPatch', () => {
-  it('wraps the immutable result in the legacy newDocument shape', () => {
+  it('将不可变结果包装为旧版 newDocument 结构', () => {
     const original = { nested: { count: 1 }, stable: { id: 1 } };
 
     const result = applyPatch(original, [{ op: 'replace', path: '/nested/count', value: 2 }]);

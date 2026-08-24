@@ -60,7 +60,7 @@ describe('OpenClawStreamHandler', () => {
     adapterState.instances.length = 0;
   });
 
-  it('preconnects with auth and replaces the store when history arrives', async () => {
+  it('带鉴权预连接，并在历史消息到达时替换 store', async () => {
     const history = [{ id: 'old-1', role: 'assistant', content: [] }] as ChatMessagesData[];
     const config: ChatServiceConfig = {
       endpoint: 'wss://gateway.example',
@@ -86,7 +86,7 @@ describe('OpenClawStreamHandler', () => {
     expect(config.onHistoryLoaded).toHaveBeenCalledWith(history);
   });
 
-  it('reports but does not reject an initialization connection failure', async () => {
+  it('上报初始化连接失败但不 reject', async () => {
     const error = new Error('offline');
     let releaseAuth!: (value: void) => void;
     const config: ChatServiceConfig = {
@@ -103,7 +103,7 @@ describe('OpenClawStreamHandler', () => {
     expect(config.onError).toHaveBeenCalledWith(error);
   });
 
-  it('connects, sends normalized request parameters, and handles stream callbacks', async () => {
+  it('连接、发送归一化的请求参数并处理流式回调', async () => {
     const custom = { type: 'markdown', data: 'custom' } as const;
     const config: ChatServiceConfig = {
       endpoint: 'wss://gateway.example',
@@ -139,7 +139,7 @@ describe('OpenClawStreamHandler', () => {
     expect(context.handleComplete).toHaveBeenCalledWith('assistant-1', false, params);
   });
 
-  it('normalizes non-object onRequest results and rethrows send failures', async () => {
+  it('归一化非对象类型的 onRequest 结果并重新抛出发送失败', async () => {
     const error = new Error('send failed');
     const config = {
       endpoint: 'wss://gateway.example',
@@ -158,7 +158,7 @@ describe('OpenClawStreamHandler', () => {
     expect(context.handleError).toHaveBeenCalledWith('assistant-1', error);
   });
 
-  it('aborts and destroys the owned adapter', async () => {
+  it('中止并销毁持有的适配器', async () => {
     const handler = new OpenClawStreamHandler({ llmService: {} as never });
     await handler.initialize({ endpoint: 'wss://gateway.example' }, lifecycleContext());
     const adapter = adapterState.instances[0];
@@ -170,7 +170,7 @@ describe('OpenClawStreamHandler', () => {
     expect(handler.getAdapter()).toBeNull();
   });
 
-  it('tolerates abort and destroy before initialization', async () => {
+  it('初始化之前调用 abort 与 destroy 也能容错', async () => {
     const handler = new OpenClawStreamHandler({ llmService: {} as never });
 
     expect(() => handler.abort()).not.toThrow();
@@ -178,7 +178,7 @@ describe('OpenClawStreamHandler', () => {
     expect(handler.getAdapter()).toBeNull();
   });
 
-  it('skips preconnection entirely without an endpoint', async () => {
+  it('没有端点时完全跳过预连接', async () => {
     const handler = new OpenClawStreamHandler({ llmService: {} as never });
 
     await handler.initialize({}, lifecycleContext());
@@ -187,7 +187,7 @@ describe('OpenClawStreamHandler', () => {
     expect(handler.getAdapter()).toBeNull();
   });
 
-  it('keeps the store untouched when history is empty', async () => {
+  it('历史消息为空时保持 store 不变', async () => {
     const config: ChatServiceConfig = { endpoint: 'wss://gateway.example', onHistoryLoaded: vi.fn() };
     const context = lifecycleContext();
     const handler = new OpenClawStreamHandler({ llmService: {} as never });
@@ -199,7 +199,7 @@ describe('OpenClawStreamHandler', () => {
     expect(config.onHistoryLoaded).not.toHaveBeenCalled();
   });
 
-  it('ignores stream messages while stop receiving is asserted', async () => {
+  it('停止接收生效时忽略流式消息', async () => {
     const config: ChatServiceConfig = { endpoint: 'wss://gateway.example' };
     const context = streamContext(config);
     vi.mocked(context.getStopReceive).mockReturnValue(true);

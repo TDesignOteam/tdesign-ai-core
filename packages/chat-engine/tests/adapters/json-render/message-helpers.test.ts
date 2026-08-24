@@ -8,24 +8,24 @@ import {
   isUIMessages,
 } from '../../../adapters/json-render/message-helpers';
 
-describe('A2UI message helpers', () => {
+describe('A2UI 消息辅助函数', () => {
   const create = { createSurface: { surfaceId: 'a', catalogId: 'default' } };
   const updateData = { updateDataModel: { surfaceId: 'a', path: '/count', op: 'replace' as const, value: 1 } };
   const remove = { deleteSurface: { surfaceId: 'a' } };
 
-  it('extracts the first surface ID in message order', () => {
+  it('按消息顺序提取第一个 Surface ID', () => {
     expect(extractSurfaceId([updateData, create])).toBe('a');
     expect(extractSurfaceId([{}])).toBeNull();
   });
 
-  it('classifies UI, creation, deletion, and data-only batches', () => {
+  it('区分 UI、创建、删除与仅数据的消息批次', () => {
     expect(isUIMessages([updateData])).toBe(false);
     expect(isUIMessages([create])).toBe(true);
     expect(hasCreationMessages([create])).toBe(true);
     expect(hasDeletionMessages([remove])).toBe(true);
   });
 
-  it('groups messages by surface while preserving order and drops unidentified messages', () => {
+  it('按 Surface 分组消息并保持顺序，丢弃无法识别的消息', () => {
     const b = { updateDataModel: { surfaceId: 'b', path: '/name', value: 'B' } };
     const groups = groupMessagesBySurface<Record<string, unknown>, Record<string, unknown>, unknown>([
       create,

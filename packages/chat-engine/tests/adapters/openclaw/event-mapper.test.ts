@@ -10,7 +10,7 @@ describe('OpenClawEventMapper', () => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
   });
 
-  it('maps assistant snapshots using deltas and tracks full text', () => {
+  it('使用增量映射助手快照并跟踪完整文本', () => {
     const first = mapper.mapEvent({
       type: 'event',
       event: 'agent',
@@ -26,7 +26,7 @@ describe('OpenClawEventMapper', () => {
     expect(mapper.getTextBuffer()).toBe('Hello!');
   });
 
-  it('derives increments from generic full snapshots', () => {
+  it('从通用完整快照推导增量', () => {
     expect(mapper.mapEvent({ type: 'event', event: 'agent', payload: { data: { text: 'A' } } }).content).toMatchObject({
       data: 'A',
     });
@@ -36,7 +36,7 @@ describe('OpenClawEventMapper', () => {
     expect(mapper.mapEvent({ type: 'event', event: 'agent', payload: { data: { text: 'AB' } } }).content).toBeNull();
   });
 
-  it('treats chat events as lifecycle signals', () => {
+  it('将 chat 事件视为生命周期信号', () => {
     expect(
       mapper.mapEvent({ type: 'event', event: 'chat', payload: { state: 'delta', runId: 'r2' } }).content,
     ).toBeNull();
@@ -54,7 +54,7 @@ describe('OpenClawEventMapper', () => {
     });
   });
 
-  it('maps tool start and result phases', () => {
+  it('映射工具调用的开始与结果阶段', () => {
     const start = mapper.mapEvent({
       type: 'event',
       event: 'agent',
@@ -84,7 +84,7 @@ describe('OpenClawEventMapper', () => {
     expect(mapper.isToolCallEnded('t1')).toBe(true);
   });
 
-  it('supports result-only tool events and suggestion results', () => {
+  it('支持仅有结果的工具事件与建议结果', () => {
     const result = mapper.mapEvent({
       type: 'event',
       event: 'agent',
@@ -97,7 +97,7 @@ describe('OpenClawEventMapper', () => {
     expect(mapper.getToolCall('s1')).toMatchObject({ toolCallName: 'suggestion', result: '[{"title":"Next"}]' });
   });
 
-  it('maps generic events and resets observable state', () => {
+  it('映射通用事件并重置可观察状态', () => {
     expect(
       mapper.mapEvent({ type: 'event', event: 'notice', payload: { message: 'maintenance' } }).content,
     ).toMatchObject({ data: 'maintenance' });
@@ -108,5 +108,5 @@ describe('OpenClawEventMapper', () => {
     expect(mapper.getToolCalls()).toEqual([]);
   });
 
-  it.todo('merges generic tool args objects without requiring a string delta');
+  it.todo('合并不依赖字符串增量的通用工具参数对象');
 });

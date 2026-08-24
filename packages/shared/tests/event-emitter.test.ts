@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import SimpleEventEmitter from '../event-emitter';
 
 describe('SimpleEventEmitter', () => {
-  it('delivers arguments to listeners in registration order', () => {
+  it('按注册顺序向监听器传递参数', () => {
     const emitter = new SimpleEventEmitter();
     const calls: string[] = [];
     const first = vi.fn<(message: string, count: number) => void>((message: string, count: number) => {
@@ -22,13 +22,13 @@ describe('SimpleEventEmitter', () => {
     expect(second).toHaveBeenCalledWith('hello', 2);
   });
 
-  it('returns false when an event has no listeners', () => {
+  it('事件没有监听器时返回 false', () => {
     const emitter = new SimpleEventEmitter();
 
     expect(emitter.emit('missing')).toBe(false);
   });
 
-  it('removes only the requested listener', () => {
+  it('仅移除指定的监听器', () => {
     const emitter = new SimpleEventEmitter();
     const removed = vi.fn();
     const retained = vi.fn();
@@ -44,7 +44,7 @@ describe('SimpleEventEmitter', () => {
     expect(retained).toHaveBeenCalledOnce();
   });
 
-  it('removes one registration when the same listener was added twice', () => {
+  it('同一监听器注册两次时仅移除一个注册', () => {
     const emitter = new SimpleEventEmitter();
     const listener = vi.fn();
     emitter.on('event', listener);
@@ -56,7 +56,7 @@ describe('SimpleEventEmitter', () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 
-  it('invokes a once listener once with the first emission arguments', () => {
+  it('once 监听器仅以首次派发参数调用一次', () => {
     const emitter = new SimpleEventEmitter();
     const listener = vi.fn();
     emitter.once('event', listener);
@@ -67,7 +67,7 @@ describe('SimpleEventEmitter', () => {
     expect(listener).toHaveBeenCalledWith('first');
   });
 
-  it.fails('does not skip a regular listener registered after a once listener', () => {
+  it.fails('不跳过在 once 监听器之后注册的普通监听器', () => {
     const emitter = new SimpleEventEmitter();
     const onceListener = vi.fn();
     const regularListener = vi.fn();
@@ -80,7 +80,7 @@ describe('SimpleEventEmitter', () => {
     expect(regularListener).toHaveBeenCalledOnce();
   });
 
-  it('removes a once listener before invoking it, even when it throws', () => {
+  it('即使抛出异常也在调用前移除 once 监听器', () => {
     const emitter = new SimpleEventEmitter();
     const error = new Error('once failed');
     const listener = vi.fn(() => {
@@ -95,7 +95,7 @@ describe('SimpleEventEmitter', () => {
     expect(consoleError).toHaveBeenCalledWith('EventEmitter listener error:', error);
   });
 
-  it('isolates listener errors and continues notifying later listeners', () => {
+  it('隔离监听器错误并继续通知后续监听器', () => {
     const emitter = new SimpleEventEmitter();
     const error = new Error('listener failed');
     const nextListener = vi.fn();
@@ -110,7 +110,7 @@ describe('SimpleEventEmitter', () => {
     expect(nextListener).toHaveBeenCalledWith(1);
   });
 
-  it('removes listeners for one event without affecting another', () => {
+  it('移除单个事件的监听器且不影响其他事件', () => {
     const emitter = new SimpleEventEmitter();
     const first = vi.fn();
     const second = vi.fn();
@@ -125,7 +125,7 @@ describe('SimpleEventEmitter', () => {
     expect(second).toHaveBeenCalledOnce();
   });
 
-  it('removes every listener when no event is specified', () => {
+  it('未指定事件时移除所有监听器', () => {
     const emitter = new SimpleEventEmitter();
     emitter.on('first', vi.fn());
     emitter.once('second', vi.fn());

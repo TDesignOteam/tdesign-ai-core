@@ -29,7 +29,7 @@ describe('MessageStore', () => {
     store.initialize();
   });
 
-  it('initializes defaults and accepts initial state', () => {
+  it('初始化默认值并接受初始状态', () => {
     expect(store.getState()).toEqual({ messageIds: [], messages: [] });
 
     const initial = userMessage('initial');
@@ -38,7 +38,7 @@ describe('MessageStore', () => {
     expect(initialized.messages).toEqual([initial]);
   });
 
-  it('creates one message and emits its updated snapshot', () => {
+  it('创建单条消息并派发其更新后的快照', () => {
     const listener = vi.fn();
     eventBus.on(ChatEngineEventType.MESSAGE_CREATE, listener);
     const message = userMessage('user-1');
@@ -49,7 +49,7 @@ describe('MessageStore', () => {
     expect(listener).toHaveBeenCalledWith({ message, messages: [message] });
   });
 
-  it('creates multiple messages and emits one create event per message', () => {
+  it('创建多条消息并为每条消息派发一次 create 事件', () => {
     const listener = vi.fn();
     eventBus.on(ChatEngineEventType.MESSAGE_CREATE, listener);
     const messages = [userMessage('user-1'), assistantMessage('assistant-1')];
@@ -66,7 +66,7 @@ describe('MessageStore', () => {
     ['replace', ['new-1', 'new-2']],
     ['prepend', ['new-1', 'new-2', 'existing']],
     ['append', ['existing', 'new-1', 'new-2']],
-  ] as const)('sets messages in %s mode without emitting create events', (mode, expectedIds) => {
+  ] as const)('以 %s 模式设置消息且不派发 create 事件', (mode, expectedIds) => {
     store.createMessage(userMessage('existing'));
     const listener = vi.fn();
     eventBus.on(ChatEngineEventType.MESSAGE_CREATE, listener);
@@ -79,13 +79,13 @@ describe('MessageStore', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it('defaults setMessages to replace mode', () => {
+  it('setMessages 默认使用 replace 模式', () => {
     store.createMessage(userMessage('existing'));
     store.setMessages([userMessage('replacement')]);
     expect(store.getState().messageIds).toEqual(['replacement']);
   });
 
-  it('appends and replaces assistant content while ignoring ineligible messages', () => {
+  it('追加并替换 AI 消息内容，同时忽略不符合条件的消息', () => {
     store.createMultiMessages([assistantMessage('assistant', [{ type: 'text', data: 'first' }]), userMessage('user')]);
 
     store.appendContent('assistant', { type: 'markdown', data: 'second' });
@@ -104,7 +104,7 @@ describe('MessageStore', () => {
     expect((store.getMessageByID('assistant') as AIMessage).content).toEqual(replacement);
   });
 
-  it('updates message and final content status, preserving an error content status', () => {
+  it('更新消息与最终内容状态，并保留错误的内容状态', () => {
     const listener = vi.fn();
     eventBus.on(ChatEngineEventType.MESSAGE_STATUS_CHANGE, listener);
     store.createMultiMessages([
@@ -127,7 +127,7 @@ describe('MessageStore', () => {
     });
   });
 
-  it('merges extension attributes', () => {
+  it('合并扩展属性', () => {
     store.createMessage({ ...userMessage('user'), ext: { source: 'local', count: 1 } });
     store.setMessageExt('user', { count: 2, selected: true });
     store.setMessageExt('missing', { ignored: true });
@@ -135,7 +135,7 @@ describe('MessageStore', () => {
     expect(store.getMessageByID('user')?.ext).toEqual({ source: 'local', count: 2, selected: true });
   });
 
-  it('removes a message and emits the remaining snapshot', () => {
+  it('移除消息并派发剩余的快照', () => {
     const first = userMessage('first');
     const second = assistantMessage('second');
     store.createMultiMessages([first, second]);
@@ -149,7 +149,7 @@ describe('MessageStore', () => {
     expect(listener).toHaveBeenCalledWith({ messageId: 'first', messages: [second] });
   });
 
-  it('clears history and emits a timestamp', () => {
+  it('清空历史消息并派发时间戳', () => {
     vi.spyOn(Date, 'now').mockReturnValue(456);
     store.createMessage(userMessage('user'));
     const listener = vi.fn();
@@ -161,7 +161,7 @@ describe('MessageStore', () => {
     expect(listener).toHaveBeenCalledWith({ timestamp: 456 });
   });
 
-  it('returns current, last assistant, and last user messages', () => {
+  it('返回当前消息、最后一条 AI 消息与最后一条用户消息', () => {
     const firstUser = userMessage('user-1');
     const assistant = assistantMessage('assistant');
     const lastUser = userMessage('user-2');
@@ -173,7 +173,7 @@ describe('MessageStore', () => {
     expect(store.getMessageByID('missing')).toBeUndefined();
   });
 
-  it('merges multiple content updates by id first, then type, and appends new content', () => {
+  it('合并多条内容更新时先按 id 再按类型匹配，并追加新内容', () => {
     store.createMessage(
       assistantMessage('assistant', [
         { id: 'text-1', type: 'text', data: 'old', status: 'streaming', ext: { retained: true } },
@@ -194,7 +194,7 @@ describe('MessageStore', () => {
     ]);
   });
 
-  it('marks the message errored and stops streaming content when an update contains an error', () => {
+  it('当更新包含错误时将消息标记为错误并停止流式内容', () => {
     store.createMessage(
       assistantMessage('assistant', [
         { id: 'text-1', type: 'text', data: 'partial', status: 'streaming' },
@@ -210,14 +210,14 @@ describe('MessageStore', () => {
     });
   });
 
-  it('works without an event bus', () => {
+  it('在没有事件总线时也能工作', () => {
     const standalone = new MessageStore();
     standalone.initialize();
     expect(() => standalone.createMessage(userMessage('user'))).not.toThrow();
     expect(standalone.messages).toHaveLength(1);
   });
 
-  it.todo('assigns a new unique ID when creating a message branch');
-  it.todo('does not emit status or delete events when the target message does not exist');
-  it.todo('matches id-less content updates by type instead of treating missing IDs as equal');
+  it.todo('创建消息分支时分配新的唯一 ID');
+  it.todo('目标消息不存在时不派发状态或删除事件');
+  it.todo('无 id 的内容更新按类型匹配，而不是把缺失的 id 视为相等');
 });

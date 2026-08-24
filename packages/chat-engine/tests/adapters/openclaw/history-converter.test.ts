@@ -6,14 +6,14 @@ import {
   isOpenClawHistoryMessage,
 } from '../../../adapters/openclaw/history-converter';
 
-describe('OpenClaw history converter', () => {
-  it('recognizes supported message roles', () => {
+describe('OpenClaw 历史消息转换器', () => {
+  it('识别支持的消息角色', () => {
     expect(isOpenClawHistoryMessage({ role: 'assistant' })).toBe(true);
     expect(isOpenClawHistoryMessage({ role: 'unknown' })).toBe(false);
     expect(isOpenClawHistoryMessage({})).toBe(false);
   });
 
-  it('converts user and system text with timestamps', () => {
+  it('转换带时间戳的用户与系统文本', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.25);
     const result = convertOpenClawHistory([
       { role: 'user', content: [{ type: 'text', text: 'Hello' }], timestamp: 0 },
@@ -29,7 +29,7 @@ describe('OpenClaw history converter', () => {
     ]);
   });
 
-  it('associates tool results and merges an assistant tool loop', () => {
+  it('关联工具调用结果并合并助手的工具调用循环', () => {
     const result = convertOpenClawHistory(
       [
         {
@@ -62,7 +62,7 @@ describe('OpenClaw history converter', () => {
     });
   });
 
-  it('skips empty and aborted-empty messages', () => {
+  it('跳过空消息与已中止的空消息', () => {
     expect(
       convertOpenClawHistory([
         { role: 'user', content: '' },
@@ -71,13 +71,13 @@ describe('OpenClaw history converter', () => {
     ).toEqual([]);
   });
 
-  it('converts a history response payload', () => {
+  it('转换历史消息响应载荷', () => {
     expect(
       convertOpenClawHistoryResponse({ sessionKey: 's', sessionId: 'id', messages: [{ role: 'user', content: 'Hi' }] }),
     ).toMatchObject([{ role: 'user', content: [{ data: 'Hi' }] }]);
   });
 
-  it.todo('honors skipAborted: false for aborted empty assistant messages');
-  it.todo('hides tool arguments and results when showToolCallDetails is false');
-  it.todo('preserves toolResult isError metadata on converted tool calls');
+  it.todo('对已中止的空助手消息支持 skipAborted: false');
+  it.todo('当 showToolCallDetails 为 false 时隐藏工具调用参数与结果');
+  it.todo('在转换后的工具调用上保留 toolResult 的 isError 元数据');
 });

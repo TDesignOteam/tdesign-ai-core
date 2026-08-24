@@ -66,7 +66,7 @@ describe('WebSocketClient', () => {
     return socket;
   }
 
-  it('connects, sends serialized data, and reports state', async () => {
+  it('连接、发送序列化数据并上报状态', async () => {
     const client = new WebSocketClient('ws://chat');
     const stateChanges = vi.fn();
     client.on('stateChange', stateChanges);
@@ -84,7 +84,7 @@ describe('WebSocketClient', () => {
     ]);
   });
 
-  it('emits start once and normalizes JSON and text messages', async () => {
+  it('只派发一次 start 并规范化 JSON 与文本消息', async () => {
     const client = new WebSocketClient('ws://chat');
     const onStart = vi.fn();
     const onMessage = vi.fn();
@@ -103,7 +103,7 @@ describe('WebSocketClient', () => {
     expect(onMessage).toHaveBeenNthCalledWith(2, { event: 'message', data: 'plain text' });
   });
 
-  it('closes manually, clears the socket, and emits aborted completion', async () => {
+  it('手动关闭、清除 socket 并派发中止的完成事件', async () => {
     const client = new WebSocketClient('ws://chat');
     const onComplete = vi.fn();
     client.on('complete', onComplete);
@@ -117,7 +117,7 @@ describe('WebSocketClient', () => {
     expect(client.isConnected()).toBe(false);
   });
 
-  it('times out deterministically when opening takes too long', async () => {
+  it('打开耗时过长时确定性地触发超时', async () => {
     const client = new WebSocketClient('ws://chat');
     const onError = vi.fn();
     client.on('error', onError);
@@ -130,7 +130,7 @@ describe('WebSocketClient', () => {
     expect(client.getStatus()).toBe(WebSocketConnectionState.ERROR);
   });
 
-  it('reconnects after an abnormal close using configured backoff', async () => {
+  it('异常关闭后按配置的退避策略重连', async () => {
     const client = new WebSocketClient('ws://chat');
     const firstSocket = await connect(client, { maxRetries: 1, retryInterval: 100, timeout: 0 });
 
@@ -148,7 +148,7 @@ describe('WebSocketClient', () => {
     expect(client.getStatus()).toBe(WebSocketConnectionState.CONNECTED);
   });
 
-  it('emits completion and a connection error when retries are disabled', async () => {
+  it('禁用重试时派发完成事件与连接错误', async () => {
     const client = new WebSocketClient('ws://chat');
     const onComplete = vi.fn();
     const onError = vi.fn();
@@ -163,7 +163,7 @@ describe('WebSocketClient', () => {
     expect(client.getStatus()).toBe(WebSocketConnectionState.DISCONNECTED);
   });
 
-  it('closes an idle connection when heartbeat monitoring is enabled', async () => {
+  it('启用心跳监测时关闭空闲连接', async () => {
     const client = new WebSocketClient('ws://chat');
     const socket = await connect(client, { heartbeatInterval: 100, timeout: 0 });
 
@@ -172,7 +172,7 @@ describe('WebSocketClient', () => {
     expect(socket.close).toHaveBeenCalledWith(4000, 'Heartbeat timeout');
   });
 
-  it('warns instead of sending while disconnected', () => {
+  it('未连接时警告而不发送', () => {
     const client = new WebSocketClient('ws://chat');
 
     client.send('hello');
@@ -180,7 +180,7 @@ describe('WebSocketClient', () => {
     expect(logger.warn).toHaveBeenCalledWith('Cannot send message: WebSocket not connected (state: disconnected)');
   });
 
-  it('closes the raw socket and reports an error when closed during connecting', async () => {
+  it('连接中关闭时关闭原生 socket 并上报错误', async () => {
     const client = new WebSocketClient('ws://chat');
     const onError = vi.fn();
     const onComplete = vi.fn();
@@ -199,7 +199,7 @@ describe('WebSocketClient', () => {
     expect(onError).toHaveBeenCalledWith(expect.any(ConnectionError));
   });
 
-  it('emits a connection error when the native socket reports onerror', async () => {
+  it('原生 socket 触发 onerror 时派发连接错误', async () => {
     const client = new WebSocketClient('ws://chat');
     const onError = vi.fn();
     client.on('error', onError);
@@ -210,7 +210,7 @@ describe('WebSocketClient', () => {
     expect(onError).toHaveBeenCalledWith(expect.any(ConnectionError));
   });
 
-  it('treats a server close with code 1000 as a normal completion', async () => {
+  it('将代码为 1000 的服务端关闭视为正常完成', async () => {
     const client = new WebSocketClient('ws://chat');
     const onComplete = vi.fn();
     const onError = vi.fn();
@@ -226,6 +226,6 @@ describe('WebSocketClient', () => {
     expect(FakeWebSocket.instances).toHaveLength(1);
   });
 
-  it.todo('puts the configured connection duration in TimeoutError.message instead of details');
-  it.todo('closes the timed-out native socket before scheduling or attempting another connection');
+  it.todo('将配置的连接时长放入 TimeoutError.message 而非 details');
+  it.todo('在调度或尝试下一次连接前关闭已超时的原生 socket');
 });

@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import * as shared from '../index';
 import type { ImmutablePatchOperation, Logger } from '../index';
 
-describe('shared public index', () => {
-  it('exports the event emitter and logger APIs', () => {
+describe('共享包公共入口', () => {
+  it('导出事件发射器和 Logger API', () => {
     const listener = vi.fn();
     const emitter = new shared.SimpleEventEmitter();
     const logger: Logger = new shared.ConsoleLogger();
@@ -17,7 +17,7 @@ describe('shared public index', () => {
     expect(shared.LoggerManager.getLogger()).toBeDefined();
   });
 
-  it('exports the immutable patch API and operation type', () => {
+  it('导出不可变补丁 API 和操作类型', () => {
     const operation: ImmutablePatchOperation = { op: 'replace', path: '/count', value: 2 };
     const original = { count: 1, stable: { id: 1 } };
 
@@ -30,7 +30,7 @@ describe('shared public index', () => {
     expect(original.count).toBe(1);
   });
 
-  it('exports JSON Patch functions and error aliases', () => {
+  it('导出 JSON Patch 函数和错误别名', () => {
     expect(shared.JsonPatchError).toBe(shared.PatchError);
     expect(shared.deepClone).toBeTypeOf('function');
     expect(shared.applyOperation).toBeTypeOf('function');
@@ -40,7 +40,7 @@ describe('shared public index', () => {
     expect(shared.validator).toBeTypeOf('function');
   });
 
-  it('exports JSON Pointer and helper utilities', () => {
+  it('导出 JSON Pointer 与辅助工具', () => {
     const value = { nested: { id: 1 } };
 
     expect(shared.escapePathComponent('a/b~c')).toBe('a~1b~0c');

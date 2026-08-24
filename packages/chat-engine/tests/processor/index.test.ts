@@ -21,7 +21,7 @@ describe('MessageProcessor', () => {
     store.initialize();
   });
 
-  it('creates a complete user message with attachments before text', () => {
+  it('创建完整的用户消息且附件位于文本之前', () => {
     vi.spyOn(Date, 'now').mockReturnValue(1000);
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const attachments = [{ fileType: 'image' as const, name: 'photo.png' }];
@@ -38,12 +38,12 @@ describe('MessageProcessor', () => {
     });
   });
 
-  it('omits an attachment block when no attachments are supplied', () => {
+  it('未提供附件时省略附件块', () => {
     const message = processor.createUserMessage('hello');
     expect(message.content).toEqual([{ type: 'text', data: 'hello' }]);
   });
 
-  it('creates assistant messages with defaults and supplied values', () => {
+  it('使用默认值与传入值创建助手消息', () => {
     vi.spyOn(Date, 'now').mockReturnValue(2000);
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const date = vi.spyOn(Date.prototype, 'toISOString').mockReturnValue('2026-01-01T00:00:00.000Z');
@@ -63,7 +63,7 @@ describe('MessageProcessor', () => {
     date.mockRestore();
   });
 
-  it('defaults a new content block to streaming without mutating it', () => {
+  it('将新内容块默认设为 streaming 且不修改原对象', () => {
     const chunk = { type: 'text' as const, data: 'hello' };
     const result = processor.processContentUpdate(undefined, chunk);
 
@@ -80,7 +80,7 @@ describe('MessageProcessor', () => {
       'Hello world',
     ],
     ['markdown', { type: 'markdown', data: '**A' }, { type: 'markdown', data: 'B**', status: 'complete' }, '**AB**'],
-  ] as const)('merges incremental %s content', (_label, existing, chunk, expectedData) => {
+  ] as const)('合并增量 %s 内容', (_label, existing, chunk, expectedData) => {
     expect(processor.processContentUpdate(existing, chunk)).toEqual({
       ...existing,
       data: expectedData,
@@ -92,7 +92,7 @@ describe('MessageProcessor', () => {
     });
   });
 
-  it('merges thinking text and metadata', () => {
+  it('合并 thinking 文本与元数据', () => {
     const existing = { type: 'thinking' as const, data: { text: 'step 1', title: 'Plan' } };
     const chunk = { type: 'thinking' as const, data: { text: ' + step 2' }, status: 'complete' as const };
 
@@ -104,7 +104,7 @@ describe('MessageProcessor', () => {
     });
   });
 
-  it('merges image and search objects', () => {
+  it('合并 image 与 search 对象', () => {
     expect(
       processor.processContentUpdate(
         { type: 'image', data: { name: 'preview', width: 100 } },
@@ -120,7 +120,7 @@ describe('MessageProcessor', () => {
     ).toMatchObject({ data: { title: 'Sources', references: [{ title: 'new' }] } });
   });
 
-  it('uses the default shallow merge for unregistered and mismatched types', () => {
+  it('对未注册与不匹配的类型使用默认浅合并', () => {
     const existing: AIMessageContent = { type: 'suggestion', data: [{ title: 'old' }], ext: { retained: true } };
     const chunk: AIMessageContent = { type: 'suggestion', data: [{ title: 'new' }] };
     expect(processor.processContentUpdate(existing, chunk)).toEqual({
@@ -138,7 +138,7 @@ describe('MessageProcessor', () => {
     ).toEqual({ type: 'markdown', data: 'new', status: 'complete' });
   });
 
-  it('supports custom merge handlers', () => {
+  it('支持自定义合并处理器', () => {
     processor.registerHandler<TextContent>('text', (chunk, existing) => ({
       ...chunk,
       data: `${existing?.data ?? ''}|${chunk.data}`,
@@ -152,13 +152,13 @@ describe('MessageProcessor', () => {
     });
   });
 
-  it('does nothing for null updates', () => {
+  it('对 null 更新不做任何处理', () => {
     const update = vi.spyOn(store, 'updateMultipleContents');
     processor.applyContentUpdate(store, 'missing', null);
     expect(update).not.toHaveBeenCalled();
   });
 
-  it('delegates array updates to the store', () => {
+  it('将数组更新委托给 store', () => {
     const contents: AIMessageContent[] = [{ type: 'text', data: 'full response' }];
     const update = vi.spyOn(store, 'updateMultipleContents');
 
@@ -167,7 +167,7 @@ describe('MessageProcessor', () => {
     expect(update).toHaveBeenCalledWith('assistant', contents);
   });
 
-  it('appends a single chunk when explicitly requested', () => {
+  it('显式请求时追加单个数据块', () => {
     store.createMessage(assistantMessage('assistant', [{ type: 'text', data: 'first' }]));
 
     processor.applyContentUpdate(store, 'assistant', { type: 'text', data: 'second', strategy: 'append' });
@@ -178,7 +178,7 @@ describe('MessageProcessor', () => {
     ]);
   });
 
-  it('merges into the last same-type content block in the current message', () => {
+  it('合并到当前消息中最后一个同类型内容块', () => {
     store.createMessage(
       assistantMessage('assistant', [
         { type: 'text', data: 'first' },
@@ -195,7 +195,7 @@ describe('MessageProcessor', () => {
     });
   });
 
-  it('adds a merge chunk when no matching content exists', () => {
+  it('不存在匹配内容时追加合并数据块', () => {
     store.createMessage(assistantMessage('assistant'));
     processor.applyContentUpdate(store, 'assistant', { type: 'image', data: { url: 'image.png' } });
     expect((store.getMessageByID('assistant') as AIMessage).content).toEqual([
@@ -203,7 +203,7 @@ describe('MessageProcessor', () => {
     ]);
   });
 
-  it('updates the nearest previous matching tool call across messages', () => {
+  it('跨消息更新最近一个匹配的工具调用', () => {
     store.createMultiMessages([
       assistantMessage('older', [
         {
@@ -225,7 +225,7 @@ describe('MessageProcessor', () => {
     expect((store.getMessageByID('current') as AIMessage).content).toEqual([]);
   });
 
-  it('does not merge activity content across messages', () => {
+  it('不跨消息合并 activity 内容', () => {
     store.createMultiMessages([
       assistantMessage('older', [{ type: 'activity-task', data: { activityType: 'task', content: { state: 'old' } } }]),
       assistantMessage('current'),
@@ -242,7 +242,7 @@ describe('MessageProcessor', () => {
     });
   });
 
-  it('ignores chunks for missing, user, or content-less assistant messages', () => {
+  it('忽略针对不存在消息、用户消息或无内容助手消息的数据块', () => {
     store.createMultiMessages([
       { id: 'user', role: 'user', content: [{ type: 'text', data: 'hello' }] },
       { id: 'content-less', role: 'assistant' },

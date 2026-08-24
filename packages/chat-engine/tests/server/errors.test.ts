@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { ConnectionError, ParseError, SSEError, TimeoutError, ValidationError } from '../../server/errors';
 
-describe('server errors', () => {
-  it('retains base error metadata', () => {
+describe('服务端错误', () => {
+  it('保留基础错误元数据', () => {
     const details = { requestId: 'request-1' };
     const error = new SSEError('failed', 'CUSTOM', 418, true, details);
 
@@ -28,12 +28,12 @@ describe('server errors', () => {
       false,
       undefined,
     ],
-  ])('constructs %s with its intended metadata', (error, name, code, isRetryable, statusCode) => {
+  ])('用预期的元数据构造 %s', (error, name, code, isRetryable, statusCode) => {
     expect(error).toBeInstanceOf(SSEError);
     expect(error).toMatchObject({ name, code, isRetryable, statusCode });
   });
 
-  it('uses the default timeout message and stores details', () => {
+  it('使用默认超时消息并存储详情', () => {
     const details = { elapsed: 1000 };
     const error = new TimeoutError(details);
 
@@ -46,5 +46,5 @@ describe('server errors', () => {
     });
   });
 
-  it.todo('accepts a timeout message as the first argument, matching all server call sites');
+  it.todo('接受超时消息作为第一个参数，与服务端所有调用点保持一致');
 });

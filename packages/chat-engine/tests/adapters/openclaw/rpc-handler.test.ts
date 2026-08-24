@@ -5,14 +5,14 @@ import { OpenClawRPCHandler, RPCError } from '../../../adapters/openclaw/rpc-han
 describe('OpenClawRPCHandler', () => {
   afterEach(() => vi.useRealTimers());
 
-  it('requires a send function', async () => {
+  it('要求提供发送函数', async () => {
     await expect(new OpenClawRPCHandler().request('test', {})).rejects.toMatchObject({
       name: 'RPCError',
       code: 'SEND_NOT_CONFIGURED',
     });
   });
 
-  it('sends a request and resolves its matching response', async () => {
+  it('发送请求并以匹配的响应 resolve', async () => {
     const handler = new OpenClawRPCHandler();
     const send = vi.fn();
     handler.setSendFunction(send);
@@ -26,7 +26,7 @@ describe('OpenClawRPCHandler', () => {
     expect(handler.getPendingCount()).toBe(0);
   });
 
-  it('rejects protocol errors with details', async () => {
+  it('携带详细信息 reject 协议错误', async () => {
     const handler = new OpenClawRPCHandler();
     let id = '';
     handler.setSendFunction((frame) => {
@@ -42,7 +42,7 @@ describe('OpenClawRPCHandler', () => {
     await expect(promise).rejects.toEqual(expect.objectContaining({ code: 'DENIED', details: { scope: 'chat' } }));
   });
 
-  it('times out and removes pending requests', async () => {
+  it('超时并移除待处理请求', async () => {
     vi.useFakeTimers();
     const handler = new OpenClawRPCHandler({ timeout: 50 });
     handler.setSendFunction(() => undefined);
@@ -53,7 +53,7 @@ describe('OpenClawRPCHandler', () => {
     expect(handler.getPendingCount()).toBe(0);
   });
 
-  it('cleans up when sending throws', async () => {
+  it('发送抛错时进行清理', async () => {
     const handler = new OpenClawRPCHandler();
     handler.setSendFunction(() => {
       throw new Error('socket closed');
@@ -62,7 +62,7 @@ describe('OpenClawRPCHandler', () => {
     expect(handler.getPendingCount()).toBe(0);
   });
 
-  it('routes frames and cancels all pending requests', async () => {
+  it('路由帧并取消全部待处理请求', async () => {
     const handler = new OpenClawRPCHandler();
     handler.setSendFunction(() => undefined);
     const one = handler.request('one', {});
@@ -80,7 +80,7 @@ describe('OpenClawRPCHandler', () => {
     expect(handler.getPendingCount()).toBe(0);
   });
 
-  it('uses the expected methods in convenience calls', async () => {
+  it('便捷调用使用预期的方法', async () => {
     const handler = new OpenClawRPCHandler();
     const frames: Array<{ id: string; method: string }> = [];
     handler.setSendFunction((frame) => {

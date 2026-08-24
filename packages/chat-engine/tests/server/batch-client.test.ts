@@ -24,7 +24,7 @@ describe('BatchClient', () => {
     vi.useRealTimers();
   });
 
-  it('returns JSON and supplies its abort signal to fetch', async () => {
+  it('返回 JSON 并向 fetch 提供中止信号', async () => {
     const responseData = { answer: 'ok' };
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue(responseData) });
     vi.stubGlobal('fetch', fetchMock);
@@ -39,7 +39,7 @@ describe('BatchClient', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('emits a connection error for a non-successful response', async () => {
+  it('对非成功响应派发连接错误', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }));
     const client = new BatchClient();
     const onError = vi.fn();
@@ -51,7 +51,7 @@ describe('BatchClient', () => {
     expect(onError.mock.calls[0][0]).toMatchObject({ message: 'HTTP error! status: 503', statusCode: undefined });
   });
 
-  it('logs and emits non-abort fetch failures', async () => {
+  it('记录并派发非中止的 fetch 失败', async () => {
     const failure = new TypeError('network unavailable');
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(failure));
     const client = new BatchClient();
@@ -64,7 +64,7 @@ describe('BatchClient', () => {
     expect(onError).toHaveBeenCalledWith(failure);
   });
 
-  it('aborts and emits a timeout error when the deadline expires', async () => {
+  it('截止时间到期时中止并派发超时错误', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(
@@ -86,7 +86,7 @@ describe('BatchClient', () => {
     expect(onError).toHaveBeenCalledWith(expect.any(TimeoutError));
   });
 
-  it('aborts an active request without reporting an abort as an error', async () => {
+  it('中止活跃请求且不将中止上报为错误', async () => {
     const signalSpy = vi.fn();
     vi.stubGlobal(
       'fetch',
@@ -110,7 +110,7 @@ describe('BatchClient', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it.fails('keeps the latest request abortable after the previous request settles', async () => {
+  it.fails('上一个请求完成后最新的请求仍可中止', async () => {
     const signals: AbortSignal[] = [];
     let resolveSecond!: (response: { ok: boolean; json: () => Promise<unknown> }) => void;
     vi.stubGlobal(
@@ -140,5 +140,5 @@ describe('BatchClient', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it.todo('puts the configured duration in TimeoutError.message instead of TimeoutError.details');
+  it.todo('将配置的时长放入 TimeoutError.message 而非 TimeoutError.details');
 });

@@ -10,13 +10,13 @@ describe('AGUIEventMapper', () => {
     mapper.reset();
   });
 
-  it('rejects malformed and unknown events', () => {
+  it('拒绝格式错误和未知的事件', () => {
     expect(mapper.mapEvent({ data: 'not json' })).toBeNull();
     expect(mapper.mapEvent({ data: { type: 'UNKNOWN' } })).toBeNull();
     expect(mapper.mapEvent({ data: { type: 'TEXT_MESSAGE_CONTENT', messageId: 'm1', delta: '' } })).toBeNull();
   });
 
-  it('maps standard and simplified text lifecycles', () => {
+  it('映射标准与简化的文本生命周期', () => {
     expect(mapper.mapEvent({ data: { type: 'TEXT_MESSAGE_START', messageId: 'm1', role: 'assistant' } })).toMatchObject(
       {
         type: 'markdown',
@@ -48,7 +48,7 @@ describe('AGUIEventMapper', () => {
     });
   });
 
-  it('carries reasoning titles and closes simplified reasoning messages', () => {
+  it('携带推理标题并关闭简化的推理消息', () => {
     expect(mapper.mapEvent({ data: { type: 'REASONING_START', title: 'Analyzing' } })).toBeNull();
     expect(
       mapper.mapEvent({ data: { type: 'REASONING_MESSAGE_CHUNK', messageId: 'r1', delta: 'Step' } }),
@@ -68,7 +68,7 @@ describe('AGUIEventMapper', () => {
     });
   });
 
-  it('accumulates tool arguments and results across a standard lifecycle', () => {
+  it('在标准生命周期中累积工具调用的参数与结果', () => {
     expect(
       mapper.mapEvent({ data: { type: 'TOOL_CALL_START', toolCallId: 't1', toolCallName: 'search' } }),
     ).toMatchObject({ strategy: 'append', status: 'pending' });
@@ -88,7 +88,7 @@ describe('AGUIEventMapper', () => {
     expect(mapper.getToolCall('t1')?.eventType).toBe('TOOL_CALL_END');
   });
 
-  it('creates a tool call from simplified chunks and resets its state', () => {
+  it('从简化分块创建工具调用并重置其状态', () => {
     expect(
       mapper.mapEvent({ data: { type: 'TOOL_CALL_CHUNK', toolCallId: 't2', toolCallName: 'read', delta: '{"file":' } }),
     ).toMatchObject({
@@ -104,7 +104,7 @@ describe('AGUIEventMapper', () => {
     expect(mapper.getToolCall('t2')).toBeUndefined();
   });
 
-  it('maps snapshots, custom events, and run errors', () => {
+  it('映射快照、自定义事件与运行错误', () => {
     const snapshot = mapper.mapEvent({
       data: { type: 'MESSAGES_SNAPSHOT', messages: [{ id: 'm1', role: 'assistant', content: 'hello' }] },
     });
@@ -115,7 +115,7 @@ describe('AGUIEventMapper', () => {
     ]);
   });
 
-  it.fails('uses append strategy for the first ACTIVITY_DELTA before a snapshot', () => {
+  it.fails('快照之前的第一个 ACTIVITY_DELTA 使用追加策略', () => {
     const first = mapper.mapEvent({
       data: {
         type: 'ACTIVITY_DELTA',

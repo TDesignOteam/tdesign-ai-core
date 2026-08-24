@@ -20,7 +20,7 @@ describe('ConnectionManager', () => {
     vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
   });
 
-  it('records connection duration using the current time', () => {
+  it('基于当前时间记录连接时长', () => {
     const manager = new ConnectionManager('connection-1');
     manager.startConnection();
     vi.setSystemTime(new Date('2026-01-01T00:00:00.250Z'));
@@ -31,7 +31,7 @@ describe('ConnectionManager', () => {
     expect(logger.info).toHaveBeenCalledWith('Connection established in 250ms');
   });
 
-  it('returns defensive copies of connection information and statistics', () => {
+  it('返回连接信息与统计数据的防御性副本', () => {
     const manager = new ConnectionManager('connection-1');
     const error = new Error('failed');
     manager.updateState(SSEConnectionState.ERROR, error);
@@ -48,7 +48,7 @@ describe('ConnectionManager', () => {
     expect(manager.getStats()).toEqual({ lastError: error });
   });
 
-  it('logs timeout errors, cleans statistics, and reports no retry', () => {
+  it('记录超时错误、清理统计数据且不重试', () => {
     const manager = new ConnectionManager('connection-1');
     const error = new TimeoutError();
 
@@ -59,7 +59,7 @@ describe('ConnectionManager', () => {
     expect(manager.getStats()).toEqual({});
   });
 
-  it('handles non-timeout errors without the timeout-specific log', () => {
+  it('处理非超时错误时不输出超时专属日志', () => {
     const manager = new ConnectionManager('connection-1');
     const error = new Error('socket hang up');
 
@@ -70,7 +70,7 @@ describe('ConnectionManager', () => {
     expect(manager.getStats()).toEqual({});
   });
 
-  it('clears recorded statistics during cleanup', () => {
+  it('清理时清除记录的统计数据', () => {
     const manager = new ConnectionManager('connection-1');
     manager.updateState(SSEConnectionState.ERROR, new Error('failed'));
 

@@ -64,7 +64,7 @@ describe('ChatEngine', () => {
     );
   });
 
-  it('initializes once with messages, protocol handler, and lifecycle event', async () => {
+  it('仅初始化一次，包含消息、协议处理器与生命周期事件', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(1000);
     const engine = new ChatEngine();
     const onInit = vi.fn();
@@ -86,7 +86,7 @@ describe('ChatEngine', () => {
     expect(onInit).toHaveBeenCalledWith({ timestamp: 1000 });
   });
 
-  it('deduplicates concurrent websocket connects and rebuilds for overrides', async () => {
+  it('对并发的 WebSocket 连接去重，并在覆盖参数时重建', async () => {
     const engine = new ChatEngine();
     await engine.init({ transport: 'ws', endpoint: 'wss://first' });
     const service = mocks.serviceInstances[0];
@@ -104,7 +104,7 @@ describe('ChatEngine', () => {
     expect(service.initWSConnection).toHaveBeenLastCalledWith({ transport: 'ws', endpoint: 'wss://second' });
   });
 
-  it('skips connection work for non-websocket transports and existing connections', async () => {
+  it('对非 WebSocket 传输方式和已存在的连接跳过连接操作', async () => {
     const engine = new ChatEngine();
     await engine.init({ transport: 'sse', endpoint: '/events' });
     const service = mocks.serviceInstances[0];
@@ -117,7 +117,7 @@ describe('ChatEngine', () => {
     expect(service.initWSConnection).not.toHaveBeenCalled();
   });
 
-  it('creates user and assistant messages without requesting when requested', async () => {
+  it('按需创建用户与 AI 消息且不发起请求', async () => {
     const engine = new ChatEngine();
     await engine.init({ transport: 'sse' });
     const requestSpy = vi.spyOn(engine, 'sendRequest');
@@ -134,7 +134,7 @@ describe('ChatEngine', () => {
     expect(requestSpy).not.toHaveBeenCalled();
   });
 
-  it('warns and ignores an empty user request', async () => {
+  it('对空的用户请求给出警告并忽略', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const engine = new ChatEngine();
     await engine.init({});
@@ -145,7 +145,7 @@ describe('ChatEngine', () => {
     expect(warn).toHaveBeenCalledOnce();
   });
 
-  it('orchestrates stream requests through the selected handler context', async () => {
+  it('通过选定的处理器上下文编排流式请求', async () => {
     const engine = new ChatEngine();
     await engine.init({ transport: 'sse' });
     await engine.sendAIMessage({ sendRequest: false });
@@ -164,7 +164,7 @@ describe('ChatEngine', () => {
     );
   });
 
-  it('applies a batch result and publishes completion', async () => {
+  it('应用批量请求结果并派发完成事件', async () => {
     const engine = new ChatEngine();
     await engine.init({ transport: 'fetch' });
     await engine.sendAIMessage({ sendRequest: false });
@@ -183,7 +183,7 @@ describe('ChatEngine', () => {
     );
   });
 
-  it('marks and publishes request errors before rethrowing', async () => {
+  it('标记并派发请求错误后再重新抛出', async () => {
     const engine = new ChatEngine();
     await engine.init({ transport: 'fetch' });
     await engine.sendAIMessage({ sendRequest: false });
@@ -198,7 +198,7 @@ describe('ChatEngine', () => {
     expect(onError).toHaveBeenCalledWith({ messageId, error, params: { messageID: messageId } });
   });
 
-  it('aborts non-WS transport and delegates protocol cleanup', async () => {
+  it('中止非 WS 传输并委托协议清理', async () => {
     const onAbort = vi.fn(async () => undefined);
     const engine = new ChatEngine();
     await engine.init({ transport: 'sse', onAbort });
@@ -210,7 +210,7 @@ describe('ChatEngine', () => {
     expect(mocks.handlerInstances[0].abort).toHaveBeenCalledOnce();
   });
 
-  it('removes the trailing assistant message when aborting a fetch request', async () => {
+  it('中止 fetch 请求时移除末尾的 AI 消息', async () => {
     const engine = new ChatEngine();
     await engine.init({ transport: 'fetch' });
     await engine.sendAIMessage({ sendRequest: false });
@@ -222,7 +222,7 @@ describe('ChatEngine', () => {
     expect(engine.messages).toEqual([]);
   });
 
-  it('completes the streaming message and forwards abort requests on websocket transport', async () => {
+  it('在 WebSocket 传输上完成流式消息并转发中止请求', async () => {
     const engine = new ChatEngine();
     await engine.init({ transport: 'ws', endpoint: 'ws://chat', abortRequest: { prompt: '/stop' } });
     const onAbortEvent = vi.fn();
@@ -246,7 +246,7 @@ describe('ChatEngine', () => {
     expect(mocks.serviceInstances[0].closeConnect).not.toHaveBeenCalled();
   });
 
-  it('applies custom onComplete content when the handler completes a stream', async () => {
+  it('处理器完成流式时应用自定义 onComplete 内容', async () => {
     const customContent = [{ type: 'text' as const, data: 'custom answer' }];
     const engine = new ChatEngine();
     await engine.init({ transport: 'sse', onComplete: vi.fn(() => customContent) });
@@ -269,7 +269,7 @@ describe('ChatEngine', () => {
     expect(onCompleteEvent).toHaveBeenCalledWith(expect.objectContaining({ messageId }));
   });
 
-  it('resumes a run with a pending assistant message and returns its id', async () => {
+  it('以 pending 状态的 AI 消息恢复运行并返回其 id', async () => {
     const engine = new ChatEngine();
     await engine.init({ transport: 'sse' });
 
@@ -284,7 +284,7 @@ describe('ChatEngine', () => {
     );
   });
 
-  it('regenerates by replacing the last assistant message and reusing prior params', async () => {
+  it('重新生成时替换最后一条 AI 消息并复用先前的参数', async () => {
     const engine = new ChatEngine();
     await engine.init({ transport: 'sse' }, [initialMessage]);
     await engine.sendRequest({ prompt: 'first', messageID: 'initial-1' });
@@ -300,7 +300,7 @@ describe('ChatEngine', () => {
     );
   });
 
-  it('stores system messages without triggering requests', async () => {
+  it('存储系统消息且不触发请求', async () => {
     const engine = new ChatEngine();
     await engine.init({ transport: 'sse' });
     const requestSpy = vi.spyOn(engine, 'sendRequest');
@@ -314,7 +314,7 @@ describe('ChatEngine', () => {
     expect(mocks.handlerInstances[0].handleStream).not.toHaveBeenCalled();
   });
 
-  it('updates the endpoint declaratively and uses it on the next connect', async () => {
+  it('以声明式方式更新端点并在下次连接时使用', async () => {
     const engine = new ChatEngine();
     await engine.init({ transport: 'ws', endpoint: 'wss://first' });
 
@@ -326,7 +326,7 @@ describe('ChatEngine', () => {
     );
   });
 
-  it('disconnect tears down the websocket without aborting the handler', async () => {
+  it('disconnect 拆除 WebSocket 但不中止处理器', async () => {
     const engine = new ChatEngine();
     await engine.init({ transport: 'ws', endpoint: 'ws://chat' });
 
@@ -336,7 +336,7 @@ describe('ChatEngine', () => {
     expect(mocks.handlerInstances[0].abort).not.toHaveBeenCalled();
   });
 
-  it('destroys initialized resources and clears messages', async () => {
+  it('销毁已初始化的资源并清空消息', async () => {
     const engine = new ChatEngine();
     await engine.init({ transport: 'sse' }, [initialMessage]);
     const destroyEvent = vi.fn();
@@ -350,11 +350,9 @@ describe('ChatEngine', () => {
     expect(engine.messages).toEqual([]);
   });
 
-  it.todo('destroy is safe before init (currently dereferences uninitialized config and service fields)');
+  it.todo('destroy 在 init 之前调用是安全的（当前会解引用未初始化的 config 与 service 字段）');
 
-  it.todo(
-    'sendUserMessage awaits and propagates the request promise (currently launches sendRequest without awaiting it)',
-  );
+  it.todo('sendUserMessage 等待并传播请求 promise（当前调用 sendRequest 时未等待其完成）');
 
-  it.todo('completing a message ignores error statuses on unrelated earlier messages');
+  it.todo('完成消息时忽略无关的更早消息上的错误状态');
 });

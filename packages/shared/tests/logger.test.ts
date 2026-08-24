@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ConsoleLogger, LoggerManager, type Logger } from '../logger';
 
 describe('ConsoleLogger', () => {
-  it('does not write debug output by default', () => {
+  it('默认不输出 debug 日志', () => {
     const debug = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
 
     new ConsoleLogger().debug('hidden', { detail: true });
@@ -11,7 +11,7 @@ describe('ConsoleLogger', () => {
     expect(debug).not.toHaveBeenCalled();
   });
 
-  it('prefixes debug output and forwards extra arguments when enabled', () => {
+  it('启用时为 debug 输出添加前缀并转发额外参数', () => {
     const debug = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
 
     new ConsoleLogger(true).debug('visible', 1, { detail: true });
@@ -19,7 +19,7 @@ describe('ConsoleLogger', () => {
     expect(debug).toHaveBeenCalledWith('[SSE Debug] visible', 1, { detail: true });
   });
 
-  it('prefixes info, warning, and error output and forwards extra arguments', () => {
+  it('为 info、warning 和 error 输出添加前缀并转发额外参数', () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -40,14 +40,14 @@ describe('LoggerManager', () => {
     LoggerManager.resetToDefault();
   });
 
-  it('lazily returns a stable default ConsoleLogger', () => {
+  it('惰性返回稳定的默认 ConsoleLogger', () => {
     const first = LoggerManager.getLogger();
 
     expect(first).toBeInstanceOf(ConsoleLogger);
     expect(LoggerManager.getLogger()).toBe(first);
   });
 
-  it('returns a configured custom logger', () => {
+  it('返回已配置的自定义 Logger', () => {
     const custom: Logger = {
       debug: vi.fn(),
       info: vi.fn(),
@@ -60,7 +60,7 @@ describe('LoggerManager', () => {
     expect(LoggerManager.getLogger()).toBe(custom);
   });
 
-  it('restores the original default logger after reset', () => {
+  it('重置后恢复原始默认 Logger', () => {
     const defaultLogger = LoggerManager.getLogger();
     const custom: Logger = {
       debug: vi.fn(),
@@ -76,7 +76,7 @@ describe('LoggerManager', () => {
     expect(LoggerManager.getLogger()).not.toBe(custom);
   });
 
-  it('allows one custom logger to replace another', () => {
+  it('允许一个自定义 Logger 替换另一个', () => {
     const first = new ConsoleLogger(true);
     const second = new ConsoleLogger();
 

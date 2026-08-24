@@ -15,7 +15,7 @@ describe('SurfaceStateManager', () => {
     manager = new SurfaceStateManager();
   });
 
-  it('registers, queries, replaces, and deletes surfaces', () => {
+  it('注册、查询、替换并删除 Surface', () => {
     manager.registerSurface('s1', schema, 'catalog');
     expect(manager.hasSurface('s1')).toBe(true);
     expect(manager.getSchema('s1')).toBe(schema);
@@ -28,7 +28,7 @@ describe('SurfaceStateManager', () => {
     expect(manager.deleteSurface('s1')).toBe(false);
   });
 
-  it('updates cached data and notifies subscribers in a microtask', async () => {
+  it('更新缓存数据并在微任务中通知订阅者', async () => {
     manager.registerSurface('s1', schema);
     const subscriber = vi.fn();
     manager.subscribe('s1', subscriber);
@@ -38,7 +38,7 @@ describe('SurfaceStateManager', () => {
     expect(subscriber).toHaveBeenCalledWith(expect.objectContaining({ data: { count: 2 } }));
   });
 
-  it('honors unsubscribe before queued notification and isolates throwing subscribers', async () => {
+  it('支持在排队通知前取消订阅并隔离抛错的订阅者', async () => {
     manager.registerSurface('s1', schema);
     const stopped = vi.fn();
     const stop = manager.subscribe('s1', stopped);
@@ -56,7 +56,7 @@ describe('SurfaceStateManager', () => {
     expect(surviving).toHaveBeenCalledOnce();
   });
 
-  it('returns false for unknown updates and reports cache statistics', () => {
+  it('对未知更新返回 false 并报告缓存统计信息', () => {
     expect(manager.updateData('missing', '/x', 'replace', 1)).toBe(false);
     expect(manager.updateSchema('missing', schema)).toBe(false);
     manager.registerSurface('s1', schema);
@@ -69,7 +69,7 @@ describe('SurfaceStateManager', () => {
     expect(manager.getStats().surfaces[0].subscriberCount).toBe(0);
   });
 
-  it('clears all surfaces and subscriptions', async () => {
+  it('清空全部 Surface 和订阅', async () => {
     manager.registerSurface('s1', schema);
     const subscriber = vi.fn();
     manager.subscribe('s1', subscriber);

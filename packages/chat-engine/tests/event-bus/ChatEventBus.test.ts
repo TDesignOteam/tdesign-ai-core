@@ -10,7 +10,7 @@ describe('ChatEventBus', () => {
     vi.useRealTimers();
   });
 
-  it('subscribes, emits, and unsubscribes regular listeners', () => {
+  it('订阅、派发与取消订阅普通监听器', () => {
     const bus = new ChatEventBus();
     const first = vi.fn();
     const second = vi.fn();
@@ -30,7 +30,7 @@ describe('ChatEventBus', () => {
     expect(bus.listenerCount(ChatEngineEventType.ENGINE_INIT)).toBe(1);
   });
 
-  it('supports one-time listeners and removing all listeners for an event', () => {
+  it('支持一次性监听器与移除事件的全部监听器', () => {
     const bus = new ChatEventBus();
     const regular = vi.fn();
     const once = vi.fn();
@@ -48,7 +48,7 @@ describe('ChatEventBus', () => {
     expect(bus.hasListeners(ChatEngineEventType.ENGINE_INIT)).toBe(false);
   });
 
-  it('isolates errors thrown by regular and one-time handlers', () => {
+  it('隔离普通与一次性处理器抛出的错误', () => {
     const error = new Error('handler failed');
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const bus = new ChatEventBus();
@@ -66,7 +66,7 @@ describe('ChatEventBus', () => {
     expect(consoleError).toHaveBeenCalledTimes(2);
   });
 
-  it('waits for the next event and removes the one-time listener', async () => {
+  it('等待下一个事件并移除一次性监听器', async () => {
     const bus = new ChatEventBus();
     const result = bus.waitFor(ChatEngineEventType.ENGINE_INIT, 100);
 
@@ -76,7 +76,7 @@ describe('ChatEventBus', () => {
     expect(bus.listenerCount(ChatEngineEventType.ENGINE_INIT)).toBe(0);
   });
 
-  it('rejects waitFor on timeout and removes its listener', async () => {
+  it('waitFor 超时时 reject 并移除其监听器', async () => {
     vi.useFakeTimers();
     const bus = new ChatEventBus();
     const result = bus.waitFor(ChatEngineEventType.ENGINE_INIT, 25);
@@ -88,7 +88,7 @@ describe('ChatEventBus', () => {
     expect(bus.listenerCount(ChatEngineEventType.ENGINE_INIT)).toBe(0);
   });
 
-  it('waits until an event matches a filter', async () => {
+  it('等待直到事件匹配过滤器', async () => {
     const bus = new ChatEventBus();
     const filter = vi.fn((payload: { timestamp: number }) => payload.timestamp > 10);
     const result = bus.waitForMatch(ChatEngineEventType.ENGINE_INIT, filter, 100);
@@ -101,7 +101,7 @@ describe('ChatEventBus', () => {
     expect(bus.listenerCount(ChatEngineEventType.ENGINE_INIT)).toBe(0);
   });
 
-  it('logs filter errors and remains subscribed for a later match', async () => {
+  it('记录过滤器错误并保持订阅以等待后续匹配', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const bus = new ChatEventBus();
     const filter = vi
@@ -119,7 +119,7 @@ describe('ChatEventBus', () => {
     expect(consoleError).toHaveBeenCalledOnce();
   });
 
-  it('rejects waitForMatch on timeout and unsubscribes', async () => {
+  it('waitForMatch 超时时 reject 并取消订阅', async () => {
     vi.useFakeTimers();
     const bus = new ChatEventBus();
     const result = bus.waitForMatch(ChatEngineEventType.ENGINE_INIT, () => false, 40);
@@ -131,7 +131,7 @@ describe('ChatEventBus', () => {
     expect(bus.listenerCount(ChatEngineEventType.ENGINE_INIT)).toBe(0);
   });
 
-  it('handles custom events independently and counts their listeners', () => {
+  it('独立处理自定义事件并统计其监听器', () => {
     const bus = new ChatEventBus();
     const alpha = vi.fn();
     const beta = vi.fn();
@@ -148,7 +148,7 @@ describe('ChatEventBus', () => {
     expect(beta).not.toHaveBeenCalled();
   });
 
-  it('bounds event history and returns a defensive array copy', () => {
+  it('限制事件历史长度并返回防御性数组副本', () => {
     vi.spyOn(Date, 'now').mockReturnValue(999);
     const bus = new ChatEventBus({ historySize: 2 });
     bus.emit(ChatEngineEventType.ENGINE_INIT, { timestamp: 1 });
@@ -169,7 +169,7 @@ describe('ChatEventBus', () => {
     expect(bus.getHistory()).toHaveLength(2);
   });
 
-  it('warns when the configured regular listener limit is reached', () => {
+  it('达到配置的普通监听器上限时发出警告', () => {
     const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const bus = new ChatEventBus({ maxListeners: 1 });
     bus.on(ChatEngineEventType.ENGINE_INIT, vi.fn());
@@ -179,7 +179,7 @@ describe('ChatEventBus', () => {
     expect(bus.listenerCount(ChatEngineEventType.ENGINE_INIT)).toBe(2);
   });
 
-  it('clears listeners and history', () => {
+  it('清除监听器与历史记录', () => {
     const bus = new ChatEventBus({ historySize: 1 });
     bus.on(ChatEngineEventType.ENGINE_INIT, vi.fn());
     bus.once(ChatEngineEventType.ENGINE_DESTROY, vi.fn());
@@ -192,7 +192,7 @@ describe('ChatEventBus', () => {
     expect(bus.getHistory()).toEqual([]);
   });
 
-  it('destroys permanently, ignoring emissions and rejecting new subscriptions', () => {
+  it('永久销毁、忽略派发并拒绝新订阅', () => {
     const bus = new ChatEventBus();
     const callback = vi.fn();
     bus.on(ChatEngineEventType.ENGINE_INIT, callback);
@@ -208,10 +208,10 @@ describe('ChatEventBus', () => {
     expect(() => bus.waitFor(ChatEngineEventType.ENGINE_INIT)).toThrow('Event bus has been destroyed');
   });
 
-  it('creates an event bus through the factory', () => {
+  it('通过工厂函数创建事件总线', () => {
     expect(createEventBus()).toBeInstanceOf(ChatEventBus);
   });
 
-  it.todo('rejects pending waitFor promises when the event bus is cleared or destroyed');
-  it.todo('applies maxListeners consistently across regular and one-time listeners');
+  it.todo('事件总线被清除或销毁时 reject 待处理的 waitFor Promise');
+  it.todo('在普通与一次性监听器上统一应用 maxListeners');
 });

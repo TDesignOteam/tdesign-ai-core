@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { checkPerformance, PERFORMANCE_THRESHOLDS, PerformanceMonitor } from '../../utils/performance';
 
 describe('PerformanceMonitor', () => {
-  it('records render and update measurements and returns function results', () => {
+  it('记录渲染与更新耗时并返回函数结果', () => {
     vi.spyOn(performance, 'now')
       .mockReturnValueOnce(10)
       .mockReturnValueOnce(25)
@@ -26,7 +26,7 @@ describe('PerformanceMonitor', () => {
     expect(monitor.getAverageUpdateTime()).toBe(8);
   });
 
-  it('keeps only the latest 100 metrics and returns defensive arrays', () => {
+  it('仅保留最近 100 条指标并返回防御性数组', () => {
     let now = 0;
     vi.spyOn(performance, 'now').mockImplementation(() => now++);
     const monitor = new PerformanceMonitor();
@@ -40,7 +40,7 @@ describe('PerformanceMonitor', () => {
     expect(monitor.getMetrics()).toHaveLength(100);
   });
 
-  it('summarizes recent metrics and resets state', () => {
+  it('汇总近期指标并重置状态', () => {
     let now = 0;
     vi.spyOn(performance, 'now').mockImplementation(() => {
       const value = now;
@@ -66,7 +66,7 @@ describe('PerformanceMonitor', () => {
     expect(monitor.getSummary()).toMatchObject({ totalOperations: 0, avgRenderTime: 0, avgUpdateTime: 0 });
   });
 
-  it('prints a formatted summary', () => {
+  it('打印格式化的摘要', () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const monitor = new PerformanceMonitor();
 
@@ -84,11 +84,11 @@ describe('PerformanceMonitor', () => {
 });
 
 describe('checkPerformance', () => {
-  it('exports the documented default thresholds', () => {
+  it('导出文档所述的默认阈值', () => {
     expect(PERFORMANCE_THRESHOLDS).toEqual({ renderTime: 50, updateTime: 16, memoryUsage: 100 });
   });
 
-  it('warns independently for metrics over each threshold', () => {
+  it('对超出各项阈值的指标分别告警', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     checkPerformance(
@@ -104,7 +104,7 @@ describe('checkPerformance', () => {
     ]);
   });
 
-  it('does not warn at or below thresholds', () => {
+  it('不高于阈值时不告警', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     checkPerformance(

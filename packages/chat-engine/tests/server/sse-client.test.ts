@@ -25,7 +25,7 @@ describe('SSEClient', () => {
     vi.useRealTimers();
   });
 
-  it('reads an SSE stream and emits start, message, completion, and state changes', async () => {
+  it('读取 SSE 流并派发 start、message、complete 与状态变更事件', async () => {
     const reader = {
       read: vi
         .fn()
@@ -66,7 +66,7 @@ describe('SSEClient', () => {
     ]);
   });
 
-  it('cancels the reader, aborts fetch, and emits aborted completion', async () => {
+  it('取消 reader、中止 fetch 并派发中止的完成事件', async () => {
     let resolveRead!: (value: { done: boolean }) => void;
     const reader = {
       read: vi.fn(() => new Promise<{ done: boolean }>((resolve) => (resolveRead = resolve))),
@@ -90,7 +90,7 @@ describe('SSEClient', () => {
     expect(client.getStatus()).toBe(SSEConnectionState.CLOSED);
   });
 
-  it('emits a timeout and aborts an inactive stream', async () => {
+  it('派发超时并中止不活跃的流', async () => {
     let resolveRead!: (value: { done: boolean }) => void;
     const reader = {
       read: vi.fn(() => new Promise<{ done: boolean }>((resolve) => (resolveRead = resolve))),
@@ -114,7 +114,7 @@ describe('SSEClient', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('exposes connection metadata without sharing the top-level object', () => {
+  it('暴露连接元数据且不共享顶层对象', () => {
     const client = new SSEClient('/events');
     const first = client.getInfo();
     const second = client.getInfo();
@@ -122,7 +122,7 @@ describe('SSEClient', () => {
     expect(first).toMatchObject({ id: client.connectionId, url: '/events', state: SSEConnectionState.DISCONNECTED });
   });
 
-  it('reports fetch network failures as connection errors', async () => {
+  it('将 fetch 网络失败上报为连接错误', async () => {
     const networkError = new TypeError('fetch failed');
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkError));
     const client = new SSEClient('/events');
@@ -134,7 +134,7 @@ describe('SSEClient', () => {
     expect(onError).toHaveBeenCalledWith(networkError);
   });
 
-  it.fails('stops connection setup after a non-OK HTTP response instead of entering CONNECTED state', async () => {
+  it.fails('非成功 HTTP 响应后停止连接建立而不进入 CONNECTED 状态', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401, statusText: 'Unauthorized', body: {} }));
     const client = new SSEClient('/events');
     const onError = vi.fn();
@@ -149,6 +149,6 @@ describe('SSEClient', () => {
     expect(client.getStatus()).toBe(SSEConnectionState.ERROR);
     expect(onStateChange.mock.calls.map(([event]) => event.to)).not.toContain(SSEConnectionState.CONNECTED);
   });
-  it.todo('puts timeout descriptions in TimeoutError.message instead of details');
-  it.todo('resets the first-token flag when a client instance reconnects');
+  it.todo('将超时描述放入 TimeoutError.message 而非 details');
+  it.todo('客户端实例重连时重置首 token 标志');
 });

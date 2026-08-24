@@ -29,9 +29,9 @@ function expectPatchError(run: () => unknown, name: string, index?: number) {
   throw new Error(`Expected ${name} to be thrown`);
 }
 
-describe('JSON Patch operations', () => {
-  describe('objects', () => {
-    it('adds, replaces, and removes object properties', () => {
+describe('JSON Patch 操作', () => {
+  describe('对象', () => {
+    it('add、replace 和 remove 对象属性', () => {
       const document = { keep: true, old: 1 };
       const result = applyPatch(document, [
         { op: 'add', path: '/added', value: { nested: true } },
@@ -45,7 +45,7 @@ describe('JSON Patch operations', () => {
       expect(document).toBe(result.newDocument);
     });
 
-    it('applies operations to properties with empty names', () => {
+    it('对空名称属性应用操作', () => {
       const document = { '': 'before' };
 
       const result = applyOperation(document, { op: 'replace', path: '/', value: 'after' }, true);
@@ -54,8 +54,8 @@ describe('JSON Patch operations', () => {
     });
   });
 
-  describe('arrays', () => {
-    it('inserts at an index and at the array end marker', () => {
+  describe('数组', () => {
+    it('在索引和数组末尾标记处插入', () => {
       const document = { values: ['a', 'c'] };
 
       applyPatch(
@@ -70,7 +70,7 @@ describe('JSON Patch operations', () => {
       expect(document.values).toEqual(['a', 'b', 'c', 'd']);
     });
 
-    it('replaces and removes array elements without leaving holes', () => {
+    it('替换和删除数组元素且不留空洞', () => {
       const document = { values: ['a', 'b', 'c'] };
       const replaced = applyOperation(document, { op: 'replace', path: '/values/1', value: 'B' }, true);
       const removed = applyOperation(document, { op: 'remove', path: '/values/0' }, true);
@@ -81,8 +81,8 @@ describe('JSON Patch operations', () => {
     });
   });
 
-  describe('root', () => {
-    it('adds and replaces the complete document', () => {
+  describe('根', () => {
+    it('add 和 replace 整个文档', () => {
       const added = applyOperation({ old: true }, { op: 'add', path: '', value: ['new'] });
       const original = { old: true };
       const replaced = applyOperation(original, { op: 'replace', path: '', value: { new: true } });
@@ -91,7 +91,7 @@ describe('JSON Patch operations', () => {
       expect(replaced).toEqual({ newDocument: { new: true }, removed: original });
     });
 
-    it('removes the complete document', () => {
+    it('remove 整个文档', () => {
       const original = { value: 1 };
 
       expect(applyOperation(original, { op: 'remove', path: '' })).toEqual({
@@ -100,7 +100,7 @@ describe('JSON Patch operations', () => {
       });
     });
 
-    it('copies and moves a nested value to the root', () => {
+    it('copy 和 move 嵌套值到根', () => {
       const document = { nested: { value: 1 }, other: true };
       const copied = applyOperation(document, { op: 'copy', from: '/nested', path: '' });
       const moved = applyOperation(document, { op: 'move', from: '/nested', path: '' });
@@ -110,7 +110,7 @@ describe('JSON Patch operations', () => {
       expect(moved).toEqual({ newDocument: document.nested, removed: document });
     });
 
-    it('gets the complete document through an internal get operation', () => {
+    it('通过内部 get 操作获取整个文档', () => {
       const document = { value: 1 };
       const operation = invalidOperation({ op: '_get', path: '' }) as Extract<Operation, { op: '_get' }>;
 
@@ -119,8 +119,8 @@ describe('JSON Patch operations', () => {
     });
   });
 
-  describe('move and copy', () => {
-    it('moves a value and reports the overwritten destination', () => {
+  describe('move 与 copy', () => {
+    it('move 值并报告被覆盖的目标', () => {
       const destination = { replaced: true };
       const document = { source: { moved: true }, destination };
 
@@ -131,7 +131,7 @@ describe('JSON Patch operations', () => {
       expect(result.removed).not.toBe(destination);
     });
 
-    it('moves array elements using the post-removal destination index', () => {
+    it('基于移除后的目标索引 move 数组元素', () => {
       const document = { values: ['a', 'b', 'c'] };
 
       applyOperation(document, { op: 'move', from: '/values/0', path: '/values/2' }, true);
@@ -139,7 +139,7 @@ describe('JSON Patch operations', () => {
       expect(document.values).toEqual(['b', 'c', 'a']);
     });
 
-    it('copies values deeply so source and destination are independent', () => {
+    it('深拷贝值使源与目标相互独立', () => {
       const document = { source: { nested: { value: 1 } } } as Record<string, any>;
 
       applyOperation(document, { op: 'copy', from: '/source', path: '/copy' }, true);
@@ -150,8 +150,8 @@ describe('JSON Patch operations', () => {
     });
   });
 
-  describe('test and get', () => {
-    it('passes tests based on structural equality', () => {
+  describe('test 与 get', () => {
+    it('基于结构相等性通过 test 操作', () => {
       const document = { value: { b: [1, 2], a: true } };
 
       expect(applyOperation(document, { op: 'test', path: '/value', value: { a: true, b: [1, 2] } })).toEqual({
@@ -160,7 +160,7 @@ describe('JSON Patch operations', () => {
       });
     });
 
-    it('throws a patch error when a test fails even without validation', () => {
+    it('test 失败时即使未启用校验也抛出补丁错误', () => {
       const operation = { op: 'test', path: '/value', value: 2 } as const;
       const error = expectPatchError(
         () => applyOperation({ value: 1 }, operation, false, true, true, 4),
@@ -172,7 +172,7 @@ describe('JSON Patch operations', () => {
       expect(error.tree).toEqual({ value: 1 });
     });
 
-    it('gets nested and root values by JSON pointer', () => {
+    it('通过 JSON Pointer 获取嵌套值和根值', () => {
       const document = { nested: { value: 1 } };
       const operation = invalidOperation({ op: '_get', path: '/nested/value' }) as Extract<Operation, { op: '_get' }>;
 
@@ -185,7 +185,7 @@ describe('JSON Patch operations', () => {
   });
 
   describe('append', () => {
-    it('concatenates strings and stringifies an existing non-null value', () => {
+    it('拼接字符串并将现有非 null 值字符串化', () => {
       const document = { text: 'Hello', count: 2 };
 
       applyPatch(
@@ -200,7 +200,7 @@ describe('JSON Patch operations', () => {
       expect(document).toEqual({ text: 'Hello world', count: '2 items' });
     });
 
-    it.each([{ initial: null }, { initial: undefined }])('initializes a $initial property', ({ initial }) => {
+    it.each([{ initial: null }, { initial: undefined }])('初始化 $initial 属性', ({ initial }) => {
       const document: { value?: string | null } = { value: initial };
 
       applyOperation(document, { op: 'append', path: '/value', value: 'first' }, true);
@@ -208,7 +208,7 @@ describe('JSON Patch operations', () => {
       expect(document.value).toBe('first');
     });
 
-    it('initializes a missing property and supports array elements', () => {
+    it('初始化缺失属性并支持数组元素', () => {
       const document = { values: ['a'] } as { missing?: string; values: string[] };
 
       applyPatch(
@@ -226,13 +226,13 @@ describe('JSON Patch operations', () => {
     it.each([
       { document: 'Hello', expected: 'Hello world' },
       { document: null, expected: ' world' },
-    ])('appends at the document root', ({ document, expected }) => {
+    ])('在文档根上执行 append', ({ document, expected }) => {
       expect(applyOperation(document, { op: 'append', path: '', value: ' world' }, true).newDocument).toBe(expected);
     });
   });
 
-  describe('mutation control', () => {
-    it('clones before a non-root operation when mutateDocument is false', () => {
+  describe('变更控制', () => {
+    it('mutateDocument 为 false 时非根操作前先克隆', () => {
       const original = { nested: { value: 1 }, untouched: { stable: true } };
 
       const result = applyOperation(original, { op: 'replace', path: '/nested/value', value: 2 }, true, false);
@@ -242,7 +242,7 @@ describe('JSON Patch operations', () => {
       expect(original.nested.value).toBe(1);
     });
 
-    it('clones once before applying a patch when mutateDocument is false', () => {
+    it('mutateDocument 为 false 时应用补丁前仅克隆一次', () => {
       const original = { values: [1], label: 'a' };
 
       const result = applyPatch(
@@ -260,7 +260,7 @@ describe('JSON Patch operations', () => {
       expect(result[0].newDocument).toBe(result[1].newDocument);
     });
 
-    it('exports the JSON-compatible clone implementation', () => {
+    it('导出 JSON 兼容的克隆实现', () => {
       const original = { nested: { value: 1 } };
       const cloned = deepClone(original);
 
@@ -269,8 +269,8 @@ describe('JSON Patch operations', () => {
     });
   });
 
-  describe('JSON Pointer and prototype protection', () => {
-    it('resolves escaped slash and tilde path components', () => {
+  describe('JSON Pointer 与原型保护', () => {
+    it('解析转义斜杠和波浪号的路径组件', () => {
       const document = { 'a/b': { '~key': 'before' } };
 
       applyOperation(document, { op: 'replace', path: '/a~1b/~0key', value: 'after' }, true);
@@ -280,14 +280,14 @@ describe('JSON Patch operations', () => {
     });
 
     it.each(['/__proto__/polluted', '/constructor/prototype/polluted', '/~1safe/__proto__/polluted'])(
-      'blocks prototype modification through %s',
+      '阻止通过 %s 修改原型',
       (path) => {
         expect(() => applyOperation({ '/safe': {} }, { op: 'add', path, value: true })).toThrow(TypeError);
         expect(({} as Record<string, unknown>).polluted).toBeUndefined();
       },
     );
 
-    it('allows an own __proto__ key to be addressed only when protection is explicitly disabled', () => {
+    it('仅在显式禁用保护时允许寻址自有 __proto__ 键', () => {
       const document = JSON.parse('{"__proto__":{"value":1}}') as Record<string, any>;
 
       applyOperation(document, { op: 'replace', path: '/__proto__/value', value: 2 }, true, true, false);
@@ -298,7 +298,7 @@ describe('JSON Patch operations', () => {
   });
 });
 
-describe('validation', () => {
+describe('校验', () => {
   it.each([
     { operation: null, name: 'OPERATION_NOT_AN_OBJECT' },
     { operation: [], name: 'OPERATION_NOT_AN_OBJECT' },
@@ -314,13 +314,13 @@ describe('validation', () => {
       name: 'OPERATION_VALUE_CANNOT_CONTAIN_UNDEFINED',
     },
     { operation: { op: 'test', path: '/value', value: [undefined] }, name: 'OPERATION_VALUE_CANNOT_CONTAIN_UNDEFINED' },
-  ])('reports $name for malformed operations', ({ operation, name }) => {
+  ])('对畸形操作报告 $name', ({ operation, name }) => {
     const error = validate([invalidOperation(operation)]);
 
     expect(error).toMatchObject({ name, index: 0, operation });
   });
 
-  it('reports the failing operation index and formatted context', () => {
+  it('报告失败操作的索引和格式化上下文', () => {
     const operation = invalidOperation({ op: 'invalid', path: '' });
     const error = validate([{ op: 'remove', path: '/valid' }, operation]);
 
@@ -329,7 +329,7 @@ describe('validation', () => {
     expect(error?.message).toContain('index: 1');
   });
 
-  it('accepts structurally valid operations without a document', () => {
+  it('接受不带文档的结构合法操作', () => {
     expect(
       validate([
         { op: 'add', path: '/new', value: null },
@@ -345,11 +345,11 @@ describe('validation', () => {
     { operation: { op: 'add', path: '/missing/child', value: 1 }, name: 'OPERATION_PATH_CANNOT_ADD' },
     { operation: { op: 'copy', from: '/missing', path: '/copy' }, name: 'OPERATION_FROM_UNRESOLVABLE' },
     { operation: { op: 'move', from: '/missing', path: '/moved' }, name: 'OPERATION_FROM_UNRESOLVABLE' },
-  ])('validates paths against a document: $name', ({ operation, name }) => {
+  ])('基于文档校验路径：$name', ({ operation, name }) => {
     expect(validate([operation as Operation], { existing: true })).toMatchObject({ name });
   });
 
-  it('rejects traversal through a primitive value', () => {
+  it('拒绝遍历穿过原始值', () => {
     expectPatchError(
       () => applyOperation({ value: 1 }, { op: 'add', path: '/value/child', value: 2 }, true),
       'OPERATION_PATH_UNRESOLVABLE',
@@ -360,11 +360,11 @@ describe('validation', () => {
   it.each([
     { path: '/values/not-an-index', name: 'OPERATION_PATH_ILLEGAL_ARRAY_INDEX' },
     { path: '/values/3', name: 'OPERATION_VALUE_OUT_OF_BOUNDS' },
-  ])('rejects invalid array add path $path', ({ path, name }) => {
+  ])('拒绝非法的数组 add 路径 $path', ({ path, name }) => {
     expectPatchError(() => applyOperation({ values: [1] }, { op: 'add', path, value: 2 }, true), name, 0);
   });
 
-  it('rejects a non-array patch sequence when validation is enabled', () => {
+  it('启用校验时拒绝非数组的补丁序列', () => {
     expectPatchError(
       () => applyPatch({}, invalidOperation({ op: 'remove', path: '/x' }) as unknown as Operation[], true),
       'SEQUENCE_NOT_AN_ARRAY',
@@ -372,7 +372,7 @@ describe('validation', () => {
     expect(validate(invalidOperation({}) as unknown as Operation[])).toMatchObject({ name: 'SEQUENCE_NOT_AN_ARRAY' });
   });
 
-  it('uses a custom validator and propagates its errors', () => {
+  it('使用自定义 validator 并传播其错误', () => {
     const customError = new Error('custom validation failed');
     const customValidator: Validator<{ value: number }> = vi.fn(() => {
       throw customError;
@@ -389,7 +389,7 @@ describe('validation', () => {
     );
   });
 
-  it('can delegate document-aware custom validation to the default validator', () => {
+  it('可将感知文档的自定义校验委托给默认 validator', () => {
     const customValidator: Validator<{ value: number }> = vi.fn((operation, index, document, path) => {
       validator(operation, index, document, path);
     });
@@ -398,7 +398,7 @@ describe('validation', () => {
     expect(customValidator).toHaveBeenCalled();
   });
 
-  it.fails('passes each operation index to a custom validator', () => {
+  it.fails('将每个操作的索引传递给自定义 validator', () => {
     const customValidator = vi.fn<Validator<{ first?: number; second?: number }>>();
 
     applyPatch(
@@ -414,8 +414,8 @@ describe('validation', () => {
   });
 });
 
-describe('reducer and equality', () => {
-  it('applies a sequence through Array.reduce', () => {
+describe('reducer 与相等性', () => {
+  it('通过 Array.reduce 应用操作序列', () => {
     const operations: Operation[] = [
       { op: 'add', path: '/count', value: 1 },
       { op: 'replace', path: '/label', value: 'b' },
@@ -429,7 +429,7 @@ describe('reducer and equality', () => {
     });
   });
 
-  it('supports root replacement in a reducer', () => {
+  it('支持在 reducer 中替换根', () => {
     expect(
       [{ op: 'replace', path: '', value: [1, 2] } as Operation].reduce(applyReducer, { old: true } as any),
     ).toEqual([1, 2]);
@@ -443,11 +443,11 @@ describe('reducer and equality', () => {
     { left: { a: 1 }, right: { a: 1, b: 2 }, equal: false },
     { left: { a: 1 }, right: [1], equal: false },
     { left: null, right: {}, equal: false },
-  ])('compares JSON-like values structurally', ({ left, right, equal }) => {
+  ])('结构化比较类 JSON 值', ({ left, right, equal }) => {
     expect(_areEquals(left, right)).toBe(equal);
   });
 
-  it.fails('compares objects that contain an own hasOwnProperty key', () => {
+  it.fails('比较包含自有 hasOwnProperty 键的对象', () => {
     const left = JSON.parse('{"hasOwnProperty":"left","value":1}');
     const right = JSON.parse('{"hasOwnProperty":"left","value":1}');
 

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { normalizeActionBinding, resolveActionParams } from '../../../adapters/json-render/action-binding';
 
-describe('action binding utilities', () => {
-  it('resolves nested path-only bindings without mutating input', () => {
+describe('动作绑定工具函数', () => {
+  it('解析嵌套的纯路径绑定且不修改输入', () => {
     const params = {
       name: { path: '/user/name' },
       nested: { count: { path: '/stats/count' } },
@@ -20,14 +20,14 @@ describe('action binding utilities', () => {
     expect(params.name).toEqual({ path: '/user/name' });
   });
 
-  it('stops resolving nested objects at the configured depth', () => {
+  it('在配置的深度处停止解析嵌套对象', () => {
     const binding = { path: '/value' };
     expect(resolveActionParams({ one: { two: binding } }, { value: 1 }, { maxDepth: 1 })).toEqual({
       one: { two: binding },
     });
   });
 
-  it('preserves special property names as own data properties', () => {
+  it('将特殊属性名保留为自身数据属性', () => {
     const params = JSON.parse('{"__proto__":{"path":"/value"},"constructor":{"path":"/value"}}') as Record<
       string,
       unknown
@@ -38,7 +38,7 @@ describe('action binding utilities', () => {
     expect(result).toMatchObject({ __proto__: 'safe', constructor: 'safe' });
   });
 
-  it('normalizes string, standard, and legacy bindings', () => {
+  it('规范化字符串、标准与旧版绑定', () => {
     expect(normalizeActionBinding('submit')).toEqual({ action: 'submit', params: {} });
     expect(normalizeActionBinding({ action: 'save', params: { id: 1 }, preventDefault: true })).toEqual({
       action: 'save',

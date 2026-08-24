@@ -4,7 +4,7 @@ import { StateManagerImpl } from '../../../adapters/agui/StateManager';
 import { AGUIEventType } from '../../../adapters/agui/types/events';
 
 describe('StateManagerImpl', () => {
-  it('stores each valid snapshot entry and tracks the latest state', () => {
+  it('存储每个有效的快照条目并跟踪最新状态', () => {
     const manager = new StateManagerImpl();
     manager.handleStateEvent({
       type: AGUIEventType.STATE_SNAPSHOT,
@@ -17,7 +17,7 @@ describe('StateManagerImpl', () => {
     expect(manager.getCurrentState()).toEqual({ name: 'Ada' });
   });
 
-  it('applies deltas immutably to the addressed state', () => {
+  it('以不可变方式向目标状态应用增量', () => {
     const manager = new StateManagerImpl();
     manager.handleStateEvent({
       type: AGUIEventType.STATE_SNAPSHOT,
@@ -35,7 +35,7 @@ describe('StateManagerImpl', () => {
     expect(after.stable).toBe(before.stable);
   });
 
-  it('notifies latest and key-bound subscribers and supports unsubscribe', () => {
+  it('通知最新订阅者与按 key 绑定的订阅者并支持取消订阅', () => {
     const manager = new StateManagerImpl();
     const latest = vi.fn();
     const cart = vi.fn();
@@ -58,7 +58,7 @@ describe('StateManagerImpl', () => {
     expect(latest).toHaveBeenCalledTimes(2);
   });
 
-  it('ignores deltas for unknown states and clears state and subscriptions', () => {
+  it('忽略未知状态的增量并清空状态和订阅', () => {
     const manager = new StateManagerImpl();
     const subscriber = vi.fn();
     manager.subscribe(subscriber);

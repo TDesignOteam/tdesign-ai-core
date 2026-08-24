@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SSEParser } from '../../server/sse-parser';
 
 describe('SSEParser', () => {
-  it('parses JSON data, event names, and CRLF-delimited chunks', () => {
+  it('解析 JSON 数据、事件名与 CRLF 分隔的数据块', () => {
     const parser = new SSEParser();
     const onMessage = vi.fn();
     parser.onMessage = onMessage;
@@ -19,7 +19,7 @@ describe('SSEParser', () => {
     expect(parser.hasIncompleteEvent()).toBe(false);
   });
 
-  it('joins multiple data fields and preserves non-JSON data', () => {
+  it('拼接多个 data 字段并保留非 JSON 数据', () => {
     const parser = new SSEParser();
     const onMessage = vi.fn();
     parser.onMessage = onMessage;
@@ -29,7 +29,7 @@ describe('SSEParser', () => {
     expect(onMessage).toHaveBeenCalledWith({ event: '', data: 'first\nsecond' });
   });
 
-  it('ignores comments, unknown fields, and events without data', () => {
+  it('忽略注释、未知字段与无数据的事件', () => {
     const parser = new SSEParser();
     const onMessage = vi.fn();
     parser.onMessage = onMessage;
@@ -39,7 +39,7 @@ describe('SSEParser', () => {
     expect(onMessage).not.toHaveBeenCalled();
   });
 
-  it('reports and resets buffered state without exposing mutable internals', () => {
+  it('上报并重置缓冲状态且不暴露可变内部数据', () => {
     const parser = new SSEParser();
     parser.parse('id: 42\ndata: partial\nremaining');
 
@@ -57,5 +57,5 @@ describe('SSEParser', () => {
     expect(parser.hasIncompleteEvent()).toBe(false);
   });
 
-  it.todo('includes the parsed id field in emitted SSE events');
+  it.todo('在派发的 SSE 事件中包含解析出的 id 字段');
 });

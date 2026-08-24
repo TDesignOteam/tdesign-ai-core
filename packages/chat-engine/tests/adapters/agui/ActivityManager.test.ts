@@ -4,7 +4,7 @@ import { ActivityManagerImpl } from '../../../adapters/agui/ActivityManager';
 import { AGUIEventType } from '../../../adapters/agui/types/events';
 
 describe('ActivityManagerImpl', () => {
-  it('stores independent activity snapshots and tracks the latest type', () => {
+  it('存储独立的活动快照并跟踪最新类型', () => {
     const manager = new ActivityManagerImpl();
     manager.handleActivityEvent({
       type: AGUIEventType.ACTIVITY_SNAPSHOT,
@@ -22,7 +22,7 @@ describe('ActivityManagerImpl', () => {
     expect(manager.getCurrentActivityType()).toBe('trace');
   });
 
-  it('applies patches and reports newly appended operation ranges', () => {
+  it('应用补丁并报告新追加的操作范围', () => {
     const manager = new ActivityManagerImpl();
     manager.handleActivityEvent({
       type: AGUIEventType.ACTIVITY_SNAPSHOT,
@@ -41,7 +41,7 @@ describe('ActivityManagerImpl', () => {
     });
   });
 
-  it('infers an array root for a delta arriving before a snapshot', () => {
+  it('为先于快照到达的增量推断数组根节点', () => {
     const manager = new ActivityManagerImpl();
     const activity = manager.handleActivityEvent({
       type: AGUIEventType.ACTIVITY_DELTA,
@@ -52,7 +52,7 @@ describe('ActivityManagerImpl', () => {
     expect(activity?.deltaInfo).toEqual({ fromIndex: 0, toIndex: 1 });
   });
 
-  it('ignores untyped deltas and clears all activity state', () => {
+  it('忽略无类型的增量并清空全部活动状态', () => {
     const manager = new ActivityManagerImpl();
     expect(manager.handleActivityEvent({ type: AGUIEventType.ACTIVITY_DELTA, patch: [] })).toBeNull();
     manager.handleActivityEvent({ type: AGUIEventType.ACTIVITY_SNAPSHOT, activityType: 'x', content: {} });

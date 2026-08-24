@@ -33,7 +33,7 @@ function setup(config: ChatServiceConfig = {}, messageId: string | undefined = '
 }
 
 describe('DefaultStreamHandler', () => {
-  it('forwards lifecycle callbacks and processes each message result', async () => {
+  it('转发生命周期回调并处理每条消息结果', async () => {
     const result = { type: 'text', data: 'hello' } as const;
     const config: ChatServiceConfig = {
       onStart: vi.fn(),
@@ -72,7 +72,7 @@ describe('DefaultStreamHandler', () => {
     expect(context.handleComplete).toHaveBeenCalledWith('assistant-1', false, params);
   });
 
-  it('ignores chunks after reception has stopped', async () => {
+  it('停止接收后忽略数据块', async () => {
     const stopped = true;
     const messageId = 'assistant-1';
     const config: ChatServiceConfig = { onMessage: vi.fn() };

@@ -39,7 +39,7 @@ function setup(config: ChatServiceConfig = {}) {
 }
 
 describe('AGUIStreamHandler', () => {
-  it('exposes adapter operations', () => {
+  it('暴露适配器操作', () => {
     const { adapter, handler } = setup();
     const chunk: SSEChunkData = { data: 'event' };
     const callbacks = { onRunStart: vi.fn() };
@@ -55,7 +55,7 @@ describe('AGUIStreamHandler', () => {
     expect(adapter.reset).toHaveBeenCalledOnce();
   });
 
-  it('filters chunks before mapping and lets onMessage override the mapped result', async () => {
+  it('映射前过滤数据块，并允许 onMessage 覆盖映射结果', async () => {
     const filtered: SSEChunkData = { event: 'filtered', data: 'clean' };
     const mapped = { type: 'text', data: 'mapped' } as const;
     const custom = { type: 'markdown', data: 'custom' } as const;
@@ -80,7 +80,7 @@ describe('AGUIStreamHandler', () => {
     expect(context.processMessageResult).toHaveBeenCalledWith('assistant-1', custom);
   });
 
-  it('publishes AG-UI run lifecycle callbacks from the adapter', async () => {
+  it('派发来自适配器的 AG-UI 运行生命周期回调', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(1234);
     const config: ChatServiceConfig = { onStart: vi.fn() };
     const params = { prompt: 'hello' };
@@ -120,7 +120,7 @@ describe('AGUIStreamHandler', () => {
     });
   });
 
-  it('only delegates transport completion for aborted runs', async () => {
+  it('仅对已中止的运行委托传输层完成处理', async () => {
     const params = { prompt: 'hello' };
     const { context, handler, getRequestConfig } = setup();
     await handler.handleStream(params, context);
@@ -131,7 +131,7 @@ describe('AGUIStreamHandler', () => {
     expect(context.handleComplete).toHaveBeenCalledWith('assistant-1', true, params);
   });
 
-  it('suppresses the AGUI run complete event for aborted runs', async () => {
+  it('对已中止的运行抑制 AGUI 运行完成事件', async () => {
     const params = { prompt: 'hello' };
     const { adapter, context, handler, getRequestConfig } = setup();
     adapter.handleAGUIEvent.mockImplementation((_chunk: SSEChunkData, callbacks: AGUIAdapterCallbacks) => {
@@ -146,7 +146,7 @@ describe('AGUIStreamHandler', () => {
     expect(context.eventBus.emit).not.toHaveBeenCalledWith(ChatEngineEventType.AGUI_RUN_COMPLETE, expect.anything());
   });
 
-  it('delegates run errors and publishes an AGUI run error event', async () => {
+  it('委托运行错误并派发 AGUI 运行错误事件', async () => {
     const { adapter, context, handler, getRequestConfig } = setup();
     const error = { type: AGUIEventType.RUN_ERROR as const, message: 'agent exploded' };
     adapter.handleAGUIEvent.mockImplementation((_chunk: SSEChunkData, callbacks: AGUIAdapterCallbacks) => {
@@ -161,7 +161,7 @@ describe('AGUIStreamHandler', () => {
     expect(context.eventBus.emit).toHaveBeenCalledWith(ChatEngineEventType.AGUI_RUN_ERROR, { error });
   });
 
-  it('skips chunks filtered out by onChunk before mapping', async () => {
+  it('映射前跳过被 onChunk 过滤掉的数据块', async () => {
     const config: ChatServiceConfig = { onChunk: vi.fn(() => null) };
     const { adapter, context, handler, getRequestConfig } = setup(config);
     adapter.handleAGUIEvent.mockReturnValue({ type: 'text', data: 'mapped' } as const);
@@ -175,7 +175,7 @@ describe('AGUIStreamHandler', () => {
     expect(context.processMessageResult).not.toHaveBeenCalled();
   });
 
-  it('drops chunks while stop receiving is asserted', async () => {
+  it('停止接收生效时丢弃数据块', async () => {
     const { context, handler, getRequestConfig } = setup();
     vi.mocked(context.getStopReceive).mockReturnValue(true);
 
@@ -187,7 +187,7 @@ describe('AGUIStreamHandler', () => {
     expect(context.processMessageResult).not.toHaveBeenCalled();
   });
 
-  it('publishes activity and tool-call content after a message update', () => {
+  it('消息更新后派发活动与工具调用内容', () => {
     const { context, handler } = setup();
     const contents = [
       { type: 'activity-progress', data: { activityType: 'progress', content: { percent: 50 } } },
