@@ -115,7 +115,7 @@ describe('AGUIEventMapper', () => {
     ]);
   });
 
-  it.todo('uses append strategy for the first ACTIVITY_DELTA before a snapshot', () => {
+  it.fails('uses append strategy for the first ACTIVITY_DELTA before a snapshot', () => {
     const first = mapper.mapEvent({
       data: {
         type: 'ACTIVITY_DELTA',

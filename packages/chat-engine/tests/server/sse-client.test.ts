@@ -123,7 +123,7 @@ describe('SSEClient', () => {
     expect(first).toMatchObject({ id: client.connectionId, url: '/events', state: SSEConnectionState.DISCONNECTED });
   });
 
-  it.todo('stops connection setup after a non-OK HTTP response instead of entering CONNECTED state', async () => {
+  it.fails('stops connection setup after a non-OK HTTP response instead of entering CONNECTED state', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401, statusText: 'Unauthorized', body: {} }));
     const client = new SSEClient('/events');
     const onError = vi.fn();

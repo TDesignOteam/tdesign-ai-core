@@ -96,7 +96,7 @@ describe('utils public helpers', () => {
     expect(getMessageContentForCopy({ id: 'a2', role: 'assistant' })).toBe('');
   });
 
-  it.todo('omits non-copyable content without adding blank lines', () => {
+  it.fails('omits non-copyable content without adding blank lines', () => {
     const content = [
       { type: 'text', data: 'first' },
       { type: 'image', data: { url: '/image.png' } },

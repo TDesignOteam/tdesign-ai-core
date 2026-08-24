@@ -75,7 +75,7 @@ describe('JSON Patch helpers', () => {
       expect(isInteger(value)).toBe(false);
     });
 
-    it.todo('rejects an empty string as an array index', () => {
+    it.fails('rejects an empty string as an array index', () => {
       expect(isInteger('')).toBe(false);
     });
   });

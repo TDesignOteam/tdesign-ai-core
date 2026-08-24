@@ -87,6 +87,4 @@ describe('DefaultStreamHandler', () => {
     expect(context.eventBus.emit).not.toHaveBeenCalled();
     expect(context.processMessageResult).not.toHaveBeenCalled();
   });
-
-  it.todo('returns null when a chunk arrives without a message id (currently returns undefined)');
 });

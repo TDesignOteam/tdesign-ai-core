@@ -398,7 +398,7 @@ describe('validation', () => {
     expect(customValidator).toHaveBeenCalled();
   });
 
-  it.todo('passes each operation index to a custom validator', () => {
+  it.fails('passes each operation index to a custom validator', () => {
     const customValidator = vi.fn<Validator<{ first?: number; second?: number }>>();
 
     applyPatch(
@@ -447,7 +447,7 @@ describe('reducer and equality', () => {
     expect(_areEquals(left, right)).toBe(equal);
   });
 
-  it.todo('compares objects that contain an own hasOwnProperty key', () => {
+  it.fails('compares objects that contain an own hasOwnProperty key', () => {
     const left = JSON.parse('{"hasOwnProperty":"left","value":1}');
     const right = JSON.parse('{"hasOwnProperty":"left","value":1}');
 

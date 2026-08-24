@@ -66,7 +66,7 @@ describe('applyPatchImmutable', () => {
     expect(original.items).toEqual([first]);
   });
 
-  it.todo('inserts an array add operation at the target index instead of replacing it', () => {
+  it.fails('inserts an array add operation at the target index instead of replacing it', () => {
     const result = applyPatchImmutable({ items: ['a', 'c'] }, [{ op: 'add', path: '/items/1', value: 'b' }]);
 
     expect(result.items).toEqual(['a', 'b', 'c']);

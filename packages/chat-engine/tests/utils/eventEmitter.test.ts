@@ -40,7 +40,7 @@ describe('SimpleEventEmitter', () => {
     expect(listener).toHaveBeenCalledWith(1);
   });
 
-  it.todo('does not skip a regular listener registered after a once listener', () => {
+  it.fails('does not skip a regular listener registered after a once listener', () => {
     const emitter = new SimpleEventEmitter();
     const onceListener = vi.fn();
     const regularListener = vi.fn();
