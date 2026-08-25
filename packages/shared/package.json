@@ -11,5 +11,8 @@
   "files": [
     "**/*.ts",
     "!**/*.test.ts"
-  ]
+  ],
+  "scripts": {
+    "test": "vitest run --root ../.. packages/shared"
+  }
 }
