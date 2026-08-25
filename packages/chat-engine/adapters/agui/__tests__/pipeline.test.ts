@@ -69,6 +69,24 @@ describe('AGUI 流式链路（mapper → processor → store）', () => {
     });
   });
 
+  it('旧版 THINKING 在首次写入被冻结后仍能继续合并增量', () => {
+    emit({ type: 'THINKING_START', title: '思考中...' });
+    emit({ type: 'THINKING_TEXT_MESSAGE_START' });
+    emit({ type: 'THINKING_TEXT_MESSAGE_CONTENT', delta: '第一段' });
+
+    const firstContent = content()[0];
+    expect(Object.isFrozen(firstContent)).toBe(true);
+    expect(Object.isFrozen(firstContent.data)).toBe(true);
+
+    expect(() => emit({ type: 'THINKING_TEXT_MESSAGE_CONTENT', delta: '第二段' })).not.toThrow();
+    expect(content()).toHaveLength(1);
+    expect(content()[0]).toMatchObject({
+      type: 'thinking',
+      status: 'streaming',
+      data: { text: '第一段第二段', title: '思考中...' },
+    });
+  });
+
   it('相同 activityType 的不同 messageId 增量写入各自的块且内容互不污染', () => {
     emit({
       type: 'ACTIVITY_DELTA',
