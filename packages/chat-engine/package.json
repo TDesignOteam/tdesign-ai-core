@@ -23,7 +23,8 @@
   ],
   "scripts": {
     "build": "tsdown",
-    "prepack": "pnpm run build"
+    "prepack": "pnpm run build",
+    "test": "vitest run --root ../.. packages/chat-engine"
   },
   "publishConfig": {
     "access": "public"

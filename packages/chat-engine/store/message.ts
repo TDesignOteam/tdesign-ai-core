@@ -251,6 +251,14 @@ export class MessageStore extends ReactiveState<ChatMessageStore> {
 
   /**
    * 更新多个内容块
+   *
+   * 匹配策略（与 MessageProcessor.applyChunkToMessage 保持一致）：
+   * - 当传入 content 带 id 时：优先按 (id === id && type === type) 精确匹配；
+   *   精确未命中时回退到按 type 匹配最后一个（带 id 的内容会覆盖该块）。
+   *   适用于 markdown / thinking / activity 等支持同类型多实例的内容块。
+   * - 当传入 content 无 id 时：按 type 匹配最后一个。
+   * - 两种方式都未命中时新增内容块。无 id 的兜底语义兼容老后端不带 id 的场景。
+   *
    * @param messageId 消息ID
    * @param contents 要更新的内容块数组
    */
@@ -263,7 +271,20 @@ export class MessageStore extends ReactiveState<ChatMessageStore> {
 
       // 更新或添加每个内容块
       contents.forEach((content) => {
-        const existingIndex = messageContent.findIndex((c) => c.id === content.id || c.type === content.type);
+        let existingIndex = -1;
+        if (content.id) {
+          // 有 id：按 (id + type) 精确匹配
+          existingIndex = messageContent.findIndex((c) => c.id === content.id && c.type === content.type);
+        }
+        if (existingIndex < 0) {
+          // 兜底：按 type 匹配最后一个（保持与老逻辑一致的"最后一个"语义）
+          for (let i = messageContent.length - 1; i >= 0; i--) {
+            if (messageContent[i].type === content.type) {
+              existingIndex = i;
+              break;
+            }
+          }
+        }
 
         if (existingIndex >= 0) {
           // 更新现有内容块
