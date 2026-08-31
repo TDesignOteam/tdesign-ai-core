@@ -13,6 +13,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "verify": "pnpm build && pnpm verify:iife && pnpm type-check && pnpm lint && pnpm format:check",
+    "publish:chat-engine": "pnpm run verify && pnpm --dir packages/chat-engine publish --publish-branch main",
+    "preinstall": "npx only-allow pnpm",
     "prepare": "husky",
     "verify:iife": "node scripts/verify-iife.mjs"
   },
@@ -21,6 +23,10 @@
       "prettier --write --cache",
       "eslint --fix --cache"
     ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TDesignOteam/tdesign-ai-core.git"
   },
   "license": "MIT",
   "engines": {

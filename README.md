@@ -37,7 +37,7 @@ tdesign-react / tdesign-vue-next / tdesign-miniprogram (宿主仓库)
 ### 添加到宿主仓库
 
 ```bash
-git submodule add https://github.com/Tencent/tdesign-ai-core.git packages/ai-core
+git submodule add https://github.com/TDesignOteam/tdesign-ai-core.git packages/ai-core
 ```
 
 ### 在宿主仓库中引用
