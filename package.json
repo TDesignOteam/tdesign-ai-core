@@ -28,8 +28,12 @@
   },
   "packageManager": "pnpm@9.15.9",
   "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@rolldown/plugin-babel": "^0.2.3",
     "@types/node": "^26.2.0",
     "@vitest/coverage-v8": "^4.1.10",
+    "babel-plugin-polyfill-corejs3": "^0.14.2",
+    "core-js-pure": "^3.49.0",
     "eslint": "^10.5.0",
     "husky": "^9.1.7",
     "jsdom": "^30.0.1",

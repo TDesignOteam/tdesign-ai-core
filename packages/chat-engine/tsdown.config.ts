@@ -1,3 +1,5 @@
+import babel from '@rolldown/plugin-babel';
+import polyfillCorejs3 from 'babel-plugin-polyfill-corejs3';
 import { defineConfig } from 'tsdown';
 import pkg from './package.json' with { type: 'json' };
 
@@ -8,12 +10,22 @@ const banner = `/**
  */
 `;
 
+function createBrowserRuntimePolyfillPlugin() {
+  return babel({
+    targets: { chrome: '86' },
+    exclude: [/[/\\]node_modules[/\\]/, /\0rolldown\/runtime\.js/],
+    plugins: [[polyfillCorejs3, { method: 'usage-pure', version: '3.49', proposals: true }]],
+  });
+}
+
 export default defineConfig([
   {
     entry: ['index.ts'],
     format: ['esm'],
+    target: 'chrome86',
     dts: true,
     sourcemap: true,
+    plugins: [createBrowserRuntimePolyfillPlugin()],
     // ESM 面向 npm/bundler 使用：内部 shared 打进产物，peer/运行时依赖保持外置。
     deps: {
       alwaysBundle: ['@tdesign/ai-shared'],
@@ -30,6 +42,8 @@ export default defineConfig([
     dts: false,
     sourcemap: true,
     platform: 'browser',
+    target: 'chrome86',
+    plugins: [createBrowserRuntimePolyfillPlugin()],
     // IIFE 面向 CDN `<script>` 使用：挂到 window.TDesignAIChatEngine，standalone 避免浏览器解析裸模块依赖。
     deps: {
       alwaysBundle: ['@tdesign/ai-shared', '@json-render/core', 'immer', 'zod'],
