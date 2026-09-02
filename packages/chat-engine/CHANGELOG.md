@@ -1,18 +1,18 @@
 # Changelog
 
-## 0.0.2
+## 🌈 0.0.2 `2026-07-24`
 
-### Fixes
+### 🐞 Bug Fixes
 
 - Remove the private workspace dependency `@tdesign/ai-shared` from the published dependency manifest and keep it bundled into build artifacts.
 - Move published `exports`, `module`, and `types` entries to top-level `package.json` fields so both npm and pnpm publish flows resolve `dist` artifacts correctly.
 - Normalize the repository URL for npm package metadata.
 
-## 0.0.1
+## 🌈 0.0.1 `2026-07-24`
 
 首个公开版本，提供框架无关的 TDesign AI 聊天引擎核心能力。
 
-### Features
+### 🚀 Features
 
 - 实现 `ChatEngine` 核心门面，统一管理初始化、销毁、发送消息、重新生成、中止请求、恢复运行和历史消息回填。
 - 实现消息仓库与内容块处理器，支持文本、Markdown、思考过程、工具调用、Activity、建议、附件等多类型内容的增量合并与状态更新。
