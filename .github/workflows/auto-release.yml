@@ -29,7 +29,7 @@ jobs:
         with:
           node-version: 24
 
-      - uses: TDesignOteam/flow-pilot-action@fa39b7f1e6f687f51bd70e6226e6d850372ea020
+      - uses: TDesignOteam/flow-pilot-action@develop
         with:
           token: ${{ secrets.TDESIGN_BOT_TOKEN }}
           packages: '@tdesign/ai-chat-engine'
