@@ -44,6 +44,13 @@ git submodule add https://github.com/TDesignOteam/tdesign-ai-core.git packages/a
 
 宿主仓库的 `pnpm-workspace.yaml` 通常已包含 `packages/**`，因此 submodule 内的子包会自动被发现为 workspace 成员。
 
+开发态的 `@tdesign/ai-chat-engine` 入口直接指向 `index.ts`，宿主仓库无需先构建本仓库，也不会误用仓库中旧的 `dist` 产物。宿主仓库必须使用能覆盖嵌套包的 workspace 配置，例如：
+
+```yaml
+packages:
+  - 'packages/**'
+```
+
 ```typescript
 // 在宿主仓库的框架绑定层中使用
 import ChatEngine from '@tdesign/ai-chat-engine';
@@ -69,6 +76,10 @@ pnpm format         # Prettier 格式化
 pnpm format:check   # Prettier 格式检查
 pnpm verify         # 构建 + 类型 + lint + format 一键校验
 ```
+
+### 发布校验
+
+`packages/chat-engine/package.json` 的 `publishConfig` 会在 pack/publish 时把入口改写为 `dist`，`prepack` 负责重新构建发布产物。
 
 ## License
 
