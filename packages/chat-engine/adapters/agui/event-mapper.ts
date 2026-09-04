@@ -190,6 +190,11 @@ export class AGUIEventMapper {
     switch (event.type) {
       case AGUIEventType.TEXT_MESSAGE_START:
         this.currentTextMessageId = event.messageId || null; // 标记当前消息 ID
+        // 若 START 携带 messageId，记录到已开启集合，避免后续无 messageId 的 CHUNK
+        // 兜底到该 id 时被判定为"首次"而重复 append 空块。
+        if (event.messageId) {
+          this.textMessageIdsOpened.add(event.messageId);
+        }
         return createMarkdownContent('', 'streaming', 'append', 'assistant', event.messageId || undefined);
 
       case AGUIEventType.TEXT_MESSAGE_CHUNK:
@@ -225,8 +230,12 @@ export class AGUIEventMapper {
    * 当 messageId 变化时创建新的内容块
    */
   private handleTextMessageChunk(event: TextMessageChunkEvent): AIMessageContent | null {
-    const messageId = event.messageId || 'default';
-    const role = event?.role || 'assistant';
+    // 兼容混合模式：某些后端会先发送带 messageId 的 TEXT_MESSAGE_START，
+    // 后续 TEXT_MESSAGE_CHUNK 却不再携带 messageId。此时应回退到 START 建立的
+    // currentTextMessageId，把 CHUNK 合并到已开好的块上，而不是再 append 新块。
+    const effectiveMessageId = event.messageId || this.currentTextMessageId || null;
+    const messageId = effectiveMessageId || 'default';
+    const role = event?.role || this.currentTextMessageRole || 'assistant';
 
     // 首次出现该 messageId：append 新块；已出现过：merge 到对应块
     // 依赖 processor 层按 (id, type) 精确 merge，支持多个 messageId 交错的场景
@@ -238,7 +247,7 @@ export class AGUIEventMapper {
     if (isFirstChunk) {
       this.textMessageIdsOpened.add(messageId);
       // 创建新内容块，使用 append 策略，通过 ext.role 传递角色信息，使用 messageId 作为 id
-      return createMarkdownContent(event.delta || '', 'streaming', 'append', role, event.messageId || undefined);
+      return createMarkdownContent(event.delta || '', 'streaming', 'append', role, effectiveMessageId || undefined);
     }
 
     // 已开启过的 messageId：merge 到对应块
@@ -247,7 +256,7 @@ export class AGUIEventMapper {
       'streaming',
       'merge',
       this.currentTextMessageRole || role,
-      event.messageId || undefined,
+      effectiveMessageId || undefined,
     );
   }
 
