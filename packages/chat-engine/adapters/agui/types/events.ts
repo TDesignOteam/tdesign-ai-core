@@ -265,7 +265,6 @@ export const ToolCallResultEventSchema = BaseEventSchema.extend({
   messageId: z.string(),
   type: z.literal(AGUIEventType.TOOL_CALL_RESULT),
   toolCallId: z.string(),
-  toolCallName: z.string(),
   content: z.string(),
   role: z.literal('tool').optional(),
 });
