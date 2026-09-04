@@ -3,11 +3,37 @@
  *
  * 提供两个纯函数：
  * 1. resolveActionParams：把 action.params 中的 `{ path: '/xxx' }` 引用替换为 data model 中的实际值
- * 2. normalizeActionBinding：把不同形态的 action 字段（字符串简写 / ActionBinding / 旧版 A2UI {name, context}）归一化为统一的 ActionBinding 形式
+ * 2. normalizeActionBinding：把不同形态的 action 字段归一化为统一的 ActionBinding 形式
  *
  * 之所以放在 ai-core：
  * - 这两段逻辑只与协议和数据模型相关，不依赖 React
  * - 在自定义协议、Vue 适配、Node 端协议生成等非 React 场景同样需要
+ *
+ * ---
+ *
+ * **A2UI Action 规范（v0.9.1 官方）**
+ * 参考：https://a2ui.org/concepts/actions/
+ *
+ * A2UI v0.9.1 定义了两类 action，均包裹在组件 schema 的 `action` 属性对象里：
+ *
+ *   1) 服务端事件（发送给 Agent）—— 用 `event` 包装：
+ *      ```json
+ *      { "action": { "event": { "name": "submit", "context": { ... } } } }
+ *      ```
+ *
+ *   2) 客户端本地函数（不发送 Agent，本地执行）—— 用 `functionCall` 包装：
+ *      ```json
+ *      { "action": { "functionCall": { "call": "openUrl", "args": { ... } } } }
+ *      ```
+ *
+ * 我们把两种官方格式都归一化为**内部统一格式**：
+ *   `{ action: string, params: Record<string, unknown>, kind?: 'event' | 'functionCall' }`
+ * 其中 `kind` 字段用于业务层区分处理策略（是否路由到本地函数注册表）。
+ *
+ * 同时向后兼容三种历史/简写格式：
+ *   - 字符串简写："submit"
+ *   - 内部标准：`{ action, params? }`
+ *   - v0.8/legacy 扁平：`{ name, context? }`（旧版 A2UI 及部分早期 mock 数据）
  */
 
 import { getByPath } from '@json-render/core';
@@ -111,54 +137,130 @@ export function resolveActionParams(
 }
 
 /**
- * 兼容旧版 A2UI 协议的 action 字段形态
+ * A2UI v0.9.1 官方服务端事件 payload
+ * @see https://a2ui.org/concepts/actions/
+ */
+export interface A2UIEventAction {
+  event: {
+    name: string;
+    context?: Record<string, unknown>;
+  };
+}
+
+/**
+ * A2UI v0.9.1 官方客户端本地函数 payload
+ * @see https://a2ui.org/concepts/actions/
+ */
+export interface A2UIFunctionCallAction {
+  functionCall: {
+    call: string;
+    args?: Record<string, unknown>;
+  };
+}
+
+/**
+ * 兼容多种 A2UI action 字段形态（v0.9.1 官方 + 历史/简写格式）
  */
 export type ActionLike =
   | string
-  | {
-      name?: string;
-      context?: Record<string, unknown>;
-      action?: string;
-      params?: Record<string, unknown>;
-      confirm?: ActionBinding['confirm'];
-      onSuccess?: ActionBinding['onSuccess'];
-      onError?: ActionBinding['onError'];
-      preventDefault?: boolean;
-    };
+  | (Partial<A2UIEventAction> &
+      Partial<A2UIFunctionCallAction> & {
+        /** legacy 扁平：v0.8/早期 mock 用 name */
+        name?: string;
+        /** legacy 扁平：v0.8/早期 mock 用 context */
+        context?: Record<string, unknown>;
+        /** 内部标准 ActionBinding：action 字符串 */
+        action?: string;
+        /** 内部标准 ActionBinding：params 参数 */
+        params?: Record<string, unknown>;
+        confirm?: ActionBinding['confirm'];
+        onSuccess?: ActionBinding['onSuccess'];
+        onError?: ActionBinding['onError'];
+        preventDefault?: boolean;
+      });
 
 /**
  * 已归一化的 A2UI action。
  *
  * `params` 仍可能包含 A2UI 的 `{ path }` 绑定，调用方应先使用
  * {@link resolveActionParams} 解析后，再交给只接受 json-render `DynamicValue` 的 ActionBinding 消费者。
+ *
+ * `kind` 字段用于区分 A2UI v0.9.1 官方定义的两种 action 类型：
+ * - `'event'`（默认）：应上报到服务端（Agent）；旧格式和内部标准格式默认按此处理
+ * - `'functionCall'`：应路由到本地函数注册表执行，不发消息给服务端
  */
 export type NormalizedActionBinding = Omit<ActionBinding, 'params'> & {
   params: Record<string, unknown>;
+  /** action 语义类型：v0.9.1 官方 event 或 functionCall（默认为 event） */
+  kind?: 'event' | 'functionCall';
 };
 
 /**
- * 把不同形态的 action 字段归一化为标准 ActionBinding
+ * 把不同形态的 action 字段归一化为标准 ActionBinding。
  *
- * 兼容三种输入：
- * 1. 字符串简写："submit" → { action: 'submit', params: {} }
- * 2. 标准 ActionBinding：{ action, params? }
- * 3. 旧版 A2UI / mock 数据：{ name, context? } → { action: name, params: context }
+ * 识别优先级（从高到低）：
+ * 1. **A2UI v0.9.1 官方 event** ：`{ event: { name, context } }` → `{ action: name, params: context, kind: 'event' }`
+ * 2. **A2UI v0.9.1 官方 functionCall**：`{ functionCall: { call, args } }` → `{ action: call, params: args, kind: 'functionCall' }`
+ * 3. **内部标准 ActionBinding**：`{ action, params? }`（保留 kind 若已存在）
+ * 4. **字符串简写**：`"submit"` → `{ action: 'submit', params: {} }`
+ * 5. **legacy 扁平**：`{ name, context? }` → `{ action: name, params: context }`（兼容旧 mock 数据）
  *
- * @returns 归一化后的 A2UI action；当无法识别时返回 null（调用方应当报错）
+ * 多字段共存时按上述优先级；无法识别时返回 null（调用方应当报错）。
+ *
+ * @returns 归一化后的 A2UI action；当无法识别时返回 null
  */
 export function normalizeActionBinding(action: ActionLike | null | undefined): NormalizedActionBinding | null {
   if (!action) return null;
 
+  // 字符串简写
   if (typeof action === 'string') {
     return { action, params: {} };
   }
 
-  const { name, context, action: explicitAction, params, ...bindingOptions } = action;
+  const {
+    event,
+    functionCall,
+    name,
+    context,
+    action: explicitAction,
+    params,
+    ...bindingOptions
+  } = action as {
+    event?: A2UIEventAction['event'];
+    functionCall?: A2UIFunctionCallAction['functionCall'];
+    name?: string;
+    context?: Record<string, unknown>;
+    action?: string;
+    params?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+
+  // 1. v0.9.1 官方 event（最高优先级）
+  if (isRecord(event) && typeof event.name === 'string' && event.name) {
+    return {
+      ...(bindingOptions as Omit<NormalizedActionBinding, 'action' | 'params' | 'kind'>),
+      action: event.name,
+      params: isRecord(event.context) ? event.context : {},
+      kind: 'event',
+    };
+  }
+
+  // 2. v0.9.1 官方 functionCall
+  if (isRecord(functionCall) && typeof functionCall.call === 'string' && functionCall.call) {
+    return {
+      ...(bindingOptions as Omit<NormalizedActionBinding, 'action' | 'params' | 'kind'>),
+      action: functionCall.call,
+      params: isRecord(functionCall.args) ? functionCall.args : {},
+      kind: 'functionCall',
+    };
+  }
+
+  // 3-5. 扁平 / 简写 / legacy
   const actionName = explicitAction ?? name ?? '';
   if (!actionName) return null;
 
   return {
-    ...bindingOptions,
+    ...(bindingOptions as Omit<NormalizedActionBinding, 'action' | 'params' | 'kind'>),
     action: actionName,
     params: params ?? context ?? {},
   };

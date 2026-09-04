@@ -104,11 +104,6 @@ function createEmptyDataModel<TData extends Record<string, unknown>>(): TData {
   return {} as TData;
 }
 
-function cloneDataModel<TData extends Record<string, unknown>>(data: TData | undefined): TData {
-  // 保留调用方的 TData 契约，同时只复制 json-render 支持的对象根。
-  return data ? { ...data } : createEmptyDataModel<TData>();
-}
-
 /**
  * 属性映射函数
  * 将 A2UI v0.9.1 组件属性转换为 json-render 组件属性
@@ -128,41 +123,79 @@ function mapProps<TProps extends Record<string, unknown>>(component: A2UICompone
     };
   }
 
+  // ============ 通用协议识别：{ path: '/xxx' } 数据绑定 ============
+  //
+  // A2UI v0.9.1 协议中，任何字段的值都可以是 `{ path: '/xxx' }` 结构，表示该字段
+  // 绑定到 dataModel 的对应路径。这是一种"字段级修饰"语法糖，作用于任意字段。
+  //
+  // 例如：
+  //   text: 'Hello'                    → 静态字符串
+  //   text: { path: '/user/name' }     → 绑定到 dataModel.user.name
+  //   disabled: false                  → 静态布尔
+  //   disabled: { path: '/formLock' }  → 绑定到 dataModel.formLock
+  //
+  // 通用处理规则：值为 { path: string } 结构的字段，自动转换为 `<key>Path: '/xxx'`
+  //   text     → textPath
+  //   disabled → disabledPath
+  //   checked  → checkedPath
+  //   title    → titlePath
+  //   ...（未来任何新增字段都自动支持，无需改这里）
+  //
+  // 特殊字段名重命名（如 A2UI `text` → json-render `content`）由 switch 分支
+  // 二次映射：先由本段生成 `textPath`，switch 里再改成 `contentPath`。
+  for (const key of Object.keys(mappedProps)) {
+    const value = mappedProps[key];
+    if (isRecord(value) && typeof value.path === 'string' && Object.keys(value).length === 1) {
+      // 只有 `path` 一个字段的对象才认定为数据绑定（避免误伤有 path 属性的普通对象）
+      mappedProps[`${key}Path`] = value.path;
+      delete mappedProps[key];
+    }
+  }
+
   // 特定类型的属性转换
   switch (componentType) {
+    case 'Text':
+      // A2UI Text 的 text 属性 → json-render Text 的 content / contentPath
+      //   - text: '静态字符串'         → content: '静态字符串'（在下方 string 分支处理）
+      //   - text: { path: '/xxx' }    → 已由上面通用扫描转成 textPath，此处再重命名为 contentPath
+      if (typeof mappedProps.text === 'string') {
+        mappedProps.content = mappedProps.text;
+        delete mappedProps.text;
+      }
+      if (typeof mappedProps.textPath === 'string') {
+        mappedProps.contentPath = mappedProps.textPath;
+        delete mappedProps.textPath;
+      }
+      break;
+
     case 'Button':
       // A2UI Button 的 text 属性 → json-render 的 label（或 children）
       if (mappedProps.text && typeof mappedProps.text === 'string') {
         mappedProps.label = mappedProps.text;
         delete mappedProps.text;
       }
-      // A2UI action 格式转换：{ name, context } → { name, params }
-      // context 中的 { path: "/xxx" } 会在运行时被 Button 组件解析
-      if (isRecord(mappedProps.action) && typeof mappedProps.action.name === 'string') {
-        const a2uiAction = mappedProps.action;
-        mappedProps.action = {
-          action: a2uiAction.name,
-          // 将 context 转为 params，保留动态绑定引用供运行时解析
-          params: recordOrEmpty(a2uiAction.context),
-        };
-      }
+      // A2UI action 字段原样透传给 json-render props.action。
+      // 运行时由 a2ui-binding 里的 normalizeActionBinding 归一化，
+      // 统一支持 v0.9.1 官方 event / functionCall 与 legacy 扁平格式。
       // 处理 theme 映射（A2UI 的 theme: 'primary' → TDesign 的 theme: 'primary'）
       // 保持不变，TDesign Button 支持 theme 属性
       break;
 
     case 'TextField':
-      // A2UI TextField 的 text 属性（数据绑定）→ json-render 的 value
-      if (isRecord(mappedProps.text) && typeof mappedProps.text.path === 'string') {
-        mappedProps.valuePath = mappedProps.text.path;
-        delete mappedProps.text;
+      // A2UI TextField 的 text 数据绑定 → json-render 的 valuePath
+      //   - text: { path } 已由通用扫描转成 textPath，此处再重命名为 valuePath
+      if (typeof mappedProps.textPath === 'string') {
+        mappedProps.valuePath = mappedProps.textPath;
+        delete mappedProps.textPath;
       }
       break;
 
     case 'CheckBox':
-      // A2UI CheckBox 的 checked 属性（数据绑定）
-      if (isRecord(mappedProps.checked) && typeof mappedProps.checked.path === 'string') {
-        mappedProps.valuePath = mappedProps.checked.path;
-        delete mappedProps.checked;
+      // A2UI CheckBox 的 checked 数据绑定 → json-render 的 valuePath
+      //   - checked: { path } 已由通用扫描转成 checkedPath，此处再重命名为 valuePath
+      if (typeof mappedProps.checkedPath === 'string') {
+        mappedProps.valuePath = mappedProps.checkedPath;
+        delete mappedProps.checkedPath;
       }
       break;
 
@@ -215,12 +248,6 @@ function mapProps<TProps extends Record<string, unknown>>(component: A2UICompone
 
     default:
       break;
-  }
-
-  // 处理通用的 disabled 数据绑定
-  if (isRecord(mappedProps.disabled) && typeof mappedProps.disabled.path === 'string') {
-    mappedProps.disabledPath = mappedProps.disabled.path;
-    delete mappedProps.disabled;
   }
 
   return mappedProps;
@@ -478,8 +505,6 @@ export function applyA2UIDataUpdate<TData extends Record<string, unknown> = Reco
   op: 'add' | 'replace' | 'remove' = 'replace',
   value?: unknown,
 ): JsonRenderSchema<TData> {
-  const newData = cloneDataModel(schema.data);
-
   if (op === 'replace' && (path === '/' || !path)) {
     // data 是用户可定义对象；协议根替换只接受对象，非对象 payload 保持现有 data。
     if (!isRecord(value)) {
@@ -492,18 +517,55 @@ export function applyA2UIDataUpdate<TData extends Record<string, unknown> = Reco
     };
   }
 
-  if (path) {
-    if (op === 'remove') {
-      deleteValueByPath(newData, path);
-    } else {
-      setValueByPath(newData, path, value);
-    }
+  if (!path) {
+    return schema;
+  }
+
+  // 关键：沿 path 深克隆所有中间节点，避免 mutate 上游冻结/复用的对象引用。
+  // 这里采用"路径上写时复制（copy-on-write along path）"：路径外的其它分支保持
+  // 原引用共享，性能与不可变性兼顾。
+  const newData = cloneAlongPath(schema.data || ({} as TData), path);
+
+  if (op === 'remove') {
+    deleteValueByPath(newData, path);
+  } else {
+    setValueByPath(newData, path, value);
   }
 
   return {
     ...schema,
     data: newData,
   };
+}
+
+/**
+ * 沿 JSON Pointer 路径深克隆中间节点
+ *
+ * 对路径上的每一层对象/数组做**浅克隆**（`{ ...obj }` 或 `[...arr]`），并把克隆对象
+ * 挂回上一层。这样最终返回的对象与 `input` 结构完全相同，但路径上的所有节点都是全新
+ * 引用，可以安全 mutate；路径外的其它分支保持原始引用共享，避免全量深克隆的性能开销。
+ *
+ * 用途：给基于 mutation 的 setValueByPath / deleteValueByPath 打好安全底座。
+ */
+function cloneAlongPath<TData extends Record<string, unknown>>(input: TData, path: string): TData {
+  const parts = path.split('/').filter(Boolean);
+  // 顶层浅克隆
+  const rootClone: Record<string, unknown> = Array.isArray(input) ? ([...(input as unknown[])] as never) : { ...input };
+
+  let current: DataNode = rootClone as DataNode;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const key = parts[i];
+    const original = getNodeValue(current, key);
+    if (!isDataNode(original)) {
+      // 中间节点不存在或非对象/数组，setValueByPath 里会按需新建，这里直接停止克隆
+      break;
+    }
+    const cloned: DataNode = Array.isArray(original) ? [...original] : { ...original };
+    setNodeValue(current, key, cloned);
+    current = cloned;
+  }
+
+  return rootClone as TData;
 }
 
 export default {
