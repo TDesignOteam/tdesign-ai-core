@@ -19,7 +19,7 @@
     "verify:iife": "node scripts/verify-iife.mjs"
   },
   "lint-staged": {
-    "{packages/**/*.ts}": [
+    "packages/**/*.ts": [
       "prettier --write --cache",
       "eslint --fix --cache"
     ]
