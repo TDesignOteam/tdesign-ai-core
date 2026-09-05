@@ -205,4 +205,32 @@ describe('SSEClient', () => {
 
     expect(onStart).toHaveBeenCalledTimes(0);
   });
+
+  it('重连时重置活动时间，避免沿用上一次连接的空闲时间', async () => {
+    const firstReader = { read: vi.fn().mockResolvedValue({ done: true }), cancel: vi.fn() };
+    const secondReader = {
+      read: vi.fn(() => new Promise<{ done: boolean }>(() => undefined)),
+      cancel: vi.fn(() => Promise.resolve()),
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(responseWithReader(firstReader))
+        .mockResolvedValueOnce(responseWithReader(secondReader)),
+    );
+    const client = new SSEClient('/events');
+
+    await client.connect({ timeout: 100 });
+    await vi.advanceTimersByTimeAsync(1000);
+    const reconnecting = client.connect({ timeout: 100 });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(secondReader.read).toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(99);
+
+    expect(client.getStatus()).toBe(SSEConnectionState.CONNECTED);
+    await client.abort();
+    void reconnecting;
+  });
 });

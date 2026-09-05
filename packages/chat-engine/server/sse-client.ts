@@ -85,6 +85,7 @@ export class SSEClient extends EventEmitter {
 
     this.firstTokenReceived = false;
     this.resetParser();
+    this.connectionInfo.lastActivity = Date.now();
     this.setState(SSEConnectionState.CONNECTING);
     this.connectionManager.startConnection();
 
