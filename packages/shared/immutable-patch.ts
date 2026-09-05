@@ -40,7 +40,7 @@ function isPatchObject(value: PatchValue): value is JsonObject {
  * "/elements/deep-progress/props/percentage" => ["elements", "deep-progress", "props", "percentage"]
  */
 function parsePath(path: string): string[] {
-  if (path === '' || path === '/') return [];
+  if (path === '') return [];
   return path
     .split('/')
     .slice(1)
@@ -69,7 +69,7 @@ function getByPath(obj: PatchValue, path: string[]): PatchValue {
  * 不可变地设置嵌套值（结构共享）
  * 只重建路径上的节点，其他节点保持原引用
  */
-function setByPath(obj: PatchValue, path: string[], value: PatchValue): PatchValue {
+function setByPath(obj: PatchValue, path: string[], value: PatchValue, insert = false): PatchValue {
   if (path.length === 0) {
     return value;
   }
@@ -79,12 +79,16 @@ function setByPath(obj: PatchValue, path: string[], value: PatchValue): PatchVal
   if (Array.isArray(obj)) {
     const index = head === '-' ? obj.length : parseInt(head, 10);
     const newArr = [...obj];
-    newArr[index] = tail.length === 0 ? value : setByPath(obj[index], tail, value);
+    if (tail.length === 0 && insert) {
+      newArr.splice(index, 0, value);
+    } else {
+      newArr[index] = tail.length === 0 ? value : setByPath(obj[index], tail, value, insert);
+    }
     return newArr;
   }
 
   const current = isPatchObject(obj) ? obj : {};
-  const newValue = tail.length === 0 ? value : setByPath(current[head], tail, value);
+  const newValue = tail.length === 0 ? value : setByPath(current[head], tail, value, insert);
   return { ...current, [head]: newValue };
 }
 
@@ -99,7 +103,9 @@ function removeByPath(obj: PatchValue, path: string[]): PatchValue {
   const [head, ...tail] = path;
 
   if (Array.isArray(obj)) {
+    if (head === '-') return obj;
     const index = parseInt(head, 10);
+    if (!Number.isInteger(index) || index < 0 || index >= obj.length) return obj;
     const newArr = [...obj];
     if (tail.length === 0) {
       newArr.splice(index, 1);
@@ -130,6 +136,8 @@ function applyOperationImmutable(document: PatchValue, operation: Operation): Pa
 
   switch (operation.op) {
     case 'add':
+      return setByPath(document, path, operation.value, true);
+
     case 'replace':
       return setByPath(document, path, operation.value);
 
@@ -146,14 +154,14 @@ function applyOperationImmutable(document: PatchValue, operation: Operation): Pa
       const fromPath = parsePath(operation.from);
       const value = getByPath(document, fromPath);
       const afterRemove = removeByPath(document, fromPath);
-      return setByPath(afterRemove, path, value);
+      return setByPath(afterRemove, path, value, true);
     }
 
     case 'copy': {
       const fromPath = parsePath(operation.from);
       const value = getByPath(document, fromPath);
       // 深拷贝 copy 的值，避免共享引用
-      return setByPath(document, path, cloneJsonValue(value));
+      return setByPath(document, path, cloneJsonValue(value), true);
     }
 
     default:

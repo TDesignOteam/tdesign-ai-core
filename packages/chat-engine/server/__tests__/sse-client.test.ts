@@ -90,6 +90,28 @@ describe('SSEClient', () => {
     expect(client.getStatus()).toBe(SSEConnectionState.CLOSED);
   });
 
+  it('建连阶段主动中止时不报告连接错误', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+          }),
+      ),
+    );
+    const client = new SSEClient('/events');
+    const onError = vi.fn();
+
+    client.on('error', onError);
+    const connecting = client.connect({ timeout: 0 });
+    await client.abort();
+    await connecting;
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(client.getStatus()).toBe(SSEConnectionState.CLOSED);
+  });
+
   it('派发超时并中止不活跃的流', async () => {
     let resolveRead!: (value: { done: boolean }) => void;
     const reader = {
@@ -134,7 +156,7 @@ describe('SSEClient', () => {
     expect(onError).toHaveBeenCalledWith(networkError);
   });
 
-  it.fails('非成功 HTTP 响应后停止连接建立而不进入 CONNECTED 状态', async () => {
+  it('非成功 HTTP 响应后停止连接建立而不进入 CONNECTED 状态', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401, statusText: 'Unauthorized', body: {} }));
     const client = new SSEClient('/events');
     const onError = vi.fn();
@@ -149,6 +171,38 @@ describe('SSEClient', () => {
     expect(client.getStatus()).toBe(SSEConnectionState.ERROR);
     expect(onStateChange.mock.calls.map(([event]) => event.to)).not.toContain(SSEConnectionState.CONNECTED);
   });
-  it.todo('将超时描述放入 TimeoutError.message 而非 details');
-  it.todo('客户端实例重连时重置首 token 标志');
+  it('将超时描述放入 TimeoutError.message 而非 details', async () => {
+    let resolveRead!: (value: { done: boolean }) => void;
+    const reader = {
+      read: vi.fn(() => new Promise<{ done: boolean }>((resolve) => (resolveRead = resolve))),
+      cancel: vi.fn(() => {
+        resolveRead({ done: true });
+        return Promise.resolve();
+      }),
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(responseWithReader(reader)));
+    const client = new SSEClient('/events');
+    const onError = vi.fn();
+    client.on('error', onError);
+
+    const connecting = client.connect({ timeout: 100 });
+    await vi.waitFor(() => expect(reader.read).toHaveBeenCalled());
+    await vi.advanceTimersByTimeAsync(100);
+    await connecting;
+
+    expect(onError.mock.calls[0][0]).toMatchObject({ message: 'No data received for 100ms', details: undefined });
+  });
+
+  it('客户端实例重连时重置首 token 标志', async () => {
+    const reader = { read: vi.fn().mockResolvedValue({ done: true }), cancel: vi.fn() };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(responseWithReader(reader)));
+    const client = new SSEClient('/events');
+    const onStart = vi.fn();
+    client.on('start', onStart);
+
+    await client.connect({ timeout: 0 });
+    await client.connect({ timeout: 0 });
+
+    expect(onStart).toHaveBeenCalledTimes(0);
+  });
 });

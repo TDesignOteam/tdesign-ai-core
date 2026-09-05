@@ -75,7 +75,7 @@ describe('JSON Patch 辅助函数', () => {
       expect(isInteger(value)).toBe(false);
     });
 
-    it.fails('拒绝空字符串作为数组索引', () => {
+    it('拒绝空字符串作为数组索引', () => {
       expect(isInteger('')).toBe(false);
     });
   });

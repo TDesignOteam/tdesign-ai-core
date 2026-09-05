@@ -350,9 +350,50 @@ describe('ChatEngine', () => {
     expect(engine.messages).toEqual([]);
   });
 
-  it.todo('destroy 在 init 之前调用是安全的（当前会解引用未初始化的 config 与 service 字段）');
+  it('destroy 在 init 之前调用是安全的', () => {
+    expect(() => new ChatEngine().destroy()).not.toThrow();
+  });
 
-  it.todo('sendUserMessage 等待并传播请求 promise（当前调用 sendRequest 时未等待其完成）');
+  it('destroy 会调用已初始化资源的清理方法', async () => {
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'sse' });
+    const service = mocks.serviceInstances[0];
+    const handler = mocks.handlerInstances[0] as Record<string, ReturnType<typeof vi.fn>>;
 
-  it.todo('完成消息时忽略无关的更早消息上的错误状态');
+    engine.destroy();
+    await Promise.resolve();
+
+    expect(service.closeConnect).toHaveBeenCalledOnce();
+    expect(service.destroy).toHaveBeenCalledOnce();
+    expect(handler.abort).toHaveBeenCalledOnce();
+    expect(handler.destroy).toHaveBeenCalledOnce();
+  });
+
+  it('sendUserMessage 等待并传播请求 promise', async () => {
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'fetch' });
+    const error = new Error('request failed');
+    const request = vi.spyOn(engine, 'sendRequest').mockRejectedValue(error);
+
+    await expect(engine.sendUserMessage({ prompt: 'hello' })).rejects.toBe(error);
+    expect(request).toHaveBeenCalledOnce();
+  });
+
+  it('完成消息时忽略无关的更早消息上的错误状态', async () => {
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'sse' });
+    await engine.sendAIMessage({ sendRequest: false });
+    const firstId = engine.messages[0].id;
+    await engine.sendAIMessage({ sendRequest: false });
+    const secondId = engine.messages[1].id;
+    engine.messageStore.setMessageStatus(firstId, 'error');
+
+    const handler = mocks.handlerInstances[0] as { handleStream: ReturnType<typeof vi.fn> };
+    handler.handleStream.mockImplementationOnce(async (_params, context) => {
+      context.handleComplete(secondId, false, {});
+    });
+    await engine.sendRequest({ messageID: secondId });
+
+    expect(engine.messageStore.getMessageByID(secondId)?.status).toBe('complete');
+  });
 });

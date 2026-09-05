@@ -46,5 +46,9 @@ describe('服务端错误', () => {
     });
   });
 
-  it.todo('接受超时消息作为第一个参数，与服务端所有调用点保持一致');
+  it('接受超时消息作为第一个参数，与服务端所有调用点保持一致', () => {
+    const error = new TimeoutError('连接建立超时');
+
+    expect(error).toMatchObject({ message: '连接建立超时', details: undefined });
+  });
 });

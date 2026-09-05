@@ -45,6 +45,7 @@ export function _deepClone(obj: any) {
 }
 //3x faster than cached /^\d+$/.test(str)
 export function isInteger(str: string): boolean {
+  if (str.length === 0) return false;
   let i = 0;
   const len = str.length;
   let charCode;

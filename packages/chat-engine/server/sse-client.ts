@@ -83,6 +83,8 @@ export class SSEClient extends EventEmitter {
       },
     };
 
+    this.firstTokenReceived = false;
+    this.resetParser();
     this.setState(SSEConnectionState.CONNECTING);
     this.connectionManager.startConnection();
 
@@ -91,11 +93,19 @@ export class SSEClient extends EventEmitter {
       this.startTimeoutMonitor();
 
       await this.establishConnection();
+      if (!this.reader) {
+        if (this.state === SSEConnectionState.CLOSING || this.state === SSEConnectionState.CLOSED) {
+          return;
+        }
+        throw new ConnectionError('SSE connection was not established');
+      }
       this.setState(SSEConnectionState.CONNECTED);
       this.connectionManager.onConnectionSuccess();
       await this.readStream();
     } catch (error) {
-      this.handleConnectionError(error as Error);
+      if (this.state !== SSEConnectionState.CLOSING && this.state !== SSEConnectionState.CLOSED) {
+        this.handleConnectionError(error as Error);
+      }
     }
   }
 
@@ -169,17 +179,13 @@ export class SSEClient extends EventEmitter {
       });
 
       if (!response.body || !response.ok) {
-        this.emit(
-          'error',
-          new ConnectionError(`HTTP ${response.status}: ${response.statusText}`, response.status, response),
-        );
-        return;
+        throw new ConnectionError(`HTTP ${response.status}: ${response.statusText}`, response.status, response);
       }
       this.reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
     } catch (error) {
       if (!(error instanceof DOMException && error.name === 'AbortError')) {
         this.logger.error('sse request failed:', error);
-        this.emit('error', error);
+        throw error;
       }
     }
   }
@@ -261,6 +267,7 @@ export class SSEClient extends EventEmitter {
    * 简化的错误处理
    */
   private handleConnectionError(error: Error) {
+    this.clearTimeouts();
     this.connectionInfo.error = error;
     this.connectionManager.handleConnectionError(error);
     this.setState(SSEConnectionState.ERROR);

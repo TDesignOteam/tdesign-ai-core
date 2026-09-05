@@ -158,11 +158,22 @@ export default class ChatEngine implements IChatEngine {
       timestamp: Date.now(),
     });
 
-    this.abortChat();
-    this.llmService.destroy();
+    if (!this.initialized) {
+      this.eventBus.destroy();
+      return;
+    }
+
+    void this.abortChat().catch((error) => {
+      console.warn('[ChatEngine] abort during destroy failed', error);
+    });
+    void Promise.resolve(this.llmService?.destroy()).catch((error) => {
+      console.warn('[ChatEngine] LLM service destroy failed', error);
+    });
     this.messageStore.clearHistory();
     this.messageStore.destroy();
-    this.streamHandler?.destroy?.();
+    void Promise.resolve(this.streamHandler?.destroy?.()).catch((error) => {
+      console.warn('[ChatEngine] stream handler destroy failed', error);
+    });
     this.eventBus.destroy();
   }
 
@@ -264,7 +275,7 @@ export default class ChatEngine implements IChatEngine {
         messageID: aiMessage.id,
         ...customParams,
       };
-      this.sendRequest(params);
+      await this.sendRequest(params);
     }
   }
 
@@ -588,7 +599,9 @@ export default class ChatEngine implements IChatEngine {
       this.processMessageResult(id, customResult);
     } else {
       // 任何内容块失败，即视为整体失败
-      const allContentFailed = this.messageStore.messages.find((content) => content.status === 'error');
+      const currentMessage = this.messageStore.getMessageByID(id);
+      const allContentFailed =
+        currentMessage?.status === 'error' || currentMessage?.content?.some((content) => content.status === 'error');
 
       this.messageStore.setMessageStatus(id, isAborted ? 'stop' : allContentFailed ? 'error' : 'complete');
     }

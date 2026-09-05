@@ -36,6 +36,8 @@ export class ChatEventBus implements IChatEventBus {
 
   private destroyed = false;
 
+  private pendingWaits = new Set<{ reject: (reason: Error) => void; cleanup: () => void }>();
+
   constructor(options: ChatEventBusOptions = {}) {
     this.options = {
       debug: false,
@@ -58,7 +60,7 @@ export class ChatEventBus implements IChatEventBus {
     const listeners = this.listeners.get(event)!;
 
     // 检查监听器数量限制
-    if (listeners.size >= this.options.maxListeners) {
+    if (this.listenerCount(event) >= this.options.maxListeners) {
       console.warn(
         `[ChatEventBus] Maximum listeners (${this.options.maxListeners}) exceeded for event: ${event}. ` +
           'Consider increasing maxListeners or removing unused listeners.',
@@ -85,6 +87,13 @@ export class ChatEventBus implements IChatEventBus {
     }
 
     this.onceListeners.get(event)!.add(callback as EventCallback);
+
+    if (this.listenerCount(event) > this.options.maxListeners) {
+      console.warn(
+        `[ChatEventBus] Maximum listeners (${this.options.maxListeners}) exceeded for event: ${event}. ` +
+          'Consider increasing maxListeners or removing unused listeners.',
+      );
+    }
 
     if (this.options.debug) {
       console.log(`[ChatEventBus] Once subscribed to event: ${event}`);
@@ -162,6 +171,7 @@ export class ChatEventBus implements IChatEventBus {
       let timer: ReturnType<typeof setTimeout> | null = null;
 
       const handler = (payload: ChatEngineEventPayloadMap[E]) => {
+        this.pendingWaits.delete(pending);
         if (timer) {
           clearTimeout(timer);
         }
@@ -170,12 +180,22 @@ export class ChatEventBus implements IChatEventBus {
 
       if (timeout > 0) {
         timer = setTimeout(() => {
+          this.pendingWaits.delete(pending);
           this.onceListeners.get(event)?.delete(handler as EventCallback);
           reject(new Error(`[ChatEventBus] Timeout waiting for event: ${event} (${timeout}ms)`));
         }, timeout);
       }
 
       this.once(event, handler);
+      const pending = {
+        reject: (reason: Error) => {
+          if (timer) clearTimeout(timer);
+          this.onceListeners.get(event)?.delete(handler as EventCallback);
+          reject(reason);
+        },
+        cleanup: () => this.onceListeners.get(event)?.delete(handler as EventCallback),
+      };
+      this.pendingWaits.add(pending);
     });
   }
 
@@ -202,6 +222,7 @@ export class ChatEventBus implements IChatEventBus {
             if (unsubscribe) {
               unsubscribe();
             }
+            this.pendingWaits.delete(pending);
             resolve(payload);
           }
         } catch (error) {
@@ -211,6 +232,7 @@ export class ChatEventBus implements IChatEventBus {
 
       if (timeout > 0) {
         timer = setTimeout(() => {
+          this.pendingWaits.delete(pending);
           if (unsubscribe) {
             unsubscribe();
           }
@@ -219,6 +241,15 @@ export class ChatEventBus implements IChatEventBus {
       }
 
       unsubscribe = this.on(event, handler);
+      const pending = {
+        reject: (reason: Error) => {
+          if (timer) clearTimeout(timer);
+          unsubscribe?.();
+          reject(reason);
+        },
+        cleanup: () => unsubscribe?.(),
+      };
+      this.pendingWaits.add(pending);
     });
   }
 
@@ -279,6 +310,9 @@ export class ChatEventBus implements IChatEventBus {
    * 清理所有订阅
    */
   clear(): void {
+    const error = new Error('[ChatEventBus] Event bus cleared');
+    this.pendingWaits.forEach(({ reject }) => reject(error));
+    this.pendingWaits.clear();
     this.listeners.clear();
     this.onceListeners.clear();
     this.customListeners.clear();

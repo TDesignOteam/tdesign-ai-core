@@ -212,6 +212,39 @@ describe('ChatEventBus', () => {
     expect(createEventBus()).toBeInstanceOf(ChatEventBus);
   });
 
-  it.todo('事件总线被清除或销毁时 reject 待处理的 waitFor Promise');
-  it.todo('在普通与一次性监听器上统一应用 maxListeners');
+  it('事件总线被清除或销毁时 reject 待处理的 waitFor Promise', async () => {
+    const bus = new ChatEventBus();
+    const pending = bus.waitFor(ChatEngineEventType.ENGINE_INIT, 0);
+
+    bus.clear();
+
+    await expect(pending).rejects.toThrow('Event bus cleared');
+  });
+
+  it('waitFor 和 waitForMatch 超时后移除 pending 状态', async () => {
+    vi.useFakeTimers();
+    const bus = new ChatEventBus();
+    const waitFor = bus.waitFor(ChatEngineEventType.ENGINE_INIT, 10);
+    const waitForMatch = bus.waitForMatch(ChatEngineEventType.ENGINE_INIT, () => false, 10);
+    const waitForResult = expect(waitFor).rejects.toThrow('Timeout waiting for event');
+    const waitForMatchResult = expect(waitForMatch).rejects.toThrow('Timeout waiting for matching event');
+
+    await vi.advanceTimersByTimeAsync(10);
+    await waitForResult;
+    await waitForMatchResult;
+
+    const pendingWaits = (bus as unknown as { pendingWaits: Set<unknown> }).pendingWaits;
+    expect(pendingWaits.size).toBe(0);
+    vi.useRealTimers();
+  });
+
+  it('在普通与一次性监听器上统一应用 maxListeners', () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const bus = new ChatEventBus({ maxListeners: 1 });
+
+    bus.on(ChatEngineEventType.ENGINE_INIT, vi.fn());
+    bus.once(ChatEngineEventType.ENGINE_INIT, vi.fn());
+
+    expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining('Maximum listeners (1) exceeded'));
+  });
 });

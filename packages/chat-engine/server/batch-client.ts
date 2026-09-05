@@ -26,10 +26,11 @@ export class BatchClient extends EventEmitter {
     // 中止上一个请求
     this.abort();
 
-    this.controller = new AbortController();
+    const controller = new AbortController();
+    this.controller = controller;
     const timeoutId = setTimeout(() => {
-      if (!this.controller?.signal.aborted) {
-        this.controller?.abort();
+      if (!controller.signal.aborted) {
+        controller.abort();
       }
       this.emit('error', new TimeoutError(`Request timed out after ${timeout}ms`));
     }, timeout);
@@ -37,7 +38,7 @@ export class BatchClient extends EventEmitter {
     try {
       const response = await fetch(endpoint, {
         ...request,
-        signal: this.controller.signal,
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -53,7 +54,9 @@ export class BatchClient extends EventEmitter {
       return undefined;
     } finally {
       clearTimeout(timeoutId);
-      this.controller = null;
+      if (this.controller === controller) {
+        this.controller = null;
+      }
     }
   }
 

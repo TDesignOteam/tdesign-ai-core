@@ -110,7 +110,7 @@ describe('BatchClient', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it.fails('上一个请求完成后最新的请求仍可中止', async () => {
+  it('上一个请求完成后最新的请求仍可中止', async () => {
     const signals: AbortSignal[] = [];
     let resolveSecond!: (response: { ok: boolean; json: () => Promise<unknown> }) => void;
     vi.stubGlobal(
@@ -140,5 +140,24 @@ describe('BatchClient', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it.todo('将配置的时长放入 TimeoutError.message 而非 TimeoutError.details');
+  it('将配置的时长放入 TimeoutError.message 而非 TimeoutError.details', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+          }),
+      ),
+    );
+    const client = new BatchClient();
+    const onError = vi.fn();
+    client.on('error', onError);
+
+    const request = client.request('/chat', {}, 100);
+    await vi.advanceTimersByTimeAsync(100);
+    await request;
+
+    expect(onError.mock.calls[0][0]).toMatchObject({ message: 'Request timed out after 100ms', details: undefined });
+  });
 });

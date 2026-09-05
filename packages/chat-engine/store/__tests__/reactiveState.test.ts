@@ -194,6 +194,23 @@ describe('ReactiveState', () => {
     expect(console.log).toHaveBeenCalledWith('New State:', state.getState());
   });
 
-  it.todo('父对象被替换时通知子路径订阅者');
-  it.todo('初始化后立即深度冻结嵌套值');
+  it('父对象被替换时通知子路径订阅者', async () => {
+    const state = createState();
+    const subscriber = vi.fn();
+    state.subscribe(subscriber, ['profile.name']);
+
+    state.setState((draft) => {
+      draft.profile = { name: 'Grace', tags: ['ts'] };
+    });
+    await flushNotifications();
+
+    expect(subscriber).toHaveBeenCalledOnce();
+  });
+
+  it('初始化后立即深度冻结嵌套值', () => {
+    const state = createState();
+
+    expect(Object.isFrozen(state.getState().profile)).toBe(true);
+    expect(Object.isFrozen(state.getState().profile.tags)).toBe(true);
+  });
 });

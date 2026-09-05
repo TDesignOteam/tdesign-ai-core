@@ -57,5 +57,13 @@ describe('SSEParser', () => {
     expect(parser.hasIncompleteEvent()).toBe(false);
   });
 
-  it.todo('在派发的 SSE 事件中包含解析出的 id 字段');
+  it('在派发的 SSE 事件中包含解析出的 id 字段', () => {
+    const parser = new SSEParser();
+    const onMessage = vi.fn();
+    parser.onMessage = onMessage;
+
+    parser.parse('id: 42\ndata: {"ok":true}\n\n');
+
+    expect(onMessage).toHaveBeenCalledWith({ event: '', id: '42', data: { ok: true } });
+  });
 });

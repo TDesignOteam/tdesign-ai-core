@@ -1,5 +1,18 @@
 import { enablePatches, produceWithPatches } from 'immer';
 
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    Object.values(value as Record<string, unknown>).forEach((child) => deepFreeze(child));
+  }
+  return value;
+}
+
+function isPathRelated(left: string[], right: string[]): boolean {
+  const length = Math.min(left.length, right.length);
+  return left.slice(0, length).every((part, index) => part === right[index]);
+}
+
 /**
  * 状态订阅者回调函数类型
  * @template T 状态类型
@@ -31,7 +44,7 @@ export default class ReactiveState<T extends object> {
    * @param initialState 初始状态（会自动冻结）
    */
   public initialize(initialState: T) {
-    this.currentState = Object.freeze(initialState);
+    this.currentState = deepFreeze(initialState);
   }
 
   /**
@@ -116,7 +129,7 @@ export default class ReactiveState<T extends object> {
               paths.some((target) => {
                 const targetParts = target.split('.');
                 const pathParts = p.split('.');
-                return targetParts.every((part, i) => pathParts[i] === part);
+                return isPathRelated(targetParts, pathParts);
               }),
             )
           ) {

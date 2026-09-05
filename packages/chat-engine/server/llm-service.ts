@@ -38,6 +38,8 @@ export class LLMService implements ILLMService {
 
   private batchClient: BatchClient | null = null;
 
+  private batchErrorHandlerConfig: ChatServiceConfig | null = null;
+
   private isDestroyed = false;
 
   /** WS 长连接模式标记：initWSConnection 成功后设为 true，表示 WS 连接跨消息复用 */
@@ -62,10 +64,15 @@ export class LLMService implements ILLMService {
     config: ChatServiceConfig,
   ): Promise<AIMessageContent | AIMessageContent[]> {
     // 确保只有一个客户端实例
-    this.batchClient = this.batchClient || new BatchClient();
-    this.batchClient.on('error', (error: Error | Response) => {
-      config.onError?.(error);
-    });
+    if (!this.batchClient) {
+      this.batchClient = new BatchClient();
+      this.batchErrorHandlerConfig = config;
+      this.batchClient.on('error', (error: Error | Response) => {
+        this.batchErrorHandlerConfig?.onError?.(error);
+      });
+    } else {
+      this.batchErrorHandlerConfig = config;
+    }
 
     const req: ChatRequestParams & Partial<RequestInit> = (await config.onRequest?.(params)) || params;
 
@@ -251,6 +258,7 @@ export class LLMService implements ILLMService {
     if (this.batchClient) {
       this.batchClient.abort();
       this.batchClient = null;
+      this.batchErrorHandlerConfig = null;
     }
   }
 

@@ -129,7 +129,9 @@ export class WebSocketClient extends EventEmitter {
     try {
       await this.establishConnection();
     } catch (error) {
-      this.handleConnectionError(error as Error);
+      if (this.getStatus() === WebSocketConnectionState.CONNECTING) {
+        this.handleConnectionError(error as Error);
+      }
     }
   }
 
@@ -169,7 +171,9 @@ export class WebSocketClient extends EventEmitter {
       if (this.connectReject) {
         const rejectFn = this.connectReject;
         this.connectReject = null;
-        rejectFn(new ConnectionError('Connection closed before established'));
+        const error = new ConnectionError('Connection closed before established');
+        this.emit('error', error);
+        rejectFn(error);
       }
 
       if (this.ws) {
@@ -239,6 +243,9 @@ export class WebSocketClient extends EventEmitter {
           this.timeoutTimer = setTimeout(() => {
             if (this.state === WebSocketConnectionState.CONNECTING) {
               const error = new TimeoutError(`WebSocket connection timeout after ${this.config.timeout}ms`);
+              this.ws?.close(4000, 'Connection timeout');
+              this.clearTimeout();
+              this.connectReject = null;
               this.handleConnectionError(error);
               reject(error);
             }
@@ -266,10 +273,27 @@ export class WebSocketClient extends EventEmitter {
         this.ws.onerror = (event) => {
           this.logger.error(`WebSocket ${this.connectionId} error:`, event);
           const error = new ConnectionError('WebSocket connection error');
+
+          if (this.state === WebSocketConnectionState.CONNECTING) {
+            const rejectFn = this.connectReject;
+            this.connectReject = null;
+            this.clearTimeout();
+            const socket = this.ws;
+            this.ws = null;
+            this.handleConnectionError(error);
+            socket?.close(4000, 'Connection error');
+            rejectFn?.(error);
+            return;
+          }
+
           this.emit('error', error);
         };
 
         this.ws.onclose = (event) => {
+          if (this.state === WebSocketConnectionState.CONNECTING) {
+            this.connectReject = null;
+            reject(new ConnectionError(`WebSocket closed: ${event.code} - ${event.reason}`));
+          }
           this.handleClose(event.code, event.reason);
         };
       } catch (error) {
@@ -310,10 +334,24 @@ export class WebSocketClient extends EventEmitter {
    * 处理连接关闭
    */
   private handleClose(code: number, reason: string): void {
+    const wasConnecting = this.state === WebSocketConnectionState.CONNECTING;
     this.clearTimers();
     this.ws = null;
 
     this.logger.warn(`[WS handleClose] code=${code}, reason="${reason}", manualClose=${this.manualClose}`);
+
+    // A connection error or timeout has already completed the attempt.
+    // Ignore the follow-up close event to avoid duplicate retries/errors.
+    if (this.state === WebSocketConnectionState.ERROR) {
+      return;
+    }
+
+    if (wasConnecting) {
+      const error = new ConnectionError(`WebSocket closed: ${code} - ${reason}`);
+      this.connectReject = null;
+      this.handleConnectionError(error);
+      return;
+    }
 
     if (this.manualClose || code === 1000) {
       // 正常关闭

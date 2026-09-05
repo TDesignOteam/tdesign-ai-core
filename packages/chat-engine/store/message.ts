@@ -117,7 +117,9 @@ export class MessageStore extends ReactiveState<ChatMessageStore> {
 
   // 更新消息整体状态
   setMessageStatus(messageId: string, status: ChatMessagesData['status']) {
-    const previousStatus = this.getMessageByID(messageId)?.status;
+    const message = this.getMessageByID(messageId);
+    if (!message) return;
+    const previousStatus = message.status;
     this.setState((draft) => {
       const message = draft.messages.find((m) => m.id === messageId);
       if (message) {
@@ -172,6 +174,7 @@ export class MessageStore extends ReactiveState<ChatMessageStore> {
 
   // 删除指定消息
   removeMessage(messageId: string) {
+    if (!this.getMessageByID(messageId)) return;
     this.setState((draft) => {
       // 从ID列表删除
       const idIndex = draft.messageIds.indexOf(messageId);
@@ -194,8 +197,17 @@ export class MessageStore extends ReactiveState<ChatMessageStore> {
     if (!original || !original.content) return;
 
     // 克隆消息并生成新ID
+    const messageIds = this.getState().messageIds;
+    let branchId = `${original.id}-branch`;
+    let suffix = 2;
+    while (messageIds.includes(branchId)) {
+      branchId = `${original.id}-branch-${suffix}`;
+      suffix += 1;
+    }
+
     const branchedMessage = {
       ...original,
+      id: branchId,
       content: original.content.map((c) => ({ ...c })),
     } as ChatMessagesData;
 

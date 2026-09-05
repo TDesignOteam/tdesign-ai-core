@@ -110,7 +110,16 @@ describe('A2UI 到 json-render 的转换', () => {
     expect(applyA2UIDataUpdate(schema, '/', 'replace', null)).toBe(schema);
   });
 
-  it.todo('解码数据路径中已转义的 JSON Pointer 令牌（~1 与 ~0）');
+  it('解码数据路径中已转义的 JSON Pointer 令牌（~1 与 ~0）', () => {
+    const originalData = Object.freeze({ 'a/b': Object.freeze({ '~key': 'old' }) });
+    const schema: JsonRenderSchema = { root: 'root', elements: {}, data: originalData };
+
+    const updated = applyA2UIDataUpdate(schema, '/a~1b/~0key', 'add', 'value');
+
+    expect(updated.data).toEqual({ 'a/b': { '~key': 'value' } });
+    expect(updated.data?.['a/b']).not.toBe(originalData['a/b']);
+    expect(originalData['a/b']['~key']).toBe('old');
+  });
 
   it('应用后续嵌套数据更新时保持先前的 schema 不可变（copy-on-write along path）', () => {
     const schema: JsonRenderSchema = {
