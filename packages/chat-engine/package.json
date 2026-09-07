@@ -1,6 +1,6 @@
 {
   "name": "@tdesign/ai-chat-engine",
-  "version": "0.0.4",
+  "version": "0.1.0",
   "description": "TDesign ChatEngine - Framework-agnostic AI chat engine core",
   "type": "module",
   "exports": {
