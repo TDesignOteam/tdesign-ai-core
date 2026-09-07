@@ -73,7 +73,37 @@ describe('OpenClaw 历史消息转换器', () => {
     ).toMatchObject([{ role: 'user', content: [{ data: 'Hi' }] }]);
   });
 
-  it.todo('对已中止的空助手消息支持 skipAborted: false');
-  it.todo('当 showToolCallDetails 为 false 时隐藏工具调用参数与结果');
-  it.todo('在转换后的工具调用上保留 toolResult 的 isError 元数据');
+  it('对已中止的空助手消息支持 skipAborted: false', () => {
+    const result = convertOpenClawHistory(
+      [{ role: 'assistant', stopReason: 'aborted', content: [{ type: 'text', text: 'partial result' }] }],
+      { skipAborted: false },
+    );
+
+    expect(result).toMatchObject([{ role: 'assistant', content: [{ type: 'text', data: 'partial result' }] }]);
+  });
+
+  it('当 showToolCallDetails 为 false 时隐藏工具调用参数与结果', () => {
+    const result = convertOpenClawHistory(
+      [
+        {
+          role: 'assistant',
+          stopReason: 'toolUse',
+          content: [{ type: 'toolCall', id: 't1', name: 'read', arguments: { path: '/a' } }],
+        },
+        { role: 'toolResult', toolCallId: 't1', content: [{ type: 'text', text: 'contents' }] },
+      ],
+      { showToolCallDetails: false },
+    );
+
+    expect(result[0]).toMatchObject({ content: [{ data: { args: '', result: '' } }] });
+  });
+
+  it('在转换后的工具调用上保留 toolResult 的 isError 元数据', () => {
+    const result = convertOpenClawHistory([
+      { role: 'assistant', stopReason: 'toolUse', content: [{ type: 'toolCall', id: 't1', name: 'read' }] },
+      { role: 'toolResult', toolCallId: 't1', content: [{ type: 'text', text: 'failed' }], isError: true },
+    ]);
+
+    expect(result[0]).toMatchObject({ content: [{ data: { ext: { isError: true } } }] });
+  });
 });

@@ -207,9 +207,9 @@ export function applyOperation<T>(
 ): OperationResult<T> {
   if (validateOperation) {
     if (typeof validateOperation == 'function') {
-      validateOperation(operation, 0, document, operation.path);
+      validateOperation(operation, index, document, operation.path);
     } else {
-      validator(operation, 0);
+      validator(operation, index);
     }
   }
   /* ROOT OPERATIONS */
@@ -307,7 +307,7 @@ export function applyOperation<T>(
             existingPathFragment = operation.path;
           }
           if (existingPathFragment !== undefined) {
-            validateFunction(operation, 0, document, existingPathFragment);
+            validateFunction(operation, index, document, existingPathFragment);
           }
         }
       }
@@ -548,7 +548,7 @@ export function validate<T>(
     if (!Array.isArray(sequence)) {
       throw new JsonPatchError('Patch sequence must be an array', 'SEQUENCE_NOT_AN_ARRAY');
     }
-    if (document) {
+    if (document !== undefined) {
       //clone document and sequence so that we can safely try applying operations
       applyPatch(_deepClone(document), _deepClone(sequence), externalValidator || true);
     } else {
@@ -612,7 +612,7 @@ export function _areEquals(a: any, b: any): boolean {
 
     if (length !== Object.keys(b).length) return false;
 
-    for (i = length; i-- !== 0; ) if (!b.hasOwnProperty(keys[i])) return false;
+    for (i = length; i-- !== 0; ) if (!Object.prototype.hasOwnProperty.call(b, keys[i])) return false;
 
     for (i = length; i-- !== 0; ) {
       key = keys[i];

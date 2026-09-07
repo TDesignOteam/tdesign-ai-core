@@ -479,7 +479,11 @@ export class OpenClawEventMapper {
     }
 
     const currentArgs = this.toolCallMap[toolCallId].args || '';
-    const newArgs = mergeStringContent(currentArgs, (data?.delta as string) || '');
+    const incomingArgs = data?.delta ?? data?.args;
+    const newArgs =
+      typeof incomingArgs === 'string'
+        ? mergeStringContent(currentArgs, incomingArgs)
+        : mergeStringContent(currentArgs, JSON.stringify(incomingArgs ?? {}));
 
     this.toolCallMap[toolCallId] = updateToolCall(this.toolCallMap[toolCallId], {
       eventType: 'TOOL_CALL_ARGS',

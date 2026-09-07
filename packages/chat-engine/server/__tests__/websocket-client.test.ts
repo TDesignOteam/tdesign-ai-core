@@ -210,6 +210,22 @@ describe('WebSocketClient', () => {
     expect(onError).toHaveBeenCalledWith(expect.any(ConnectionError));
   });
 
+  it('建连阶段原生 socket 仅触发 onerror 时结束 connect 并清理超时', async () => {
+    const client = new WebSocketClient('ws://chat');
+    const onError = vi.fn();
+    client.on('error', onError);
+
+    const pending = client.connect({ timeout: 100 });
+    const socket = FakeWebSocket.instances[0];
+    socket.onerror?.({ type: 'error' } as Event);
+
+    await expect(pending).resolves.toBeUndefined();
+    expect(client.getStatus()).toBe(WebSocketConnectionState.ERROR);
+    expect(onError).toHaveBeenCalledOnce();
+    expect(socket.close).toHaveBeenCalledWith(4000, 'Connection error');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('将代码为 1000 的服务端关闭视为正常完成', async () => {
     const client = new WebSocketClient('ws://chat');
     const onComplete = vi.fn();
@@ -226,6 +242,29 @@ describe('WebSocketClient', () => {
     expect(FakeWebSocket.instances).toHaveLength(1);
   });
 
-  it.todo('将配置的连接时长放入 TimeoutError.message 而非 details');
-  it.todo('在调度或尝试下一次连接前关闭已超时的原生 socket');
+  it('将配置的连接时长放入 TimeoutError.message 而非 details', async () => {
+    const client = new WebSocketClient('ws://chat');
+    const onError = vi.fn();
+    client.on('error', onError);
+
+    const pending = client.connect({ timeout: 100 });
+    await vi.advanceTimersByTimeAsync(100);
+    await pending;
+
+    expect(onError.mock.calls[0][0]).toMatchObject({
+      message: 'WebSocket connection timeout after 100ms',
+      details: undefined,
+    });
+  });
+
+  it('在调度或尝试下一次连接前关闭已超时的原生 socket', async () => {
+    const client = new WebSocketClient('ws://chat');
+    const pending = client.connect({ timeout: 100, maxRetries: 1, retryInterval: 50 });
+    const socket = FakeWebSocket.instances[0];
+
+    await vi.advanceTimersByTimeAsync(100);
+    await pending;
+
+    expect(socket.close).toHaveBeenCalledWith(4000, 'Connection timeout');
+  });
 });

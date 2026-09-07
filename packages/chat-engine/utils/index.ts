@@ -128,16 +128,16 @@ export function getMessageContentForCopy(message: ChatMessagesData): string {
   if (!isAIMessage(message) || !message.content) {
     return '';
   }
-  return message.content.reduce((pre: string, item: AIMessageContent) => {
-    let append = '';
-    if (isTextContent(item) || isMarkdownContent(item)) {
-      append = item.data;
-    } else if (isThinkingContent(item)) {
-      append = item.data.text || '';
-    }
-    if (!pre) {
-      return append;
-    }
-    return `${pre}\n${append}`;
-  }, '');
+  return message.content
+    .reduce((parts: string[], item: AIMessageContent) => {
+      let append: string | undefined;
+      if (isTextContent(item) || isMarkdownContent(item)) {
+        append = item.data;
+      } else if (isThinkingContent(item)) {
+        append = item.data.text || undefined;
+      }
+      if (append) parts.push(append);
+      return parts;
+    }, [])
+    .join('\n');
 }

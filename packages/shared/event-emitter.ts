@@ -16,7 +16,10 @@ export default class SimpleEventEmitter {
   off<TArgs extends unknown[]>(event: string, listener: EventListener<TArgs>): void {
     const listeners = this.events.get(event);
     if (listeners) {
-      const index = listeners.indexOf(listener as EventListener);
+      const index = listeners.findIndex(
+        (registered) =>
+          registered === listener || (registered as EventListener & { listener?: EventListener }).listener === listener,
+      );
       if (index !== -1) {
         listeners.splice(index, 1);
       }
@@ -28,13 +31,14 @@ export default class SimpleEventEmitter {
       this.off(event, wrapper);
       listener(...args);
     };
+    (wrapper as EventListener & { listener?: EventListener }).listener = listener as EventListener;
     this.on(event, wrapper);
   }
 
   emit<TArgs extends unknown[]>(event: string, ...args: TArgs): boolean {
     const listeners = this.events.get(event);
     if (listeners && listeners.length > 0) {
-      listeners.forEach((listener) => {
+      [...listeners].forEach((listener) => {
         try {
           listener(...args);
         } catch (error) {

@@ -67,7 +67,7 @@ describe('SimpleEventEmitter', () => {
     expect(listener).toHaveBeenCalledWith('first');
   });
 
-  it.fails('不跳过在 once 监听器之后注册的普通监听器', () => {
+  it('不跳过在 once 监听器之后注册的普通监听器', () => {
     const emitter = new SimpleEventEmitter();
     const onceListener = vi.fn();
     const regularListener = vi.fn();
@@ -78,6 +78,17 @@ describe('SimpleEventEmitter', () => {
 
     expect(onceListener).toHaveBeenCalledOnce();
     expect(regularListener).toHaveBeenCalledOnce();
+  });
+
+  it('可以通过原始 callback 移除 once 监听器', () => {
+    const emitter = new SimpleEventEmitter();
+    const listener = vi.fn();
+    emitter.once('event', listener);
+
+    emitter.off('event', listener);
+    emitter.emit('event');
+
+    expect(listener).not.toHaveBeenCalled();
   });
 
   it('即使抛出异常也在调用前移除 once 监听器', () => {

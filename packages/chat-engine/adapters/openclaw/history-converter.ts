@@ -158,7 +158,7 @@ export function convertOpenClawHistory(
 
       case 'assistant': {
         // 跳过被中止且无内容的消息
-        if (isAbortedEmpty(msg)) {
+        if (options?.skipAborted !== false && isAbortedEmpty(msg)) {
           break;
         }
 
@@ -317,11 +317,18 @@ function convertAssistantContent(
         const toolCallId = (item.id || '') as string;
         const toolCallName = getToolCallName(item.name as string, options);
         const rawArgs = item.arguments;
-        const argsStr = rawArgs ? (typeof rawArgs === 'string' ? rawArgs : JSON.stringify(rawArgs)) : '';
+        const argsStr =
+          options?.showToolCallDetails === false
+            ? ''
+            : rawArgs
+              ? typeof rawArgs === 'string'
+                ? rawArgs
+                : JSON.stringify(rawArgs)
+              : '';
 
         // 查找对应的 toolResult
         const toolResult = toolResultMap.get(toolCallId);
-        const resultStr = toolResult?.content || '';
+        const resultStr = options?.showToolCallDetails === false ? '' : toolResult?.content || '';
 
         const toolCall = {
           toolCallId,
@@ -330,6 +337,7 @@ function convertAssistantContent(
           parentMessageId: '',
           args: argsStr,
           result: resultStr,
+          ...(toolResult?.isError !== undefined ? { ext: { isError: toolResult.isError } } : {}),
         };
 
         const status = toolResult ? 'complete' : 'complete';

@@ -66,13 +66,21 @@ function isArrayIndex(key: string): boolean {
   return /^\d+$/.test(key);
 }
 
+function parseDataPath(path: string): string[] {
+  return path
+    .split('/')
+    .slice(1)
+    .map((part) => part.replace(/~1/g, '/').replace(/~0/g, '~'));
+}
+
 function getNodeValue(node: DataNode, key: string): unknown {
   return Array.isArray(node) ? node[parseInt(key, 10)] : node[key];
 }
 
 function setNodeValue(node: DataNode, key: string, value: unknown): void {
   if (Array.isArray(node)) {
-    node[parseInt(key, 10)] = value;
+    if (key === '-') node.push(value);
+    else node[parseInt(key, 10)] = value;
   } else {
     node[key] = value;
   }
@@ -352,7 +360,7 @@ function buildSurfaceState<TProps extends Record<string, unknown>, TData extends
  * 支持数组索引路径（如 /list/0/name）
  */
 function setValueByPath(obj: Record<string, unknown>, path: string, value: unknown): void {
-  const parts = path.split('/').filter(Boolean);
+  const parts = parseDataPath(path);
   let current: DataNode = obj;
 
   for (let i = 0; i < parts.length - 1; i++) {
@@ -377,7 +385,7 @@ function setValueByPath(obj: Record<string, unknown>, path: string, value: unkno
  * 支持数组索引路径
  */
 function deleteValueByPath(obj: Record<string, unknown>, path: string): void {
-  const parts = path.split('/').filter(Boolean);
+  const parts = parseDataPath(path);
   let current: DataNode = obj;
 
   for (let i = 0; i < parts.length - 1; i++) {
@@ -548,7 +556,7 @@ export function applyA2UIDataUpdate<TData extends Record<string, unknown> = Reco
  * 用途：给基于 mutation 的 setValueByPath / deleteValueByPath 打好安全底座。
  */
 function cloneAlongPath<TData extends Record<string, unknown>>(input: TData, path: string): TData {
-  const parts = path.split('/').filter(Boolean);
+  const parts = parseDataPath(path);
   // 顶层浅克隆
   const rootClone: Record<string, unknown> = Array.isArray(input) ? ([...(input as unknown[])] as never) : { ...input };
 

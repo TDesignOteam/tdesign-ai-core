@@ -248,6 +248,28 @@ describe('MessageStore', () => {
     expect(content[1]).toMatchObject({ id: 'tb', data: 'replaced' });
   });
 
-  it.todo('创建消息分支时分配新的唯一 ID');
-  it.todo('目标消息不存在时不派发状态或删除事件');
+  it('创建消息分支时分配新的唯一 ID', () => {
+    const original = assistantMessage('assistant', [{ type: 'text', data: 'answer' }]);
+    store.createMessage(original);
+
+    store.createMessageBranch('assistant');
+
+    expect(store.messages).toHaveLength(2);
+    expect(store.messages[1].id).not.toBe(original.id);
+    expect(store.messages[1].id).toBe('assistant-branch');
+    expect(store.messages[1].content).not.toBe(original.content);
+  });
+
+  it('目标消息不存在时不派发状态或删除事件', () => {
+    const statusListener = vi.fn();
+    const deleteListener = vi.fn();
+    eventBus.on(ChatEngineEventType.MESSAGE_STATUS_CHANGE, statusListener);
+    eventBus.on(ChatEngineEventType.MESSAGE_DELETE, deleteListener);
+
+    store.setMessageStatus('missing', 'error');
+    store.removeMessage('missing');
+
+    expect(statusListener).not.toHaveBeenCalled();
+    expect(deleteListener).not.toHaveBeenCalled();
+  });
 });

@@ -66,19 +66,27 @@ describe('applyPatchImmutable', () => {
     expect(original.items).toEqual([first]);
   });
 
-  it.fails('数组的 add 操作在目标索引处插入而非替换', () => {
+  it('数组的 add 操作在目标索引处插入而非替换', () => {
     const result = applyPatchImmutable({ items: ['a', 'c'] }, [{ op: 'add', path: '/items/1', value: 'b' }]);
 
     expect(result.items).toEqual(['a', 'b', 'c']);
   });
 
-  it.fails('move 数组元素且不丢失目标索引之后的元素', () => {
+  it('数组的 copy 操作在目标索引处插入而非替换', () => {
+    const result = applyPatchImmutable({ source: 'b', items: ['a', 'c'] }, [
+      { op: 'copy', from: '/source', path: '/items/1' },
+    ]);
+
+    expect(result).toEqual({ source: 'b', items: ['a', 'b', 'c'] });
+  });
+
+  it('move 数组元素且不丢失目标索引之后的元素', () => {
     const result = applyPatchImmutable({ v: ['a', 'b', 'c'] }, [{ op: 'move', from: '/v/0', path: '/v/1' }]);
 
     expect(result.v).toEqual(['b', 'a', 'c']);
   });
 
-  it.fails('忽略对数组追加标记 "-" 的 remove 而非删除第一个元素', () => {
+  it('忽略对数组追加标记 "-" 的 remove 而非删除第一个元素', () => {
     const result = applyPatchImmutable({ items: ['a', 'b', 'c'] }, [{ op: 'remove', path: '/items/-' }]);
 
     expect(result.items).toEqual(['a', 'b', 'c']);
@@ -190,7 +198,7 @@ describe('applyPatchImmutable', () => {
     expect(original).toEqual({ value: 1 });
   });
 
-  it.fails('按 RFC 6902 将路径 "/" 视为空字符串键而非根', () => {
+  it('按 RFC 6902 将路径 "/" 视为空字符串键而非根', () => {
     const original = { value: 1 };
 
     expect(applyPatchImmutable(original, [{ op: 'replace', path: '/', value: 'replacement' }])).toEqual({

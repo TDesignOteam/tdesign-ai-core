@@ -108,5 +108,27 @@ describe('OpenClawEventMapper', () => {
     expect(mapper.getToolCalls()).toEqual([]);
   });
 
-  it.todo('合并不依赖字符串增量的通用工具参数对象');
+  it('合并不依赖字符串增量的通用工具参数对象', () => {
+    mapper.mapEvent({
+      type: 'event',
+      event: 'agent',
+      payload: { stream: 'tool', data: { phase: 'start', toolCallId: 't1', name: 'read', args: {} } },
+    });
+
+    const result = mapper.mapEvent({
+      type: 'event',
+      event: 'agent',
+      payload: { stream: 'tool', data: { phase: 'args', toolCallId: 't1', args: { path: '/a' } } },
+    });
+
+    expect(result.content).toMatchObject({ data: { args: '{"path":"/a"}' } });
+
+    const merged = mapper.mapEvent({
+      type: 'event',
+      event: 'agent',
+      payload: { stream: 'tool', data: { phase: 'args', toolCallId: 't1', args: { mode: 'raw' } } },
+    });
+
+    expect(merged.content).toMatchObject({ data: { args: '{"path":"/a","mode":"raw"}' } });
+  });
 });

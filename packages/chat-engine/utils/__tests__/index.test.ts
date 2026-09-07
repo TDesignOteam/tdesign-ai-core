@@ -96,7 +96,7 @@ describe('utils 公开辅助函数', () => {
     expect(getMessageContentForCopy({ id: 'a2', role: 'assistant' })).toBe('');
   });
 
-  it.fails('忽略不可复制的内容且不产生空行', () => {
+  it('忽略不可复制的内容且不产生空行', () => {
     const content = [
       { type: 'text', data: 'first' },
       { type: 'image', data: { url: '/image.png' } },

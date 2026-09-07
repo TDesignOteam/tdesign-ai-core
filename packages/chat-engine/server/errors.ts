@@ -26,7 +26,10 @@ export class ConnectionError extends SSEError {
 
 // 超时错误
 export class TimeoutError extends SSEError {
-  constructor(details?: unknown, message = '请求超时') {
+  constructor(messageOrDetails?: unknown, detailsOrMessage: unknown = '请求超时') {
+    const isMessage = typeof messageOrDetails === 'string';
+    const message = isMessage ? messageOrDetails : String(detailsOrMessage);
+    const details = isMessage ? undefined : messageOrDetails;
     super(message, 'TIMEOUT_ERROR', undefined, true, details);
     this.name = 'TimeoutError';
   }

@@ -108,6 +108,7 @@ export class SSEParser {
         this.onMessage({
           event: this.currentEvent.event || '',
           data,
+          ...(this.currentEvent.id !== undefined ? { id: this.currentEvent.id } : {}),
         });
       } catch (error) {
         this.logger.error('Error emitting event:', error);
