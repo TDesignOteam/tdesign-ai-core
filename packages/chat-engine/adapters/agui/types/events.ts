@@ -16,7 +16,11 @@ const isOperation = (value: unknown): value is Operation => {
 const OperationSchema = z.custom<Operation>(isOperation, 'Expected a JSON Patch operation');
 
 export type ToolCallEventType =
-  'TOOL_CALL_START' | 'TOOL_CALL_ARGS' | 'TOOL_CALL_END' | 'TOOL_CALL_CHUNK' | 'TOOL_CALL_RESULT';
+  | 'TOOL_CALL_START'
+  | 'TOOL_CALL_ARGS'
+  | 'TOOL_CALL_END'
+  | 'TOOL_CALL_CHUNK'
+  | 'TOOL_CALL_RESULT';
 
 export enum AGUIEventType {
   TEXT_MESSAGE_START = 'TEXT_MESSAGE_START',
