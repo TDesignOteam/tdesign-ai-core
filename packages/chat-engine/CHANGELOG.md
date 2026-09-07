@@ -1,5 +1,11 @@
 # Changelog
 
+## 🌈 0.0.4 `2026-09-07`
+
+### 🐞 Bug Fixes
+
+- 修复适配 A2UI 功能的部分缺陷 @LzhengH ([#35](https://github.com/TDesignOteam/tdesign-ai-core/pull/35))
+
 ## 🌈 0.0.3 `2026-09-02`
 
 ### 🚀 Features
