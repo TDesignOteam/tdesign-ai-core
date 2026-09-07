@@ -1,5 +1,12 @@
 # Changelog
 
+## 🌈 0.0.4 `2026-09-07`
+
+### 🐞 Bug Fixes
+
+- 修复适配 A2UI 功能的部分缺陷 @LzhengH ([#35](https://github.com/TDesignOteam/tdesign-ai-core/pull/35))
+- 修复不携带messageId的TEXT_MESSAGE_CHUNK/END事件的简化用法 @LzhengH ([#34](https://github.com/TDesignOteam/tdesign-ai-core/pull/34))
+
 ## 🌈 0.0.3 `2026-09-02`
 
 ### 🚀 Features
