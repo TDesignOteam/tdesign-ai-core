@@ -160,13 +160,15 @@ export const TextMessageContentEventSchema = BaseEventSchema.extend({
 
 export const TextMessageEndEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.TEXT_MESSAGE_END),
-  messageId: z.string(),
+  // 规范上必需，但兼容部分后端在简化模式下发送 `messageId: null` 的实现
+  messageId: z.string().nullish(),
   delta: z.string().optional(),
 });
 
 export const TextMessageChunkEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.TEXT_MESSAGE_CHUNK),
-  messageId: z.string().optional(),
+  // 简化模式下 messageId 为选填，允许 undefined / null，由 EventMapper 回退到 START 建立的 id
+  messageId: z.string().nullish(),
   role: z.literal('assistant').optional(),
   delta: z.string().optional(),
 });
