@@ -284,6 +284,97 @@ describe('ChatEngine', () => {
     );
   });
 
+  it('携带 resume 恢复被 interrupt 中断的运行', async () => {
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'sse', protocol: 'agui' });
+    const handler = mocks.handlerInstances[0] as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    handler.getPendingInterrupts = vi.fn(() => [{ id: 'int-1', reason: 'tool_call' }]);
+    const resume = [{ interruptId: 'int-1', status: 'resolved' as const, payload: { approved: true } }];
+
+    const id = await engine.resumeInterrupts(resume, { threadId: 'thread-1' } as ChatRequestParams<{
+      threadId: string;
+    }>);
+
+    expect(engine.messages).toHaveLength(1);
+    expect(id).toBe(engine.messages[0].id);
+    expect(engine.messages[0]).toEqual(expect.objectContaining({ role: 'assistant', status: 'streaming' }));
+    expect(handler.handleStream).toHaveBeenCalledWith(
+      { threadId: 'thread-1', resume, messageID: id },
+      expect.objectContaining({ messageId: id }),
+    );
+  });
+
+  it('resume 未覆盖全部开放 interrupts 时输出警告', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'sse', protocol: 'agui' });
+    const handler = mocks.handlerInstances[0] as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    handler.getPendingInterrupts = vi.fn(() => [
+      { id: 'int-1', reason: 'tool_call' },
+      { id: 'int-2', reason: 'input_required' },
+    ]);
+
+    await engine.resumeInterrupts([{ interruptId: 'int-1', status: 'cancelled' }]);
+
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0][0]).toContain('int-2');
+  });
+
+  it('resume 携带未知 interruptId 时输出警告', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'sse', protocol: 'agui' });
+    const handler = mocks.handlerInstances[0] as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    handler.getPendingInterrupts = vi.fn(() => [{ id: 'int-1', reason: 'tool_call' }]);
+
+    await engine.resumeInterrupts([
+      { interruptId: 'int-1', status: 'resolved' },
+      { interruptId: 'int-x', status: 'cancelled' },
+    ]);
+
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0][0]).toContain('int-x');
+  });
+
+  it('无待决 interrupts 或非 AG-UI 协议时 resume 输出警告', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'sse', protocol: 'agui' });
+    const handler = mocks.handlerInstances[0] as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    handler.getPendingInterrupts = vi.fn(() => []);
+
+    await engine.resumeInterrupts([{ interruptId: 'int-1', status: 'resolved' }]);
+
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0][0]).toContain('无待决');
+
+    warn.mockClear();
+    const plain = new ChatEngine();
+    await plain.init({ transport: 'sse' });
+
+    await plain.resumeInterrupts([{ interruptId: 'int-1', status: 'resolved' }]);
+
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0][0]).toContain('非 AG-UI');
+  });
+
+  it('resume 已过期的 interrupt 时输出警告', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(2000);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'sse', protocol: 'agui' });
+    const handler = mocks.handlerInstances[0] as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    handler.getPendingInterrupts = vi.fn(() => [
+      { id: 'int-1', reason: 'input_required', expiresAt: '1970-01-01T00:00:00.000Z' },
+    ]);
+
+    await engine.resumeInterrupts([{ interruptId: 'int-1', status: 'resolved' }]);
+
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0][0]).toContain('int-1');
+    expect(warn.mock.calls[0][0]).toContain('过期');
+  });
+
   it('重新生成时替换最后一条 AI 消息并复用先前的参数', async () => {
     const engine = new ChatEngine();
     await engine.init({ transport: 'sse' }, [initialMessage]);

@@ -146,6 +146,114 @@ describe('AGUIStreamHandler', () => {
     expect(context.eventBus.emit).not.toHaveBeenCalledWith(ChatEngineEventType.AGUI_RUN_COMPLETE, expect.anything());
   });
 
+  it('派发 AG-UI 运行中断事件并跟踪待决策 interrupts', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1234);
+    const params = { prompt: 'hello' };
+    const interrupts = [{ id: 'int-1', reason: 'tool_call', toolCallId: 'tc-1', message: 'approve?' }];
+    const { adapter, context, handler, getRequestConfig } = setup();
+    adapter.handleAGUIEvent.mockImplementation((_chunk: SSEChunkData, callbacks: AGUIAdapterCallbacks) => {
+      callbacks.onRunInterrupted?.(
+        {
+          type: AGUIEventType.RUN_FINISHED,
+          runId: 'run-1',
+          threadId: 'thread-1',
+        },
+        interrupts,
+      );
+      return null;
+    });
+
+    await handler.handleStream(params, context);
+    getRequestConfig()!.onMessage?.({ data: 'run event' });
+
+    expect(context.handleComplete).toHaveBeenCalledWith(
+      'assistant-1',
+      false,
+      params,
+      expect.objectContaining({ type: 'RUN_FINISHED' }),
+    );
+    expect(context.eventBus.emit).toHaveBeenCalledWith(ChatEngineEventType.AGUI_RUN_INTERRUPTED, {
+      runId: 'run-1',
+      threadId: 'thread-1',
+      messageId: 'assistant-1',
+      interrupts,
+      timestamp: 1234,
+    });
+    expect(context.eventBus.emit).not.toHaveBeenCalledWith(ChatEngineEventType.AGUI_RUN_COMPLETE, expect.anything());
+    expect(handler.getPendingInterrupts()).toEqual(interrupts);
+  });
+
+  it('新一轮 RUN_STARTED 清空待决策 interrupts', async () => {
+    const interrupts = [{ id: 'int-1', reason: 'tool_call' }];
+    const { adapter, context, handler, getRequestConfig } = setup();
+    let runCount = 0;
+    adapter.handleAGUIEvent.mockImplementation((_chunk: SSEChunkData, callbacks: AGUIAdapterCallbacks) => {
+      runCount += 1;
+      if (runCount === 1) {
+        callbacks.onRunInterrupted?.(
+          { type: AGUIEventType.RUN_FINISHED, runId: 'run-1', threadId: 'thread-1' },
+          interrupts,
+        );
+      } else {
+        callbacks.onRunStart?.({ type: AGUIEventType.RUN_STARTED, runId: 'run-2', threadId: 'thread-1' });
+      }
+      return null;
+    });
+
+    await handler.handleStream({ prompt: 'hello' }, context);
+    getRequestConfig()!.onMessage?.({ data: 'run event' });
+    expect(handler.getPendingInterrupts()).toEqual(interrupts);
+
+    await handler.handleStream(
+      { resume: [{ interruptId: 'int-1', status: 'resolved', payload: { approved: true } }] },
+      context,
+    );
+    getRequestConfig()!.onMessage?.({ data: 'run event' });
+
+    expect(handler.getPendingInterrupts()).toEqual([]);
+  });
+
+  it('resetAdapter 同步清空待决策 interrupts', async () => {
+    const interrupts = [{ id: 'int-1', reason: 'tool_call' }];
+    const { adapter, context, handler, getRequestConfig } = setup();
+    adapter.handleAGUIEvent.mockImplementation((_chunk: SSEChunkData, callbacks: AGUIAdapterCallbacks) => {
+      callbacks.onRunInterrupted?.(
+        { type: AGUIEventType.RUN_FINISHED, runId: 'run-1', threadId: 'thread-1' },
+        interrupts,
+      );
+      return null;
+    });
+
+    await handler.handleStream({ prompt: 'hello' }, context);
+    getRequestConfig()!.onMessage?.({ data: 'run event' });
+    expect(handler.getPendingInterrupts()).toEqual(interrupts);
+
+    handler.resetAdapter();
+    expect(adapter.reset).toHaveBeenCalledOnce();
+    expect(handler.getPendingInterrupts()).toEqual([]);
+  });
+
+  it('存在未决 interrupts 且请求未携带 resume 时给出警告', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const interrupts = [{ id: 'int-1', reason: 'tool_call' }];
+    const { adapter, context, handler, getRequestConfig } = setup();
+    adapter.handleAGUIEvent.mockImplementation((_chunk: SSEChunkData, callbacks: AGUIAdapterCallbacks) => {
+      callbacks.onRunInterrupted?.(
+        { type: AGUIEventType.RUN_FINISHED, runId: 'run-1', threadId: 'thread-1' },
+        interrupts,
+      );
+      return null;
+    });
+
+    await handler.handleStream({ prompt: 'hello' }, context);
+    getRequestConfig()!.onMessage?.({ data: 'run event' });
+    expect(warn).not.toHaveBeenCalled();
+
+    await handler.handleStream({ prompt: 'follow up' }, context);
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0][0]).toContain('resume');
+  });
+
   it('委托运行错误并派发 AGUI 运行错误事件', async () => {
     const { adapter, context, handler, getRequestConfig } = setup();
     const error = { type: AGUIEventType.RUN_ERROR as const, message: 'agent exploded' };

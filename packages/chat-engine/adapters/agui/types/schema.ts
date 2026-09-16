@@ -143,6 +143,62 @@ export const ToolSchema = z.object({
   parameters: ChatJSONValueSchema, // JSON Schema for the tool parameters
 });
 
+/**
+ * Interrupt 定义（AG-UI Interrupts 规范）
+ * https://docs.ag-ui.com/concepts/interrupts
+ */
+export const InterruptSchema = z.object({
+  /** 关联键：贯穿 interrupt、resume、幂等与审计 */
+  id: z.string(),
+  /** 分类路由提示，核心值：tool_call / input_required / confirmation，其余为自定义扩展 */
+  reason: z.string(),
+  /** 人类可读的提示文案，通用兜底 UI 内容 */
+  message: z.string().optional(),
+  /** 绑定到先前 ToolCall* 序列的 toolCallId（reason: tool_call 时必须存在） */
+  toolCallId: z.string().optional(),
+  /** 期望的 resume.payload 的 JSON Schema */
+  responseSchema: ChatJSONValueSchema.optional(),
+  /** 可选 ISO-8601 过期时间，过期 resume 将产生 RunError */
+  expiresAt: z.string().optional(),
+  /** 框架自定义自由数据 */
+  metadata: ChatJSONObjectSchema.optional(),
+  /** 引发该 interrupt 的 subagent runId（根 run 引发时缺省） */
+  subagentRunId: z.string().optional(),
+});
+
+/**
+ * RunFinished 的 outcome 判别联合
+ * - success：正常完成（result 仍在事件根字段，向后兼容）
+ * - interrupt：运行暂停等待用户输入
+ */
+export const RunFinishedOutcomeSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('success'),
+  }),
+  z.object({
+    type: z.literal('interrupt'),
+    interrupts: z.array(InterruptSchema).min(1),
+  }),
+]);
+
+/**
+ * resume 条目状态
+ * - resolved：用户已响应，payload 携带响应内容（拒绝表达在 payload 内，如 { approved: false }）
+ * - cancelled：用户放弃，未提供有效输入，payload 应省略
+ */
+export const InterruptResumeStatusSchema = z.union([z.literal('resolved'), z.literal('cancelled')]);
+
+/**
+ * RunAgentInput.resume 数组条目（用于恢复被 interrupt 的运行）
+ */
+export const InterruptResumeSchema = z.object({
+  /** 必须引用被中断运行 interrupts[] 中的某个 id */
+  interruptId: z.string(),
+  status: InterruptResumeStatusSchema,
+  payload: ChatJSONValueSchema.optional(),
+  metadata: ChatJSONObjectSchema.optional(),
+});
+
 export const RunAgentInputSchema = z.object({
   threadId: z.string(),
   runId: z.string(),
@@ -151,6 +207,8 @@ export const RunAgentInputSchema = z.object({
   tools: z.array(ToolSchema),
   context: z.array(ContextSchema),
   forwardedProps: ChatJSONObjectSchema,
+  /** 恢复被 interrupt 的运行：必须覆盖该 run 的所有开放 interrupt */
+  resume: z.array(InterruptResumeSchema).optional(),
 });
 
 export const StateSchema = ChatJSONObjectSchema;
@@ -167,7 +225,11 @@ export type AGUIReasoningMessage = z.infer<typeof ReasoningMessageSchema>;
 export type AGUIMessage = z.infer<typeof AGUIMessageSchema>;
 export type AGUIContext = z.infer<typeof ContextSchema>;
 export type AGUITool = z.infer<typeof ToolSchema>;
-export type RunAgentInput = z.infer<typeof RunAgentInputSchema>;
+export type AGUIInterrupt = z.infer<typeof InterruptSchema>;
+export type AGUIRunFinishedOutcome = z.infer<typeof RunFinishedOutcomeSchema>;
+export type AGUIInterruptResumeStatus = z.infer<typeof InterruptResumeStatusSchema>;
+export type AGUIInterruptResume = z.infer<typeof InterruptResumeSchema>;
+export type AGUIRunAgentInput = z.infer<typeof RunAgentInputSchema>;
 export type AGUIState = z.infer<typeof StateSchema>;
 export type AGUIRole = z.infer<typeof RoleSchema>;
 

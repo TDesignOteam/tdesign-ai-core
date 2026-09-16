@@ -12,7 +12,8 @@ import type {
 import { AGUIEventMapper } from './event-mapper';
 import type { BaseEvent, RunErrorEvent, RunFinishedEvent, RunStartedEvent } from './types/events';
 import { AGUIEventType } from './types/events';
-import type { AGUIHistoryMessage, AGUIUserHistoryMessage } from './types';
+import type { AGUIHistoryMessage, AGUIUserHistoryMessage, AGUIInterrupt } from './types';
+import { RunFinishedOutcomeSchema } from './types/schema';
 import { buildToolCallMap, processMessageGroup } from './utils';
 
 // 重新导出类型，以便其他文件可以使用
@@ -30,6 +31,13 @@ export type {
 export interface AGUIAdapterCallbacks {
   onRunStart?: (event: RunStartedEvent) => void;
   onRunComplete?: (isAborted: boolean, params: ChatRequestParams, event?: RunFinishedEvent) => void;
+  /**
+   * 运行以 interrupt 结果结束（HITL 暂停等待用户输入）
+   *
+   * 触发条件：RUN_FINISHED 携带 `outcome.type === 'interrupt'` 且 interrupts 非空；
+   * 此时不再触发 onRunComplete。未提供该回调时回退到 onRunComplete。
+   */
+  onRunInterrupted?: (event: RunFinishedEvent, interrupts: AGUIInterrupt[]) => void;
   onRunError?: (error: RunErrorEvent) => void;
 }
 
@@ -272,9 +280,16 @@ export class AGUIAdapter {
       case AGUIEventType.RUN_STARTED:
         callbacks.onRunStart?.(event as RunStartedEvent);
         return true;
-      case AGUIEventType.RUN_FINISHED:
-        callbacks.onRunComplete?.(false, {} as ChatRequestParams, event as RunFinishedEvent);
+      case AGUIEventType.RUN_FINISHED: {
+        const finishedEvent = event as RunFinishedEvent;
+        const interrupts = this.extractInterrupts(finishedEvent);
+        if (interrupts.length > 0 && callbacks.onRunInterrupted) {
+          callbacks.onRunInterrupted(finishedEvent, interrupts);
+        } else {
+          callbacks.onRunComplete?.(false, {} as ChatRequestParams, finishedEvent);
+        }
         return true;
+      }
       case AGUIEventType.RUN_ERROR:
         // RUN_ERROR 需要触发回调，但不能返回 true
         // 因为还需要通过 event-mapper 生成错误消息内容用于 UI 展示
@@ -283,6 +298,24 @@ export class AGUIAdapter {
       default:
         return false; // 不是生命周期事件
     }
+  }
+
+  /**
+   * 从 RUN_FINISHED 事件提取开放的 interrupts（带运行时校验）
+   *
+   * - outcome 缺省或 `success`：返回 `[]`（向后兼容，视为正常完成）
+   * - outcome 为 `interrupt`：经 `RunFinishedOutcomeSchema` 校验后返回 interrupts
+   * - outcome 校验失败（未知 type、interrupts 为空或结构非法）：输出警告并返回 `[]`，
+   *   按正常完成处理，避免畸形数据污染业务层
+   */
+  private extractInterrupts(event: RunFinishedEvent): AGUIInterrupt[] {
+    if (event.outcome === undefined) return [];
+    const parsed = RunFinishedOutcomeSchema.safeParse(event.outcome);
+    if (!parsed.success) {
+      console.warn('[AGUIAdapter] RUN_FINISHED 携带非法的 outcome，按正常完成处理:', event.outcome);
+      return [];
+    }
+    return parsed.data.type === 'interrupt' ? parsed.data.interrupts : [];
   }
 }
 

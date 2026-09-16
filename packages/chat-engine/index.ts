@@ -4,6 +4,7 @@ import { ChatEngineEventType, ChatEventBus } from './event-bus';
 import MessageProcessor from './processor';
 import { LLMService } from './server';
 import { isSnapshotMessageContent } from './adapters/agui/utils';
+import type { AGUIInterruptResume } from './adapters/agui/types';
 import {
   createStreamHandler,
   type AGUIStreamHandler,
@@ -385,6 +386,82 @@ export default class ChatEngine implements IChatEngine {
       content: [],
       status: 'pending',
       params,
+      sendRequest: true,
+    });
+  }
+
+  /**
+   * 恢复被 interrupt 暂停的运行（Human-in-the-Loop）。
+   *
+   * 适用场景：Agent 以 `RUN_FINISHED { outcome: { type: 'interrupt' } }` 结束，
+   * 等待用户对开放 interrupts 的决策（如工具调用审批、补充表单输入）。
+   *
+   * 流程：
+   * 1. 收集用户决策，构造 `resume` 数组（status: 'resolved' | 'cancelled'）
+   * 2. 创建一条空的 AI 消息承载续跑内容
+   * 3. 携带 `resume` 发起新请求（同一 `threadId`），`resume` 经 `onRequest`
+   *    进入 RunAgentInput 供后端关联
+   * 4. 后端继续运行，对 tool_call 类 interrupt 直接推 `TOOL_CALL_RESULT`
+   *
+   * AG-UI 规范要求单次 `resume` 覆盖全部开放 interrupts；覆盖不全、包含未知 id、
+   * 无待决 interrupts 或已过期时会输出警告（最终由后端裁决，违反规范将产生 `RUN_ERROR`）。
+   *
+   * @param resume  逐条 interrupt 的用户响应，`interruptId` 须对应 `getPendingInterrupts()` 中的 id
+   * @param params  请求参数，应包含与被中断运行相同的 `threadId`
+   * @returns 新创建的 AI 消息 ID
+   */
+  public async resumeInterrupts(resume: AGUIInterruptResume[], params: ChatRequestParams = {}): Promise<string> {
+    // 软校验 AG-UI 规范：resume 覆盖全部开放 interrupts（规则 3）、不提交已过期 interrupt（规则 7）
+    if (this.agui === null) {
+      console.warn('[ChatEngine] resumeInterrupts: 当前协议非 AG-UI，resume 字段为 AG-UI 规范专属，后端可能无法识别。');
+    }
+
+    const pending = this.agui?.getPendingInterrupts?.() ?? [];
+    if (pending.length === 0 && this.agui !== null) {
+      console.warn(
+        '[ChatEngine] resumeInterrupts: 当前无待决的 interrupts，resume 可能已过期或已被处理，后端可能返回 RunError。',
+      );
+    }
+
+    if (pending.length > 0) {
+      const coveredIds = new Set(resume.map((item) => item.interruptId));
+      const pendingIds = new Set(pending.map((interrupt) => interrupt.id));
+      const uncovered = pending.filter((interrupt) => !coveredIds.has(interrupt.id));
+      if (uncovered.length > 0) {
+        console.warn(
+          `[ChatEngine] resumeInterrupts: 存在未被覆盖的 interrupts（${uncovered
+            .map((interrupt) => interrupt.id)
+            .join(', ')}），AG-UI 规范要求单次 resume 覆盖全部开放中断，后端可能返回 RunError。`,
+        );
+      }
+      const unknown = resume.filter((item) => !pendingIds.has(item.interruptId));
+      if (unknown.length > 0) {
+        console.warn(
+          `[ChatEngine] resumeInterrupts: resume 中存在未知的 interruptId（${unknown
+            .map((item) => item.interruptId)
+            .join(', ')}），须对应 getPendingInterrupts() 返回的开放中断，后端可能返回 RunError。`,
+        );
+      }
+      const expired = pending.filter(
+        (interrupt) =>
+          coveredIds.has(interrupt.id) &&
+          interrupt.expiresAt !== undefined &&
+          !Number.isNaN(Date.parse(interrupt.expiresAt)) &&
+          Date.parse(interrupt.expiresAt) < Date.now(),
+      );
+      if (expired.length > 0) {
+        console.warn(
+          `[ChatEngine] resumeInterrupts: 存在已过期的 interrupts（${expired
+            .map((interrupt) => interrupt.id)
+            .join(', ')}），AG-UI 规范禁止对过期 interrupt 提交 resume，后端将返回 RunError。`,
+        );
+      }
+    }
+
+    return this.dispatchAssistantMessage({
+      content: [],
+      status: 'pending',
+      params: { ...params, resume } as ChatRequestParams<{ resume?: AGUIInterruptResume[] }>,
       sendRequest: true,
     });
   }
