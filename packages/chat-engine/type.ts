@@ -1,4 +1,5 @@
 import type { ToolCallEventType } from './adapters/agui/types/events';
+import type { AGUIInterruptResume } from './adapters/agui/types';
 import type { MessageStore } from './store/message';
 
 export type ChatMessageRole = 'user' | 'assistant' | 'system';
@@ -359,6 +360,16 @@ export interface IChatEngine {
    * 然后继续推增量事件直到 RUN_FINISHED
    */
   resumeRun(params?: ChatRequestParams): Promise<string>;
+
+  /**
+   * 恢复被 interrupt 暂停的运行（Human-in-the-Loop）
+   * @param resume 逐条 interrupt 的用户响应，interruptId 须对应开放的 interrupt id
+   * @param params 请求参数，应包含与被中断运行相同的 threadId
+   * @returns 新创建的 AI 消息 ID
+   * @description 创建空的 AI 消息后携带 resume 数组发起新请求，
+   * 后端据此继续运行（如对 tool_call 类 interrupt 直接推 TOOL_CALL_RESULT）
+   */
+  resumeInterrupts(resume: AGUIInterruptResume[], params?: ChatRequestParams): Promise<string>;
 
   /**
    * 重新生成AI回复

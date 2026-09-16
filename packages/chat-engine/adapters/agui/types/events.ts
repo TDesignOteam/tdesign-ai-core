@@ -1,7 +1,13 @@
 import { z } from 'zod';
 
 import type { Operation } from '../../../../shared/immutable-patch';
-import { AGUIMessageSchema, ChatJSONObjectSchema, ChatJSONValueSchema, StateSchema } from './schema';
+import {
+  AGUIMessageSchema,
+  ChatJSONObjectSchema,
+  ChatJSONValueSchema,
+  RunFinishedOutcomeSchema,
+  StateSchema,
+} from './schema';
 
 const isOperation = (value: unknown): value is Operation => {
   if (typeof value !== 'object' || value === null || !('op' in value) || !('path' in value)) return false;
@@ -342,6 +348,9 @@ export const RunFinishedEventSchema = BaseEventSchema.extend({
   threadId: z.string(),
   runId: z.string(),
   result: ChatJSONValueSchema.optional(),
+  // 可选运行结果（AG-UI Interrupts 规范）：缺省视为正常完成（向后兼容）
+  // https://docs.ag-ui.com/concepts/interrupts
+  outcome: RunFinishedOutcomeSchema.optional(),
 });
 
 export const RunErrorEventSchema = BaseEventSchema.extend({

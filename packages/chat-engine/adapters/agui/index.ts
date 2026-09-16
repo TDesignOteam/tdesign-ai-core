@@ -11,8 +11,8 @@ import type {
 } from '../../type';
 import { AGUIEventMapper } from './event-mapper';
 import type { BaseEvent, RunErrorEvent, RunFinishedEvent, RunStartedEvent } from './types/events';
-import { AGUIEventType } from './types/events';
-import type { AGUIHistoryMessage, AGUIUserHistoryMessage } from './types';
+import { AGUIEventType, RunErrorEventSchema, RunFinishedEventSchema, RunStartedEventSchema } from './types/events';
+import type { AGUIHistoryMessage, AGUIUserHistoryMessage, AGUIInterrupt } from './types';
 import { buildToolCallMap, processMessageGroup } from './utils';
 
 // 重新导出类型，以便其他文件可以使用
@@ -30,6 +30,13 @@ export type {
 export interface AGUIAdapterCallbacks {
   onRunStart?: (event: RunStartedEvent) => void;
   onRunComplete?: (isAborted: boolean, params: ChatRequestParams, event?: RunFinishedEvent) => void;
+  /**
+   * 运行以 interrupt 结果结束（HITL 暂停等待用户输入）
+   *
+   * 触发条件：RUN_FINISHED 携带 `outcome.type === 'interrupt'` 且 interrupts 非空；
+   * 此时不再触发 onRunComplete。未提供该回调时回退到 onRunComplete。
+   */
+  onRunInterrupted?: (event: RunFinishedEvent, interrupts: AGUIInterrupt[]) => void;
   onRunError?: (error: RunErrorEvent) => void;
 }
 
@@ -269,17 +276,41 @@ export class AGUIAdapter {
    */
   private handleAGUISpecificEvents(event: BaseEvent, callbacks: AGUIAdapterCallbacks): boolean {
     switch (event.type) {
-      case AGUIEventType.RUN_STARTED:
-        callbacks.onRunStart?.(event as RunStartedEvent);
+      case AGUIEventType.RUN_STARTED: {
+        const parsed = RunStartedEventSchema.safeParse(event);
+        if (!parsed.success) {
+          console.warn('[AGUIAdapter] RUN_STARTED 事件格式非法，已忽略:', event);
+          return true;
+        }
+        callbacks.onRunStart?.(parsed.data);
         return true;
-      case AGUIEventType.RUN_FINISHED:
-        callbacks.onRunComplete?.(false, {} as ChatRequestParams, event as RunFinishedEvent);
+      }
+      case AGUIEventType.RUN_FINISHED: {
+        const parsed = RunFinishedEventSchema.safeParse(event);
+        if (!parsed.success) {
+          console.warn('[AGUIAdapter] RUN_FINISHED 事件格式非法，已忽略:', event);
+          return true;
+        }
+        const finishedEvent = parsed.data;
+        const interrupts = finishedEvent.outcome?.type === 'interrupt' ? finishedEvent.outcome.interrupts : [];
+        if (interrupts.length > 0 && callbacks.onRunInterrupted) {
+          callbacks.onRunInterrupted(finishedEvent, interrupts);
+        } else {
+          callbacks.onRunComplete?.(false, {} as ChatRequestParams, finishedEvent);
+        }
         return true;
-      case AGUIEventType.RUN_ERROR:
+      }
+      case AGUIEventType.RUN_ERROR: {
+        const parsed = RunErrorEventSchema.safeParse(event);
+        if (!parsed.success) {
+          console.warn('[AGUIAdapter] RUN_ERROR 事件格式非法，已忽略:', event);
+          return false;
+        }
         // RUN_ERROR 需要触发回调，但不能返回 true
         // 因为还需要通过 event-mapper 生成错误消息内容用于 UI 展示
-        callbacks.onRunError?.(event as RunErrorEvent);
+        callbacks.onRunError?.(parsed.data);
         return false; // 继续处理，让 event-mapper 生成错误消息
+      }
       default:
         return false; // 不是生命周期事件
     }
