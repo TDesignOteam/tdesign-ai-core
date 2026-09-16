@@ -11,9 +11,8 @@ import type {
 } from '../../type';
 import { AGUIEventMapper } from './event-mapper';
 import type { BaseEvent, RunErrorEvent, RunFinishedEvent, RunStartedEvent } from './types/events';
-import { AGUIEventType } from './types/events';
+import { AGUIEventType, RunErrorEventSchema, RunFinishedEventSchema, RunStartedEventSchema } from './types/events';
 import type { AGUIHistoryMessage, AGUIUserHistoryMessage, AGUIInterrupt } from './types';
-import { RunFinishedOutcomeSchema } from './types/schema';
 import { buildToolCallMap, processMessageGroup } from './utils';
 
 // 重新导出类型，以便其他文件可以使用
@@ -277,12 +276,23 @@ export class AGUIAdapter {
    */
   private handleAGUISpecificEvents(event: BaseEvent, callbacks: AGUIAdapterCallbacks): boolean {
     switch (event.type) {
-      case AGUIEventType.RUN_STARTED:
-        callbacks.onRunStart?.(event as RunStartedEvent);
+      case AGUIEventType.RUN_STARTED: {
+        const parsed = RunStartedEventSchema.safeParse(event);
+        if (!parsed.success) {
+          console.warn('[AGUIAdapter] RUN_STARTED 事件格式非法，已忽略:', event);
+          return true;
+        }
+        callbacks.onRunStart?.(parsed.data);
         return true;
+      }
       case AGUIEventType.RUN_FINISHED: {
-        const finishedEvent = event as RunFinishedEvent;
-        const interrupts = this.extractInterrupts(finishedEvent);
+        const parsed = RunFinishedEventSchema.safeParse(event);
+        if (!parsed.success) {
+          console.warn('[AGUIAdapter] RUN_FINISHED 事件格式非法，已忽略:', event);
+          return true;
+        }
+        const finishedEvent = parsed.data;
+        const interrupts = finishedEvent.outcome?.type === 'interrupt' ? finishedEvent.outcome.interrupts : [];
         if (interrupts.length > 0 && callbacks.onRunInterrupted) {
           callbacks.onRunInterrupted(finishedEvent, interrupts);
         } else {
@@ -290,32 +300,20 @@ export class AGUIAdapter {
         }
         return true;
       }
-      case AGUIEventType.RUN_ERROR:
+      case AGUIEventType.RUN_ERROR: {
+        const parsed = RunErrorEventSchema.safeParse(event);
+        if (!parsed.success) {
+          console.warn('[AGUIAdapter] RUN_ERROR 事件格式非法，已忽略:', event);
+          return false;
+        }
         // RUN_ERROR 需要触发回调，但不能返回 true
         // 因为还需要通过 event-mapper 生成错误消息内容用于 UI 展示
-        callbacks.onRunError?.(event as RunErrorEvent);
+        callbacks.onRunError?.(parsed.data);
         return false; // 继续处理，让 event-mapper 生成错误消息
+      }
       default:
         return false; // 不是生命周期事件
     }
-  }
-
-  /**
-   * 从 RUN_FINISHED 事件提取开放的 interrupts（带运行时校验）
-   *
-   * - outcome 缺省或 `success`：返回 `[]`（向后兼容，视为正常完成）
-   * - outcome 为 `interrupt`：经 `RunFinishedOutcomeSchema` 校验后返回 interrupts
-   * - outcome 校验失败（未知 type、interrupts 为空或结构非法）：输出警告并返回 `[]`，
-   *   按正常完成处理，避免畸形数据污染业务层
-   */
-  private extractInterrupts(event: RunFinishedEvent): AGUIInterrupt[] {
-    if (event.outcome === undefined) return [];
-    const parsed = RunFinishedOutcomeSchema.safeParse(event.outcome);
-    if (!parsed.success) {
-      console.warn('[AGUIAdapter] RUN_FINISHED 携带非法的 outcome，按正常完成处理:', event.outcome);
-      return [];
-    }
-    return parsed.data.type === 'interrupt' ? parsed.data.interrupts : [];
   }
 }
 

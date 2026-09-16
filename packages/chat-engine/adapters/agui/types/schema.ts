@@ -147,24 +147,34 @@ export const ToolSchema = z.object({
  * Interrupt 定义（AG-UI Interrupts 规范）
  * https://docs.ag-ui.com/concepts/interrupts
  */
-export const InterruptSchema = z.object({
-  /** 关联键：贯穿 interrupt、resume、幂等与审计 */
-  id: z.string(),
-  /** 分类路由提示，核心值：tool_call / input_required / confirmation，其余为自定义扩展 */
-  reason: z.string(),
-  /** 人类可读的提示文案，通用兜底 UI 内容 */
-  message: z.string().optional(),
-  /** 绑定到先前 ToolCall* 序列的 toolCallId（reason: tool_call 时必须存在） */
-  toolCallId: z.string().optional(),
-  /** 期望的 resume.payload 的 JSON Schema */
-  responseSchema: ChatJSONValueSchema.optional(),
-  /** 可选 ISO-8601 过期时间，过期 resume 将产生 RunError */
-  expiresAt: z.string().optional(),
-  /** 框架自定义自由数据 */
-  metadata: ChatJSONObjectSchema.optional(),
-  /** 引发该 interrupt 的 subagent runId（根 run 引发时缺省） */
-  subagentRunId: z.string().optional(),
-});
+export const InterruptSchema = z
+  .object({
+    /** 关联键：贯穿 interrupt、resume、幂等与审计 */
+    id: z.string(),
+    /** 分类路由提示，核心值：tool_call / input_required / confirmation，其余为自定义扩展 */
+    reason: z.string(),
+    /** 人类可读的提示文案，通用兜底 UI 内容 */
+    message: z.string().optional(),
+    /** 绑定到先前 ToolCall* 序列的 toolCallId（reason: tool_call 时必须存在） */
+    toolCallId: z.string().optional(),
+    /** 期望的 resume.payload 的 JSON Schema */
+    responseSchema: ChatJSONValueSchema.optional(),
+    /** 可选 ISO-8601 过期时间，过期 resume 将产生 RunError */
+    expiresAt: z.string().optional(),
+    /** 框架自定义自由数据 */
+    metadata: ChatJSONObjectSchema.optional(),
+    /** 引发该 interrupt 的 subagent runId（根 run 引发时缺省） */
+    subagentRunId: z.string().optional(),
+  })
+  .superRefine((interrupt, context) => {
+    if (interrupt.reason === 'tool_call' && !interrupt.toolCallId) {
+      context.addIssue({
+        code: 'custom',
+        path: ['toolCallId'],
+        message: 'tool_call interrupt 必须提供 toolCallId',
+      });
+    }
+  });
 
 /**
  * RunFinished 的 outcome 判别联合

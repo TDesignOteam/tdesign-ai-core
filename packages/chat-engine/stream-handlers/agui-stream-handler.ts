@@ -19,8 +19,8 @@ export class AGUIStreamHandler implements IStreamHandler {
   private llmService: LLMService;
   private aguiAdapter: AGUIAdapter;
 
-  /** 当前待用户决策的开放 interrupts（RUN_STARTED 时清空） */
-  private pendingInterrupts: AGUIInterrupt[] = [];
+  /** 各线程当前待用户决策的开放 interrupts（对应线程 RUN_STARTED 时清空） */
+  private pendingInterrupts = new Map<string, AGUIInterrupt[]>();
 
   constructor(llmService: LLMService, aguiAdapter?: AGUIAdapter) {
     this.llmService = llmService;
@@ -74,24 +74,32 @@ export class AGUIStreamHandler implements IStreamHandler {
    *
    * 运行以 `outcome.type === 'interrupt'` 结束时更新，下一次 RUN_STARTED 时清空。
    * resume 请求应通过 `ChatEngine.resumeInterrupts` 发起，覆盖全部开放 interrupts。
+   * @param threadId 指定线程时仅返回该线程的中断；缺省时返回全部线程的中断
    */
-  getPendingInterrupts(): AGUIInterrupt[] {
-    return [...this.pendingInterrupts];
+  getPendingInterrupts(threadId?: string): AGUIInterrupt[] {
+    if (threadId !== undefined) return [...(this.pendingInterrupts.get(threadId) ?? [])];
+    return [...this.pendingInterrupts.values()].flatMap((interrupts) => interrupts);
   }
 
   /**
    * 手动清空待决策的开放 interrupts（一般由 RUN_STARTED 自动清空，无需手动调用）
+   * @param threadId 指定线程时仅清空该线程；缺省时清空全部线程
    */
-  clearPendingInterrupts(): void {
-    this.pendingInterrupts = [];
+  clearPendingInterrupts(threadId?: string): void {
+    if (threadId === undefined) {
+      this.pendingInterrupts.clear();
+    } else {
+      this.pendingInterrupts.delete(threadId);
+    }
   }
 
   async handleStream(params: ChatRequestParams, context: StreamContext): Promise<void> {
     const { messageId, config } = context;
 
     // AG-UI 规范：存在未决 interrupts 时，新的 RunAgentInput 必须携带非空 resume 覆盖全部开放中断
-    const resume = (params as ChatRequestParams<{ resume?: unknown[] }>).resume;
-    if (this.pendingInterrupts.length > 0 && !(resume && resume.length > 0)) {
+    const { resume, threadId } = params as ChatRequestParams<{ resume?: unknown[]; threadId?: string }>;
+    const pending = threadId === undefined ? [] : this.getPendingInterrupts(threadId);
+    if (pending.length > 0 && !(resume && resume.length > 0)) {
       console.warn(
         '[AGUIStreamHandler] 当前线程存在未决的 interrupts，本次请求未携带 resume 字段，' +
           '后端可能返回 RunError。请使用 engine.resumeInterrupts() 恢复运行。',
@@ -120,7 +128,7 @@ export class AGUIStreamHandler implements IStreamHandler {
             // 重置适配器状态，确保新一轮对话从干净状态开始
             this.aguiAdapter.reset();
             // 新 run 开始，上一轮的开放 interrupts 不再阻塞（resume 已被后端接受）
-            this.clearPendingInterrupts();
+            this.clearPendingInterrupts(event.threadId);
             config.onStart?.(JSON.stringify(event));
             // 发布 AGUI 运行开始事件
             context.eventBus.emit(ChatEngineEventType.AGUI_RUN_START, {
@@ -142,7 +150,7 @@ export class AGUIStreamHandler implements IStreamHandler {
           },
           onRunInterrupted: (event, interrupts) => {
             // 记录开放 interrupts 供业务层查询与 resume
-            this.pendingInterrupts = interrupts;
+            this.pendingInterrupts.set(event.threadId, interrupts);
             // 与正常完成相同的结算路径（消息状态、onComplete、REQUEST_COMPLETE）
             context.handleComplete(messageId, false, params, event);
             // 发布 AGUI 运行中断事件

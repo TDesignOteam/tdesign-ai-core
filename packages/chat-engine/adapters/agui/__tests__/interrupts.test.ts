@@ -63,6 +63,27 @@ describe('AG-UI Interrupts schema', () => {
     ).toBe(false);
   });
 
+  it('tool_call interrupt 必须携带 toolCallId', () => {
+    expect(
+      RunFinishedEventSchema.safeParse({
+        ...interruptFinishedEvent,
+        outcome: {
+          type: 'interrupt',
+          interrupts: [{ id: 'int-1', reason: 'tool_call' }],
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      RunFinishedEventSchema.safeParse({
+        ...interruptFinishedEvent,
+        outcome: {
+          type: 'interrupt',
+          interrupts: [{ id: 'int-1', reason: 'confirmation' }],
+        },
+      }).success,
+    ).toBe(true);
+  });
+
   it('RunAgentInput 支持可选的 resume 数组', () => {
     const input = {
       threadId: 'thread-1',
@@ -144,7 +165,7 @@ describe('AGUIAdapter interrupt 派发', () => {
     expect(onRunInterrupted).not.toHaveBeenCalled();
   });
 
-  it('outcome 非法（未知 type 或 interrupts 为空）时警告并回退 onRunComplete', () => {
+  it('非法 RUN_FINISHED 事件告警并跳过生命周期回调', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const adapter = new AGUIAdapter();
     const onRunComplete = vi.fn();
@@ -174,7 +195,35 @@ describe('AGUIAdapter interrupt 派发', () => {
     );
 
     expect(warn).toHaveBeenCalledTimes(2);
-    expect(onRunComplete).toHaveBeenCalledTimes(2);
+    expect(onRunComplete).not.toHaveBeenCalled();
+    expect(onRunInterrupted).not.toHaveBeenCalled();
+  });
+
+  it('缺少 threadId 或 runId 的生命周期事件不会触发回调', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const adapter = new AGUIAdapter();
+    const onRunStart = vi.fn();
+    const onRunComplete = vi.fn();
+    const onRunInterrupted = vi.fn();
+
+    adapter.handleAGUIEvent(
+      { data: { type: AGUIEventType.RUN_STARTED, runId: 'run-1' } },
+      { onRunStart, onRunComplete, onRunInterrupted },
+    );
+    adapter.handleAGUIEvent(
+      {
+        data: {
+          type: AGUIEventType.RUN_FINISHED,
+          runId: 'run-1',
+          outcome: { type: 'interrupt', interrupts: [toolCallInterrupt] },
+        },
+      },
+      { onRunStart, onRunComplete, onRunInterrupted },
+    );
+
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(onRunStart).not.toHaveBeenCalled();
+    expect(onRunComplete).not.toHaveBeenCalled();
     expect(onRunInterrupted).not.toHaveBeenCalled();
   });
 });

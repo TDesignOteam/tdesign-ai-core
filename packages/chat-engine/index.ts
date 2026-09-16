@@ -416,8 +416,19 @@ export default class ChatEngine implements IChatEngine {
       console.warn('[ChatEngine] resumeInterrupts: 当前协议非 AG-UI，resume 字段为 AG-UI 规范专属，后端可能无法识别。');
     }
 
-    const pending = this.agui?.getPendingInterrupts?.() ?? [];
-    if (pending.length === 0 && this.agui !== null) {
+    const threadId = (params as ChatRequestParams<{ threadId?: string }>).threadId;
+    const allPending = this.agui?.getPendingInterrupts?.() ?? [];
+    const pending = threadId === undefined ? allPending : (this.agui?.getPendingInterrupts?.(threadId) ?? []);
+    if (this.agui !== null && allPending.length > 0 && threadId === undefined) {
+      console.warn(
+        '[ChatEngine] resumeInterrupts: 缺少 threadId；AG-UI 规范要求使用被中断运行的同一线程，后端可能返回 RunError。',
+      );
+    } else if (this.agui !== null && allPending.length > 0 && pending.length === 0) {
+      console.warn(
+        `[ChatEngine] resumeInterrupts: threadId（${threadId}）与当前待决 interrupts 所属线程不匹配，后端可能返回 RunError。`,
+      );
+    }
+    if (allPending.length === 0 && this.agui !== null) {
       console.warn(
         '[ChatEngine] resumeInterrupts: 当前无待决的 interrupts，resume 可能已过期或已被处理，后端可能返回 RunError。',
       );

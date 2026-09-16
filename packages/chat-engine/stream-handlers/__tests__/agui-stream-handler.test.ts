@@ -205,7 +205,10 @@ describe('AGUIStreamHandler', () => {
     expect(handler.getPendingInterrupts()).toEqual(interrupts);
 
     await handler.handleStream(
-      { resume: [{ interruptId: 'int-1', status: 'resolved', payload: { approved: true } }] },
+      {
+        threadId: 'thread-1',
+        resume: [{ interruptId: 'int-1', status: 'resolved', payload: { approved: true } }],
+      },
       context,
     );
     getRequestConfig()!.onMessage?.({ data: 'run event' });
@@ -224,7 +227,7 @@ describe('AGUIStreamHandler', () => {
       return null;
     });
 
-    await handler.handleStream({ prompt: 'hello' }, context);
+    await handler.handleStream({ prompt: 'hello', threadId: 'thread-1' }, context);
     getRequestConfig()!.onMessage?.({ data: 'run event' });
     expect(handler.getPendingInterrupts()).toEqual(interrupts);
 
@@ -245,13 +248,39 @@ describe('AGUIStreamHandler', () => {
       return null;
     });
 
-    await handler.handleStream({ prompt: 'hello' }, context);
+    await handler.handleStream({ prompt: 'hello', threadId: 'thread-1' }, context);
     getRequestConfig()!.onMessage?.({ data: 'run event' });
     expect(warn).not.toHaveBeenCalled();
 
-    await handler.handleStream({ prompt: 'follow up' }, context);
+    await handler.handleStream({ prompt: 'follow up', threadId: 'thread-1' }, context);
     expect(warn).toHaveBeenCalledOnce();
     expect(warn.mock.calls[0][0]).toContain('resume');
+  });
+
+  it('不同线程的 RUN_STARTED 不会清除其他线程的待决 interrupts', async () => {
+    const interrupts = [{ id: 'int-1', reason: 'tool_call', toolCallId: 'tc-1' }];
+    const { adapter, context, handler, getRequestConfig } = setup();
+    let runCount = 0;
+    adapter.handleAGUIEvent.mockImplementation((_chunk: SSEChunkData, callbacks: AGUIAdapterCallbacks) => {
+      runCount += 1;
+      if (runCount === 1) {
+        callbacks.onRunInterrupted?.(
+          { type: AGUIEventType.RUN_FINISHED, runId: 'run-1', threadId: 'thread-1' },
+          interrupts,
+        );
+      } else {
+        callbacks.onRunStart?.({ type: AGUIEventType.RUN_STARTED, runId: 'run-2', threadId: 'thread-2' });
+      }
+      return null;
+    });
+
+    await handler.handleStream({ prompt: 'first', threadId: 'thread-1' }, context);
+    getRequestConfig()!.onMessage?.({ data: 'interrupt' });
+    await handler.handleStream({ prompt: 'second', threadId: 'thread-2' }, context);
+    getRequestConfig()!.onMessage?.({ data: 'started' });
+
+    expect(handler.getPendingInterrupts('thread-1')).toEqual(interrupts);
+    expect(handler.getPendingInterrupts('thread-2')).toEqual([]);
   });
 
   it('委托运行错误并派发 AGUI 运行错误事件', async () => {
