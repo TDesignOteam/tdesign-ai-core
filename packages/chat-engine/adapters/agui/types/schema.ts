@@ -143,6 +143,70 @@ export const ToolSchema = z.object({
   parameters: ChatJSONValueSchema, // JSON Schema for the tool parameters
 });
 
+/**
+ * Interrupt reason 分类法核心值
+ *
+ * 允许自定义字符串（建议命名空间化，如 `<framework>:<name>`），`core:` 前缀为保留。
+ * 客户端遇到未知 reason 不应报错，而应从 message / responseSchema / metadata 渲染。
+ * https://docs.ag-ui.com/concepts/interrupts
+ */
+export const InterruptReason = {
+  /** 绑定到特定工具调用的决策，必须设置 toolCallId */
+  TOOL_CALL: 'tool_call',
+  /** 需要结构化输入，应设置 responseSchema */
+  INPUT_REQUIRED: 'input_required',
+  /** 独立的是/否确认，responseSchema 可选 */
+  CONFIRMATION: 'confirmation',
+} as const;
+
+export type InterruptReason = (typeof InterruptReason)[keyof typeof InterruptReason] | (string & {});
+
+/**
+ * 中断（Interrupt）Schema
+ *
+ * 运行在需要人工审批、结构化输入或等待外部决策时暂停，`RunFinished` 事件的
+ * `outcome` 会携带一组待处理中断，客户端收集响应后通过下一轮请求的 `resume` 回传。
+ * https://docs.ag-ui.com/concepts/interrupts
+ */
+export const InterruptSchema = z.object({
+  /** 关联键，贯穿中断、恢复、幂等与审计 */
+  id: z.string(),
+  /** 分类路由提示（见 InterruptReason） */
+  reason: z.string(),
+  /** 人类可读提示，作为通用回退 UI 内容 */
+  message: z.string().optional(),
+  /** 绑定到之前 ToolCall* 序列的 toolCallId（reason='tool_call' 时必需） */
+  toolCallId: z.string().optional(),
+  /** 期望 resume.payload 满足的 JSON Schema */
+  responseSchema: ChatJSONValueSchema.optional(),
+  /** 可选 ISO-8601 有效期，过期后恢复会产生 RunError */
+  expiresAt: z.string().optional(),
+  /** 框架特定的自由数据 */
+  metadata: ChatJSONObjectSchema.optional(),
+  /** 引发该中断的子智能体归属 */
+  subagentRunId: z.string().optional(),
+});
+
+/**
+ * 恢复状态
+ * - resolved：用户已响应，payload 携带答案（拒绝也在 payload 内表达，如 { approved: false }）
+ * - cancelled：用户放弃，应省略 payload
+ */
+export const ResumeStatusSchema = z.union([z.literal('resolved'), z.literal('cancelled')]);
+
+/**
+ * 恢复项 Schema（下一轮 RunAgentInput.resume 的数组元素）
+ */
+export const ResumeInputSchema = z.object({
+  /** 必须引用中断运行中某个 interrupt 的 id */
+  interruptId: z.string(),
+  status: ResumeStatusSchema,
+  /** 用户响应载荷（依 responseSchema 校验），cancelled 时应省略 */
+  payload: ChatJSONValueSchema.optional(),
+  /** 关于响应的信封数据（如签名、路由键），`ag-ui` 键为保留键 */
+  metadata: ChatJSONObjectSchema.optional(),
+});
+
 export const RunAgentInputSchema = z.object({
   threadId: z.string(),
   runId: z.string(),
@@ -151,6 +215,8 @@ export const RunAgentInputSchema = z.object({
   tools: z.array(ToolSchema),
   context: z.array(ContextSchema),
   forwardedProps: ChatJSONObjectSchema,
+  // 携带对上一轮中断的响应，用于恢复运行（interrupts）
+  resume: z.array(ResumeInputSchema).optional(),
 });
 
 export const StateSchema = ChatJSONObjectSchema;
@@ -170,6 +236,9 @@ export type AGUITool = z.infer<typeof ToolSchema>;
 export type RunAgentInput = z.infer<typeof RunAgentInputSchema>;
 export type AGUIState = z.infer<typeof StateSchema>;
 export type AGUIRole = z.infer<typeof RoleSchema>;
+export type Interrupt = z.infer<typeof InterruptSchema>;
+export type ResumeStatus = z.infer<typeof ResumeStatusSchema>;
+export type ResumeInput = z.infer<typeof ResumeInputSchema>;
 
 // 历史消息类型别名，复用已有的类型
 export type AGUIHistoryMessage = AGUIMessage;

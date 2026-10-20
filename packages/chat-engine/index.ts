@@ -4,6 +4,7 @@ import { ChatEngineEventType, ChatEventBus } from './event-bus';
 import MessageProcessor from './processor';
 import { LLMService } from './server';
 import { isSnapshotMessageContent } from './adapters/agui/utils';
+import type { ResumeInput } from './adapters/agui/types';
 import {
   createStreamHandler,
   type AGUIStreamHandler,
@@ -387,6 +388,41 @@ export default class ChatEngine implements IChatEngine {
       params,
       sendRequest: true,
     });
+  }
+
+  /**
+   * 恢复被中断（interrupt）的 Agent 运行。
+   *
+   * 适用场景：上一轮运行以 `RUN_FINISHED(outcome.type='interrupt')` 结束，
+   * 用户对每个中断作出响应（`engine.agui?.resolveInterrupt / cancelInterrupt`）后，
+   * 调用本方法把响应通过 `resume` 附加到请求参数并发起新的运行。
+   *
+   * 流程：
+   * 1. 收集 resume（未显式传入时从 AG-UI 适配器自动构建，会校验是否覆盖全部中断）
+   * 2. 创建一条空的 AI 消息承载后续推送
+   * 3. 携带 `resume` 发起请求（由业务侧 `onRequest` 写入 RunAgentInput.resume）
+   * 4. 恢复请求发出后清理已处理的中断
+   *
+   * @param params 额外请求参数；可显式传入 `resume`，否则从适配器自动构建
+   * @returns 新创建的 AI 消息 ID
+   */
+  public async resumeInterrupt(params: ChatRequestParams & { resume?: ResumeInput[] } = {}): Promise<string> {
+    const { resume: explicitResume, ...rest } = params;
+    // 未显式传入 resume 时，从 AG-UI 适配器构建（校验：不支持部分恢复）
+    const resume = explicitResume ?? this.agui?.buildResume() ?? [];
+    // resume 通过 forwardedProps 语义随请求参数透传，由业务侧 onRequest 写入 RunAgentInput.resume
+    const requestParams: ChatRequestParams<{ resume: ResumeInput[] }> = { ...rest, resume };
+
+    const messageId = await this.dispatchAssistantMessage({
+      content: [],
+      status: 'pending',
+      params: requestParams,
+      sendRequest: true,
+    });
+
+    // 恢复请求已发出，清理已处理的中断
+    this.agui?.clearInterrupts();
+    return messageId;
   }
 
   /**

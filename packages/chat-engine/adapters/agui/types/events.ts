@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 import type { Operation } from '../../../../shared/immutable-patch';
-import { AGUIMessageSchema, ChatJSONObjectSchema, ChatJSONValueSchema, StateSchema } from './schema';
+import type { Interrupt } from './schema';
+import { AGUIMessageSchema, ChatJSONObjectSchema, ChatJSONValueSchema, InterruptSchema, StateSchema } from './schema';
 
 const isOperation = (value: unknown): value is Operation => {
   if (typeof value !== 'object' || value === null || !('op' in value) || !('path' in value)) return false;
@@ -337,11 +338,34 @@ export const RunStartedEventSchema = BaseEventSchema.extend({
   runId: z.string(),
 });
 
+/**
+ * 运行结果（可区分联合）
+ * - success：运行正常完成，可选 result 保留在事件根部
+ * - interrupt：运行暂停等待用户输入，interrupts 为非空数组
+ *
+ * `outcome` 为可选字段：省略时向后兼容，视为正常完成。
+ * https://docs.ag-ui.com/concepts/interrupts
+ */
+export const RunFinishedSuccessOutcomeSchema = z.object({
+  type: z.literal('success'),
+});
+
+export const RunFinishedInterruptOutcomeSchema = z.object({
+  type: z.literal('interrupt'),
+  interrupts: z.array(InterruptSchema).min(1),
+});
+
+export const RunFinishedOutcomeSchema = z.discriminatedUnion('type', [
+  RunFinishedSuccessOutcomeSchema,
+  RunFinishedInterruptOutcomeSchema,
+]);
+
 export const RunFinishedEventSchema = BaseEventSchema.extend({
   type: z.literal(AGUIEventType.RUN_FINISHED),
   threadId: z.string(),
   runId: z.string(),
   result: ChatJSONValueSchema.optional(),
+  outcome: RunFinishedOutcomeSchema.optional(),
 });
 
 export const RunErrorEventSchema = BaseEventSchema.extend({
@@ -429,7 +453,26 @@ export type RawEvent = z.infer<typeof RawEventSchema>;
 export type CustomEvent = z.infer<typeof CustomEventSchema>;
 export type RunStartedEvent = z.infer<typeof RunStartedEventSchema>;
 export type RunFinishedEvent = z.infer<typeof RunFinishedEventSchema>;
+export type RunFinishedOutcome = z.infer<typeof RunFinishedOutcomeSchema>;
 export type RunErrorEvent = z.infer<typeof RunErrorEventSchema>;
 export type StepStartedEvent = z.infer<typeof StepStartedEventSchema>;
 export type StepFinishedEvent = z.infer<typeof StepFinishedEventSchema>;
 export type AGUIEvent = z.infer<typeof EventSchemas>;
+
+/**
+ * 判断 RUN_FINISHED 事件是否以中断结果结束
+ * @param event RUN_FINISHED 事件
+ * @returns 是否为中断结果
+ */
+export function isInterruptOutcome(event: RunFinishedEvent): boolean {
+  return event.outcome?.type === 'interrupt';
+}
+
+/**
+ * 从 RUN_FINISHED 事件中提取中断列表
+ * @param event RUN_FINISHED 事件
+ * @returns 中断数组；非中断结果时返回 null
+ */
+export function getRunInterrupts(event: RunFinishedEvent): Interrupt[] | null {
+  return event.outcome?.type === 'interrupt' ? event.outcome.interrupts : null;
+}

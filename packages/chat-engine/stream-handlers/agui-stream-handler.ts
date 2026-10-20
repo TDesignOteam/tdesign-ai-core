@@ -6,7 +6,15 @@
  */
 import { AGUIAdapter } from '../adapters/agui';
 import type { AGUIAdapterCallbacks } from '../adapters/agui';
-import type { AIMessageContent, ChatRequestParams, SSEChunkData, ToolCall } from '../type';
+import type { Interrupt, ResumeInput } from '../adapters/agui';
+import type {
+  AIMessageContent,
+  ChatJSONObject,
+  ChatJSONValue,
+  ChatRequestParams,
+  SSEChunkData,
+  ToolCall,
+} from '../type';
 import { ChatEngineEventType } from '../event-bus';
 import { LLMService } from '../server';
 import { isActivityContent, isToolCallContent } from '../utils';
@@ -62,6 +70,41 @@ export class AGUIStreamHandler implements IStreamHandler {
     this.aguiAdapter.reset();
   }
 
+  /**
+   * 获取当前所有开放中断（AGUI 协议专属）
+   */
+  getInterrupts(): Interrupt[] {
+    return this.aguiAdapter.interruptManager.getInterrupts();
+  }
+
+  /**
+   * 响应某个中断（拒绝也通过 payload 表达，如 { approved: false }）
+   */
+  resolveInterrupt(interruptId: string, payload?: ChatJSONValue, metadata?: ChatJSONObject): void {
+    this.aguiAdapter.interruptManager.resolve(interruptId, payload, metadata);
+  }
+
+  /**
+   * 放弃某个中断（不携带 payload）
+   */
+  cancelInterrupt(interruptId: string, metadata?: ChatJSONObject): void {
+    this.aguiAdapter.interruptManager.cancel(interruptId, metadata);
+  }
+
+  /**
+   * 构建 resume 数组，若仍有未处理中断则抛出 AGUIError（不支持部分恢复）
+   */
+  buildResume(): ResumeInput[] {
+    return this.aguiAdapter.interruptManager.buildResume();
+  }
+
+  /**
+   * 清空已记录的中断与响应（恢复请求发出后调用）
+   */
+  clearInterrupts(): void {
+    this.aguiAdapter.interruptManager.clear();
+  }
+
   async handleStream(params: ChatRequestParams, context: StreamContext): Promise<void> {
     const { messageId, config } = context;
 
@@ -110,6 +153,16 @@ export class AGUIStreamHandler implements IStreamHandler {
             // 发布 AGUI 运行错误事件
             context.eventBus.emit(ChatEngineEventType.AGUI_RUN_ERROR, {
               error,
+            });
+          },
+          onRunInterrupt: (interrupts, event) => {
+            // 中断：运行已结束（暂停等待用户响应），先结算消息状态，再广播中断事件
+            context.handleComplete(messageId, false, {} as ChatRequestParams, event);
+            context.eventBus.emit(ChatEngineEventType.AGUI_RUN_INTERRUPT, {
+              interrupts,
+              runId: event.runId,
+              threadId: event.threadId,
+              timestamp: Date.now(),
             });
           },
         });

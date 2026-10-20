@@ -11,8 +11,9 @@ import type {
 } from '../../type';
 import { AGUIEventMapper } from './event-mapper';
 import type { BaseEvent, RunErrorEvent, RunFinishedEvent, RunStartedEvent } from './types/events';
-import { AGUIEventType } from './types/events';
-import type { AGUIHistoryMessage, AGUIUserHistoryMessage } from './types';
+import { AGUIEventType, getRunInterrupts } from './types/events';
+import type { AGUIHistoryMessage, AGUIUserHistoryMessage, Interrupt } from './types';
+import { interruptManager } from './InterruptManager';
 import { buildToolCallMap, processMessageGroup } from './utils';
 
 // 重新导出类型，以便其他文件可以使用
@@ -31,6 +32,13 @@ export interface AGUIAdapterCallbacks {
   onRunStart?: (event: RunStartedEvent) => void;
   onRunComplete?: (isAborted: boolean, params: ChatRequestParams, event?: RunFinishedEvent) => void;
   onRunError?: (error: RunErrorEvent) => void;
+  /**
+   * 运行以中断结果结束（RUN_FINISHED.outcome.type === 'interrupt'）。
+   *
+   * 运行已暂停等待用户响应，客户端应收集响应后通过下一轮请求的 `resume` 恢复。
+   * 触发此回调时不再触发 {@link onRunComplete}。
+   */
+  onRunInterrupt?: (interrupts: Interrupt[], event: RunFinishedEvent) => void;
 }
 
 /**
@@ -245,6 +253,13 @@ export class AGUIAdapter {
     return this.aguiEventMapper.getToolCalls();
   }
 
+  /**
+   * 中断管理器：管理 RUN_FINISHED 携带的开放中断，收集响应并构建 resume 数组。
+   */
+  get interruptManager() {
+    return interruptManager;
+  }
+
   getToolcallByName(name: string): ToolCall | undefined {
     const result = this.aguiEventMapper.getToolCalls().find((call) => call.toolCallName === name);
     return result;
@@ -272,9 +287,22 @@ export class AGUIAdapter {
       case AGUIEventType.RUN_STARTED:
         callbacks.onRunStart?.(event as RunStartedEvent);
         return true;
-      case AGUIEventType.RUN_FINISHED:
-        callbacks.onRunComplete?.(false, {} as ChatRequestParams, event as RunFinishedEvent);
+      case AGUIEventType.RUN_FINISHED: {
+        const finishedEvent = event as RunFinishedEvent;
+        const interrupts = getRunInterrupts(finishedEvent);
+        if (interrupts) {
+          // 中断结果：记录开放中断供 UI 收集响应，并在下一轮通过 resume 回传，
+          // 不再走正常完成回调
+          interruptManager.handleInterrupts(interrupts, {
+            threadId: finishedEvent.threadId,
+            runId: finishedEvent.runId,
+          });
+          callbacks.onRunInterrupt?.(interrupts, finishedEvent);
+        } else {
+          callbacks.onRunComplete?.(false, {} as ChatRequestParams, finishedEvent);
+        }
         return true;
+      }
       case AGUIEventType.RUN_ERROR:
         // RUN_ERROR 需要触发回调，但不能返回 true
         // 因为还需要通过 event-mapper 生成错误消息内容用于 UI 展示
@@ -291,6 +319,7 @@ export class AGUIAdapter {
  */
 export * from './StateManager';
 export * from './ActivityManager';
+export * from './InterruptManager';
 export * from './types';
 
 function normalizeUserMessageContent(value: ChatJSONValue): UserMessageContent | null {

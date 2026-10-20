@@ -39,6 +39,9 @@ vi.mock('../stream-handlers', () => ({
       afterMessageUpdate: vi.fn(),
       abort: vi.fn(),
       destroy: vi.fn(),
+      // AG-UI 中断代理方法（仅 protocol: 'agui' 场景使用）
+      buildResume: vi.fn(() => []),
+      clearInterrupts: vi.fn(),
     };
     mocks.handlerInstances.push(handler);
     return handler;
@@ -282,6 +285,52 @@ describe('ChatEngine', () => {
       { threadId: 'thread-1', messageID: id },
       expect.objectContaining({ messageId: id }),
     );
+  });
+
+  it('恢复中断：显式传入 resume 时直接透传并清理中断', async () => {
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'sse', protocol: 'agui' });
+    const handler = mocks.handlerInstances[0] as unknown as {
+      buildResume: ReturnType<typeof vi.fn>;
+      clearInterrupts: ReturnType<typeof vi.fn>;
+      handleStream: ReturnType<typeof vi.fn>;
+    };
+    const resume = [{ interruptId: 'int-1', status: 'resolved' as const, payload: { approved: true } }];
+
+    const id = await engine.resumeInterrupt({ threadId: 'thread-1', resume });
+
+    // 显式 resume 时不应再调用 buildResume
+    expect(handler.buildResume).not.toHaveBeenCalled();
+    // resume 随请求参数透传
+    expect(handler.handleStream).toHaveBeenCalledWith(
+      expect.objectContaining({ threadId: 'thread-1', resume, messageID: id }),
+      expect.objectContaining({ messageId: id }),
+    );
+    // 请求发出后清理已处理的中断
+    expect(handler.clearInterrupts).toHaveBeenCalledOnce();
+    expect(engine.messages.at(-1)).toEqual(expect.objectContaining({ role: 'assistant' }));
+  });
+
+  it('恢复中断：未传 resume 时从适配器自动构建', async () => {
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'sse', protocol: 'agui' });
+    const handler = mocks.handlerInstances[0] as unknown as {
+      buildResume: ReturnType<typeof vi.fn>;
+      clearInterrupts: ReturnType<typeof vi.fn>;
+      handleStream: ReturnType<typeof vi.fn>;
+    };
+    const built = [{ interruptId: 'int-2', status: 'cancelled' as const }];
+    handler.buildResume.mockReturnValue(built);
+
+    const id = await engine.resumeInterrupt({ threadId: 'thread-1' });
+
+    // 未显式传入时从适配器构建 resume
+    expect(handler.buildResume).toHaveBeenCalledOnce();
+    expect(handler.handleStream).toHaveBeenCalledWith(
+      expect.objectContaining({ threadId: 'thread-1', resume: built, messageID: id }),
+      expect.objectContaining({ messageId: id }),
+    );
+    expect(handler.clearInterrupts).toHaveBeenCalledOnce();
   });
 
   it('重新生成时替换最后一条 AI 消息并复用先前的参数', async () => {

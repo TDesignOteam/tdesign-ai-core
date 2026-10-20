@@ -161,6 +161,62 @@ describe('AGUIStreamHandler', () => {
     expect(context.eventBus.emit).toHaveBeenCalledWith(ChatEngineEventType.AGUI_RUN_ERROR, { error });
   });
 
+  it('运行中断时先结算消息再派发 AGUI 运行中断事件', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1234);
+    const params = { prompt: 'hello' };
+    const interrupts = [{ id: 'int-1', reason: 'confirmation', message: '确认？' }];
+    const event = {
+      type: AGUIEventType.RUN_FINISHED as const,
+      runId: 'run-1',
+      threadId: 'thread-1',
+      outcome: { type: 'interrupt' as const, interrupts },
+    };
+    const { adapter, context, handler, getRequestConfig } = setup();
+    adapter.handleAGUIEvent.mockImplementation((_chunk: SSEChunkData, callbacks: AGUIAdapterCallbacks) => {
+      callbacks.onRunInterrupt?.(interrupts, event);
+      return null;
+    });
+
+    await handler.handleStream(params, context);
+    getRequestConfig()!.onMessage?.({ data: 'run event' });
+
+    // 中断需先结算消息状态（非中止）
+    expect(context.handleComplete).toHaveBeenCalledWith('assistant-1', false, {}, event);
+    // 再广播中断事件
+    expect(context.eventBus.emit).toHaveBeenCalledWith(ChatEngineEventType.AGUI_RUN_INTERRUPT, {
+      interrupts,
+      runId: 'run-1',
+      threadId: 'thread-1',
+      timestamp: 1234,
+    });
+    // 中断不应触发正常完成事件
+    expect(context.eventBus.emit).not.toHaveBeenCalledWith(ChatEngineEventType.AGUI_RUN_COMPLETE, expect.anything());
+  });
+
+  it('暴露中断管理代理方法', () => {
+    const { adapter, handler } = setup();
+    const interrupts = [{ id: 'int-1', reason: 'confirmation' }];
+    const resume = [{ interruptId: 'int-1', status: 'resolved' as const, payload: { approved: true } }];
+    const interruptManager = {
+      getInterrupts: vi.fn(() => interrupts),
+      resolve: vi.fn(),
+      cancel: vi.fn(),
+      buildResume: vi.fn(() => resume),
+      clear: vi.fn(),
+    };
+    // adapter.interruptManager 为只读 getter，这里以可枚举属性注入
+    Object.defineProperty(adapter, 'interruptManager', { value: interruptManager, configurable: true });
+
+    expect(handler.getInterrupts()).toBe(interrupts);
+    handler.resolveInterrupt('int-1', { approved: true }, { sig: 'x' });
+    expect(interruptManager.resolve).toHaveBeenCalledWith('int-1', { approved: true }, { sig: 'x' });
+    handler.cancelInterrupt('int-1', { sig: 'y' });
+    expect(interruptManager.cancel).toHaveBeenCalledWith('int-1', { sig: 'y' });
+    expect(handler.buildResume()).toBe(resume);
+    handler.clearInterrupts();
+    expect(interruptManager.clear).toHaveBeenCalledOnce();
+  });
+
   it('映射前跳过被 onChunk 过滤掉的数据块', async () => {
     const config: ChatServiceConfig = { onChunk: vi.fn(() => null) };
     const { adapter, context, handler, getRequestConfig } = setup(config);

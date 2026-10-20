@@ -2,6 +2,7 @@
  * ChatEngine 事件总线类型定义
  */
 import type { AIMessageContent, ChatMessagesData, ChatRequestParams, ChatStatus, ToolCall } from '../type';
+import type { Interrupt } from '../adapters/agui/types';
 
 /**
  * 事件类型枚举
@@ -30,6 +31,7 @@ export enum ChatEngineEventType {
   AGUI_RUN_START = 'agui:run:start',
   AGUI_RUN_COMPLETE = 'agui:run:complete',
   AGUI_RUN_ERROR = 'agui:run:error',
+  AGUI_RUN_INTERRUPT = 'agui:run:interrupt',
   AGUI_STATE_UPDATE = 'agui:state:update',
   AGUI_TOOLCALL = 'agui:toolcall',
   AGUI_ACTIVITY = 'agui:activity',
@@ -117,6 +119,12 @@ export interface ChatEngineEventPayloadMap {
   [ChatEngineEventType.AGUI_RUN_ERROR]: {
     error: Error | unknown;
     runId?: string;
+  };
+  [ChatEngineEventType.AGUI_RUN_INTERRUPT]: {
+    interrupts: Interrupt[];
+    runId: string;
+    threadId?: string;
+    timestamp: number;
   };
   [ChatEngineEventType.AGUI_STATE_UPDATE]: {
     stateKey: string;
