@@ -623,10 +623,11 @@ export default class ChatEngine implements IChatEngine {
     if (Array.isArray(customResult) || (customResult && 'status' in customResult)) {
       this.processMessageResult(id, customResult);
     } else {
-      // 任何内容块失败，即视为整体失败
-      const allContentFailed = this.messageStore.messages.find((content) => content.status === 'error');
+      // 仅检查当前消息的内容块状态：历史消息中的失败记录不应影响本轮结算
+      const message = this.messageStore.getMessageByID(id);
+      const currentContentFailed = message?.content?.some((content) => content.status === 'error');
 
-      this.messageStore.setMessageStatus(id, isAborted ? 'stop' : allContentFailed ? 'error' : 'complete');
+      this.messageStore.setMessageStatus(id, isAborted ? 'stop' : currentContentFailed ? 'error' : 'complete');
     }
 
     const message = this.messageStore.getMessageByID(id);
