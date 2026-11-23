@@ -38,6 +38,9 @@ export class LLMService implements ILLMService {
 
   private batchClient: BatchClient | null = null;
 
+  /** 批量请求在途时的错误回调。client 上只挂一个监听器，由它转发到这里 */
+  private batchErrorHandler: ((error: Error | Response) => void) | null = null;
+
   private isDestroyed = false;
 
   /** WS 长连接模式标记：initWSConnection 成功后设为 true，表示 WS 连接跨消息复用 */
@@ -55,22 +58,37 @@ export class LLMService implements ILLMService {
   }
 
   /**
+   * 复用（或创建）批量客户端
+   *
+   * 错误监听器只在创建时注册一次，回调转发给当前在途请求的 onError。
+   */
+  private ensureBatchClient(): BatchClient {
+    if (!this.batchClient) {
+      this.batchClient = new BatchClient();
+      this.batchClient.on('error', (error: Error | Response) => {
+        this.batchErrorHandler?.(error);
+      });
+    }
+    return this.batchClient;
+  }
+
+  /**
    * 处理批量请求（非流式）
    */
   async handleBatchRequest(
     params: ChatRequestParams,
     config: ChatServiceConfig,
   ): Promise<AIMessageContent | AIMessageContent[]> {
-    // 确保只有一个客户端实例
-    this.batchClient = this.batchClient || new BatchClient();
-    this.batchClient.on('error', (error: Error | Response) => {
-      config.onError?.(error);
-    });
+    const client = this.ensureBatchClient();
+    // 只更新「当前在途请求」的回调，不再往 client 上挂新监听器：
+    // 原来每次调用都 on('error', ...)，监听器会随请求数累积，
+    // 既重复触发回调，也把每次请求的 config 闭包一直留在内存里。
+    this.batchErrorHandler = (error) => config.onError?.(error);
 
     const req: ChatRequestParams & Partial<RequestInit> = (await config.onRequest?.(params)) || params;
 
     try {
-      const data = await this.batchClient.request<AIMessageContent>(
+      const data = await client.request<AIMessageContent>(
         config.endpoint!,
         {
           method: 'POST',
@@ -252,6 +270,7 @@ export class LLMService implements ILLMService {
       this.batchClient.abort();
       this.batchClient = null;
     }
+    this.batchErrorHandler = null;
   }
 
   /**
