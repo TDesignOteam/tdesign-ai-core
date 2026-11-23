@@ -34,7 +34,9 @@ export default class SimpleEventEmitter {
   emit<TArgs extends unknown[]>(event: string, ...args: TArgs): boolean {
     const listeners = this.events.get(event);
     if (listeners && listeners.length > 0) {
-      listeners.forEach((listener) => {
+      // 在快照上遍历：once 包装器会在自己的回调里把它 splice 掉，直接 forEach
+      // 活数组会让紧随其后的监听器整体前移一位而被跳过。
+      [...listeners].forEach((listener) => {
         try {
           listener(...args);
         } catch (error) {
