@@ -26,10 +26,13 @@ export class BatchClient extends EventEmitter {
     // 中止上一个请求
     this.abort();
 
-    this.controller = new AbortController();
+    const controller = new AbortController();
+    this.controller = controller;
     const timeoutId = setTimeout(() => {
-      if (!this.controller?.signal.aborted) {
-        this.controller?.abort();
+      // 用本次请求自己的 controller：this.controller 可能已经指向之后发出的请求，
+      // 拿它去 abort 会把新请求误中止。
+      if (!controller.signal.aborted) {
+        controller.abort();
       }
       this.emit('error', new TimeoutError(`Request timed out after ${timeout}ms`));
     }, timeout);
@@ -37,7 +40,7 @@ export class BatchClient extends EventEmitter {
     try {
       const response = await fetch(endpoint, {
         ...request,
-        signal: this.controller.signal,
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -53,7 +56,11 @@ export class BatchClient extends EventEmitter {
       return undefined;
     } finally {
       clearTimeout(timeoutId);
-      this.controller = null;
+      // 只有 controller 仍属于本次请求时才清空。先发出的请求结束时若无条件置空，
+      // 会把后来请求的 controller 抹掉，之后 abort() 就再也中止不了那个请求。
+      if (this.controller === controller) {
+        this.controller = null;
+      }
     }
   }
 
