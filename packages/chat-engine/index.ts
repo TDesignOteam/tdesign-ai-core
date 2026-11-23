@@ -160,8 +160,15 @@ export default class ChatEngine implements IChatEngine {
     });
 
     this.abortChat();
-    this.llmService.destroy();
-    this.messageStore.clearHistory();
+    // llmService / streamHandler 只在 init 之后才有值，init 之前调用 destroy 也要安全
+    if (this.llmService) {
+      this.llmService.destroy();
+    }
+    // 状态只在 init 里 initialize 过才有内容；未初始化时 clearHistory 会在
+    // undefined 的 draft 上赋值而抛错
+    if (this.messageStore.isInitialized) {
+      this.messageStore.clearHistory();
+    }
     this.messageStore.destroy();
     this.streamHandler?.destroy?.();
     this.eventBus.destroy();
@@ -460,6 +467,12 @@ export default class ChatEngine implements IChatEngine {
    * ws 模式下通过 `config.abortRequest` 以 fire-and-forget 发送 `/stop`。
    */
   public async abortChat() {
+    // config / llmService 用 `!` 声明、只在 init 里赋值，init 之前调用会解引用
+    // undefined。没有 config 也就没有需要中止的请求，直接返回。
+    if (!this.config || !this.llmService) {
+      return;
+    }
+
     const transport = LLMService.resolveTransport(this.config);
     const lastAI = this.messageStore.lastAIMessage;
 

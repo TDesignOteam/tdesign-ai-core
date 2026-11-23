@@ -35,6 +35,16 @@ export default class ReactiveState<T extends object> {
   }
 
   /**
+   * 是否已经 initialize
+   *
+   * `currentState` 在 initialize 之前是 undefined，此时任何 setState 都会让 immer
+   * 在 undefined 的 draft 上赋值而抛错，调用方需要据此跳过状态清理之类的操作。
+   */
+  public get isInitialized(): boolean {
+    return this.currentState !== undefined;
+  }
+
+  /**
    * 更新状态方法
    * @param updater 状态更新函数（使用immer的draft机制）
    * @param paths 可选的手动指定变更路径（自动模式会从immer patches中提取）

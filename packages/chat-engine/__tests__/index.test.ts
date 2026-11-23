@@ -399,7 +399,12 @@ describe('ChatEngine', () => {
     expect(engine.messages).toEqual([]);
   });
 
-  it.todo('destroy 在 init 之前调用是安全的（当前会解引用未初始化的 config 与 service 字段）');
+  it('destroy 与 abortChat 在 init 之前调用是安全的', async () => {
+    const engine = new ChatEngine();
+
+    await expect(engine.abortChat()).resolves.toBeUndefined();
+    expect(() => engine.destroy()).not.toThrow();
+  });
 
   it.todo('sendUserMessage 等待并传播请求 promise（当前调用 sendRequest 时未等待其完成）');
 
