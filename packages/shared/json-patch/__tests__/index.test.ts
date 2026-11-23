@@ -398,7 +398,7 @@ describe('校验', () => {
     expect(customValidator).toHaveBeenCalled();
   });
 
-  it.fails('将每个操作的索引传递给自定义 validator', () => {
+  it('将每个操作的索引传递给自定义 validator', () => {
     const customValidator = vi.fn<Validator<{ first?: number; second?: number }>>();
 
     applyPatch(
@@ -447,7 +447,7 @@ describe('reducer 与相等性', () => {
     expect(_areEquals(left, right)).toBe(equal);
   });
 
-  it.fails('比较包含自有 hasOwnProperty 键的对象', () => {
+  it('比较包含自有 hasOwnProperty 键的对象', () => {
     const left = JSON.parse('{"hasOwnProperty":"left","value":1}');
     const right = JSON.parse('{"hasOwnProperty":"left","value":1}');
 

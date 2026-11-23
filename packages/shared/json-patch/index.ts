@@ -9,7 +9,7 @@
  *   If the path does not exist or is null/undefined, it will be initialized with the value.
  *   Example: {"op": "append", "path": "/content", "value": "示例"}
  */
-import { PatchError, _deepClone, isInteger, unescapePathComponent, hasUndefined } from './helpers';
+import { PatchError, _deepClone, isInteger, unescapePathComponent, hasUndefined, hasOwnProperty } from './helpers';
 
 export const JsonPatchError = PatchError;
 export const deepClone = _deepClone;
@@ -207,9 +207,9 @@ export function applyOperation<T>(
 ): OperationResult<T> {
   if (validateOperation) {
     if (typeof validateOperation == 'function') {
-      validateOperation(operation, 0, document, operation.path);
+      validateOperation(operation, index, document, operation.path);
     } else {
-      validator(operation, 0);
+      validator(operation, index);
     }
   }
   /* ROOT OPERATIONS */
@@ -612,7 +612,9 @@ export function _areEquals(a: any, b: any): boolean {
 
     if (length !== Object.keys(b).length) return false;
 
-    for (i = length; i-- !== 0; ) if (!b.hasOwnProperty(keys[i])) return false;
+    // 走 helpers 里的安全版本：直接调 b.hasOwnProperty 时，如果文档自身带一个
+    // "hasOwnProperty" 键（JSON.parse 出来的对象很常见），这里会抛 TypeError。
+    for (i = length; i-- !== 0; ) if (!hasOwnProperty(b, keys[i])) return false;
 
     for (i = length; i-- !== 0; ) {
       key = keys[i];

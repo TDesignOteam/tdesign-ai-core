@@ -47,6 +47,9 @@ export function _deepClone(obj: any) {
 export function isInteger(str: string): boolean {
   let i = 0;
   const len = str.length;
+  // 空字符串不是合法下标：循环一次都不开会直接落到 return true，
+  // 于是空的 path 段被当成下标 0，指向第一个元素。
+  if (len === 0) return false;
   let charCode;
   while (i < len) {
     charCode = str.charCodeAt(i);
