@@ -110,7 +110,7 @@ describe('BatchClient', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it.fails('上一个请求完成后最新的请求仍可中止', async () => {
+  it('上一个请求完成后最新的请求仍可中止', async () => {
     const signals: AbortSignal[] = [];
     let resolveSecond!: (response: { ok: boolean; json: () => Promise<unknown> }) => void;
     vi.stubGlobal(
