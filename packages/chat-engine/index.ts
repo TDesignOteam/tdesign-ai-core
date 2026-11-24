@@ -265,7 +265,9 @@ export default class ChatEngine implements IChatEngine {
         messageID: aiMessage.id,
         ...customParams,
       };
-      this.sendRequest(params);
+      // 等待并向上抛：sendRequest 出错时会先置消息状态为 error 再 rethrow，
+      // 这里不 await 会让调用方拿到已 resolve 的 promise，失败被吞成 unhandled rejection
+      await this.sendRequest(params);
     }
   }
 

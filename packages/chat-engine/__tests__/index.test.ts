@@ -401,7 +401,19 @@ describe('ChatEngine', () => {
 
   it.todo('destroy 在 init 之前调用是安全的（当前会解引用未初始化的 config 与 service 字段）');
 
-  it.todo('sendUserMessage 等待并传播请求 promise（当前调用 sendRequest 时未等待其完成）');
+  it('sendUserMessage 等待并传播请求 promise', async () => {
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'sse' });
+    const handler = mocks.handlerInstances[0] as unknown as { handleStream: ReturnType<typeof vi.fn> };
+    handler.handleStream.mockRejectedValue(new Error('stream failed'));
+    const requestError = vi.fn();
+    engine.eventBus.on(ChatEngineEventType.REQUEST_ERROR, requestError);
+
+    await expect(engine.sendUserMessage({ prompt: 'hello' })).rejects.toThrow('stream failed');
+
+    expect(requestError).toHaveBeenCalledOnce();
+    expect(engine.messages.at(-1)!.status).toBe('error');
+  });
 
   it.todo('完成消息时忽略无关的更早消息上的错误状态');
 });
