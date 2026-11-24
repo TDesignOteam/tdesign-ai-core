@@ -90,7 +90,10 @@ export class SSEClient extends EventEmitter {
       // 启动统一超时监控
       this.startTimeoutMonitor();
 
-      await this.establishConnection();
+      const established = await this.establishConnection();
+      if (!established) {
+        return;
+      }
       this.setState(SSEConnectionState.CONNECTED);
       this.connectionManager.onConnectionSuccess();
       await this.readStream();
@@ -154,7 +157,7 @@ export class SSEClient extends EventEmitter {
   /**
    * 建立连接
    */
-  private async establishConnection(): Promise<void> {
+  private async establishConnection(): Promise<boolean> {
     this.controller = new AbortController();
 
     try {
@@ -169,18 +172,19 @@ export class SSEClient extends EventEmitter {
       });
 
       if (!response.body || !response.ok) {
-        this.emit(
-          'error',
-          new ConnectionError(`HTTP ${response.status}: ${response.statusText}`, response.status, response),
-        );
-        return;
+        // 抛给 connect() 的 catch 走统一的 handleConnectionError：只有那里会把状态
+        // 置为 ERROR。原来这里只 emit 不抛，connect() 会继续 setState(CONNECTED)。
+        throw new ConnectionError(`HTTP ${response.status}: ${response.statusText}`, response.status, response);
       }
       this.reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+      return true;
     } catch (error) {
-      if (!(error instanceof DOMException && error.name === 'AbortError')) {
-        this.logger.error('sse request failed:', error);
-        this.emit('error', error);
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        // 主动 abort 不是连接错误，状态由 abort() 自己维护
+        return false;
       }
+      this.logger.error('sse request failed:', error);
+      throw error;
     }
   }
 

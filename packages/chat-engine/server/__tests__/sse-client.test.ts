@@ -134,7 +134,7 @@ describe('SSEClient', () => {
     expect(onError).toHaveBeenCalledWith(networkError);
   });
 
-  it.fails('非成功 HTTP 响应后停止连接建立而不进入 CONNECTED 状态', async () => {
+  it('非成功 HTTP 响应后停止连接建立而不进入 CONNECTED 状态', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401, statusText: 'Unauthorized', body: {} }));
     const client = new SSEClient('/events');
     const onError = vi.fn();
