@@ -135,6 +135,11 @@ export function getMessageContentForCopy(message: ChatMessagesData): string {
     } else if (isThinkingContent(item)) {
       append = item.data.text || '';
     }
+    // 图片、附件等不可复制的片段 `append` 为空串，此时不能拼分隔符，
+    // 否则 `[text, image, markdown]` 会得到 'first\n\nsecond' 这种空行。
+    if (!append) {
+      return pre;
+    }
     if (!pre) {
       return append;
     }
