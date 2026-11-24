@@ -67,7 +67,7 @@ describe('SimpleEventEmitter', () => {
     expect(listener).toHaveBeenCalledWith('first');
   });
 
-  it.fails('不跳过在 once 监听器之后注册的普通监听器', () => {
+  it('不跳过在 once 监听器之后注册的普通监听器', () => {
     const emitter = new SimpleEventEmitter();
     const onceListener = vi.fn();
     const regularListener = vi.fn();
