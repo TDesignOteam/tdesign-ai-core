@@ -40,7 +40,8 @@ function isPatchObject(value: PatchValue): value is JsonObject {
  * "/elements/deep-progress/props/percentage" => ["elements", "deep-progress", "props", "percentage"]
  */
 function parsePath(path: string): string[] {
-  if (path === '' || path === '/') return [];
+  // RFC 6902 §4："" 才是根，"/" 是「空字符串键」的对象层。
+  if (path === '') return [];
   return path
     .split('/')
     .slice(1)
@@ -89,6 +90,35 @@ function setByPath(obj: PatchValue, path: string[], value: PatchValue): PatchVal
 }
 
 /**
+ * 不可变地「插入」嵌套值（结构共享）
+ *
+ * 与 setByPath 的区别只在数组：RFC 6902 §4.1 规定 add 在目标索引处插入，
+ * 原索引及其后的元素整体后移；"-" 表示追加到末尾。对象上两者等价。
+ */
+function addByPath(obj: PatchValue, path: string[], value: PatchValue): PatchValue {
+  if (path.length === 0) {
+    return value;
+  }
+
+  const [head, ...tail] = path;
+
+  if (Array.isArray(obj)) {
+    const newArr = [...obj];
+    const index = head === '-' ? newArr.length : parseInt(head, 10);
+    if (tail.length === 0) {
+      newArr.splice(index, 0, value);
+    } else {
+      newArr[index] = addByPath(obj[index], tail, value);
+    }
+    return newArr;
+  }
+
+  const current = isPatchObject(obj) ? obj : {};
+  const newValue = tail.length === 0 ? value : addByPath(current[head], tail, value);
+  return { ...current, [head]: newValue };
+}
+
+/**
  * 不可变地删除嵌套值（结构共享）
  */
 function removeByPath(obj: PatchValue, path: string[]): PatchValue {
@@ -99,6 +129,11 @@ function removeByPath(obj: PatchValue, path: string[]): PatchValue {
   const [head, ...tail] = path;
 
   if (Array.isArray(obj)) {
+    // "-" 只在 add 里合法；remove 上的 "-" 不是有效索引，忽略而不是删掉首元素
+    // （parseInt('-') 是 NaN，splice(NaN, 1) 会退化成删除下标 0）。
+    if (head === '-') {
+      return obj;
+    }
     const index = parseInt(head, 10);
     const newArr = [...obj];
     if (tail.length === 0) {
@@ -130,6 +165,8 @@ function applyOperationImmutable(document: PatchValue, operation: Operation): Pa
 
   switch (operation.op) {
     case 'add':
+      return addByPath(document, path, operation.value);
+
     case 'replace':
       return setByPath(document, path, operation.value);
 
@@ -146,7 +183,8 @@ function applyOperationImmutable(document: PatchValue, operation: Operation): Pa
       const fromPath = parsePath(operation.from);
       const value = getByPath(document, fromPath);
       const afterRemove = removeByPath(document, fromPath);
-      return setByPath(afterRemove, path, value);
+      // 目标位置沿用 add 的插入语义，否则数组上的 move 会覆盖掉目标索引之后的元素。
+      return addByPath(afterRemove, path, value);
     }
 
     case 'copy': {
