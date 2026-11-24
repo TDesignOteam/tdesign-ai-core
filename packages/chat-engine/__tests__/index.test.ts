@@ -403,5 +403,54 @@ describe('ChatEngine', () => {
 
   it.todo('sendUserMessage 等待并传播请求 promise（当前调用 sendRequest 时未等待其完成）');
 
-  it.todo('完成消息时忽略无关的更早消息上的错误状态');
+  it('历史失败消息不再影响后续轮次的完成状态结算', async () => {
+    const failedHistoryMessage = {
+      id: 'old-failed',
+      role: 'assistant' as const,
+      status: 'error' as const,
+      content: [{ type: 'text' as const, data: '上一轮失败', status: 'error' as const }],
+    };
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'sse' }, [failedHistoryMessage]);
+    await engine.sendAIMessage({ sendRequest: false });
+    const currentId = engine.messages[engine.messages.length - 1].id;
+    const onComplete = vi.fn();
+    engine.eventBus.on(ChatEngineEventType.REQUEST_COMPLETE, onComplete);
+
+    // 触发一次流式请求以取得处理器上下文，再模拟正常收尾
+    await engine.sendRequest({ prompt: 'hello', messageID: currentId });
+    const context = mocks.handlerInstances[0].handleStream.mock.calls[0][1] as {
+      handleComplete: (id: string, isAborted: boolean, params: ChatRequestParams) => void;
+    };
+    engine.messageStore.appendContent(currentId, { type: 'text', data: '本轮正常回答正文', status: 'streaming' });
+    context.handleComplete(currentId, false, { messageID: currentId });
+
+    const current = engine.messageStore.getMessageByID(currentId);
+    expect(current?.status).toBe('complete');
+    expect(current?.content[current.content.length - 1].status).toBe('complete');
+    expect(current?.content[current.content.length - 1].data).toBe('本轮正常回答正文');
+    // 历史失败消息保持原状
+    const historyMessage = engine.messageStore.getMessageByID('old-failed');
+    expect(historyMessage?.status).toBe('error');
+    expect(onComplete).toHaveBeenCalledWith(
+      expect.objectContaining({ messageId: currentId, params: { messageID: currentId } }),
+    );
+  });
+
+  it('当前消息内容块失败时整体仍结算为 error', async () => {
+    const engine = new ChatEngine();
+    await engine.init({ transport: 'sse' });
+    await engine.sendAIMessage({ sendRequest: false });
+    const currentId = engine.messages[engine.messages.length - 1].id;
+
+    await engine.sendRequest({ prompt: 'hello', messageID: currentId });
+    const context = mocks.handlerInstances[0].handleStream.mock.calls[0][1] as {
+      handleComplete: (id: string, isAborted: boolean, params: ChatRequestParams) => void;
+    };
+    engine.messageStore.appendContent(currentId, { type: 'text', data: '失败回答', status: 'error' });
+    context.handleComplete(currentId, false, { messageID: currentId });
+
+    const current = engine.messageStore.getMessageByID(currentId);
+    expect(current?.status).toBe('error');
+  });
 });
