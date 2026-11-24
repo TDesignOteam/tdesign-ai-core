@@ -1,5 +1,11 @@
 # Changelog
 
+## 🌈 0.1.1 `2026-11-24`
+
+### 🚀 Features
+
+- 支持AGUI协议 Interrupts 特性 @LzhengH ([#41](https://github.com/TDesignOteam/tdesign-ai-core/pull/41))
+
 ## 🌈 0.0.4 `2026-09-07`
 
 ### 🐞 Bug Fixes
