@@ -146,7 +146,7 @@ describe('LLMService', () => {
     expect(onError).toHaveBeenCalledWith(error);
   });
 
-  it.fails('只注册一个批量错误监听器而不是随请求累积', async () => {
+  it('只注册一个批量错误监听器而不是随请求累积', async () => {
     const service = new LLMService();
     const onError = vi.fn();
     const first = service.handleBatchRequest({}, { endpoint: '/chat', onError });
